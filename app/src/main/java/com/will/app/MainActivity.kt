@@ -1,4 +1,4 @@
-package com.example.helloworld
+package com.will.app
 
 import android.app.Activity
 import android.app.AlertDialog

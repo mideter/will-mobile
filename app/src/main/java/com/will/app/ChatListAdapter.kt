@@ -1,4 +1,4 @@
-package com.example.helloworld
+package com.will.app
 
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
