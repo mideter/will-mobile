@@ -5,9 +5,6 @@
     <string name="disconnect">Отключиться</string>
     <string name="message_hint">Сообщение…</string>
     <string name="send_arrow">→</string>
-    <string name="hint_login">Логин</string>
-    <string name="hint_password">Пароль</string>
-    <string name="auth_required">Укажите логин и пароль (как у сервера Will: AUTH user pass).</string>
     <string name="network_title">Сеть</string>
     <string name="chat_connecting">Подключение к серверу…</string>
     <string name="chat_connected">Соединение установлено.</string>

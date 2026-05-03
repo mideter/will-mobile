@@ -11,11 +11,7 @@ import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Аналог [WillChatBridge] из will/src/gui: TCP к серверу Will, отправка строк с \\n,
- * приём входящих сообщений в фоне и колбэки в главный поток.
- *
- * Сервер Will после connect ожидает строку `AUTH user pass\\n`; GUI на Qt её не шлёт,
- * поэтому здесь авторизация выполняется явно (как в CLI [ChatSession]).
+ * TCP к серверу: отправка строк с \\n, приём входящих сообщений в фоне и колбэки в главный поток.
  */
 class WillChatBridge {
 
@@ -37,7 +33,7 @@ class WillChatBridge {
         socket?.isConnected == true && !stopping.get()
     }
 
-    fun connectDefaultServer(username: String, password: String, listener: Listener) {
+    fun connectDefaultServer(listener: Listener) {
         disconnectServer()
         stopping.set(false)
 
@@ -49,20 +45,6 @@ class WillChatBridge {
 
                 val w = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))
                 val r = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
-
-                w.write("AUTH $username $password\n")
-                w.flush()
-
-                val authLine = r.readLine()
-                if (authLine == null || !authLine.startsWith("AUTH_OK")) {
-                    try {
-                        s.close()
-                    } catch (_: Exception) {
-                    }
-                    post(listener) { onError(authLine ?: "Нет ответа сервера") }
-                    post(listener) { onConnectionChanged(false) }
-                    return@Thread
-                }
 
                 synchronized(lock) {
                     if (stopping.get()) {

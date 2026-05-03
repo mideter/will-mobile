@@ -19,8 +19,6 @@ class MainActivity : Activity() {
     private lateinit var editMessage: EditText
     private lateinit var btnSend: Button
     private lateinit var btnConnect: Button
-    private lateinit var editLogin: EditText
-    private lateinit var editPassword: EditText
 
     private val bridgeListener = object : WillChatBridge.Listener {
         override fun onPeerMessage(text: String) {
@@ -59,8 +57,6 @@ class MainActivity : Activity() {
         editMessage = findViewById(R.id.editMessage)
         btnSend = findViewById(R.id.btnSend)
         btnConnect = findViewById(R.id.btnConnect)
-        editLogin = findViewById(R.id.editLogin)
-        editPassword = findViewById(R.id.editPassword)
 
         chatAdapter = ChatListAdapter(this)
         chatList.adapter = chatAdapter
@@ -128,18 +124,8 @@ class MainActivity : Activity() {
             return
         }
 
-        val user = editLogin.text?.toString()?.trim().orEmpty()
-        val pass = editPassword.text?.toString().orEmpty()
-        if (user.isEmpty() || pass.isEmpty()) {
-            AlertDialog.Builder(this)
-                .setMessage(R.string.auth_required)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-            return
-        }
-
         appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_connecting))
-        bridge.connectDefaultServer(user, pass, bridgeListener)
+        bridge.connectDefaultServer(bridgeListener)
     }
 
     private fun onSend() {
@@ -155,7 +141,5 @@ class MainActivity : Activity() {
         btnConnect.setText(if (connected) R.string.disconnect else R.string.connect)
         editMessage.isEnabled = connected
         btnSend.isEnabled = connected
-        editLogin.isEnabled = !connected
-        editPassword.isEnabled = !connected
     }
 }

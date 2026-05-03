@@ -19,39 +19,6 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <EditText
-                android:id="@+id/editLogin"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="@string/hint_login"
-                android:importantForAutofill="no"
-                android:inputType="text"
-                android:maxLines="1"
-                android:textColor="@color/will_ink"
-                android:textColorHint="@color/will_muted"
-                android:textSize="14sp" />
-
-            <EditText
-                android:id="@+id/editPassword"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:hint="@string/hint_password"
-                android:importantForAutofill="no"
-                android:inputType="textPassword"
-                android:maxLines="1"
-                android:textColor="@color/will_ink"
-                android:textColorHint="@color/will_muted"
-                android:textSize="14sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:gravity="end"
             android:orientation="horizontal"
             android:paddingTop="4dp">
