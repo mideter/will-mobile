@@ -131,10 +131,18 @@ class MainActivity : Activity() {
 
     private fun onSend() {
         if (!bridge.isConnected()) return
-        val text = editMessage.text?.toString()?.trim().orEmpty()
-        if (text.isEmpty()) return
-        appendChatLine(ChatLineKind.SELF, text)
-        bridge.sendLine(text)
+        val trimmed = editMessage.text?.toString()?.trim().orEmpty()
+        if (trimmed.isEmpty()) return
+        val maxLen = resources.getInteger(R.integer.max_message_length)
+        if (trimmed.length > maxLen) {
+            appendChatLine(
+                ChatLineKind.SYSTEM,
+                getString(R.string.chat_message_too_long, maxLen),
+            )
+            return
+        }
+        appendChatLine(ChatLineKind.SELF, trimmed)
+        bridge.sendLine(trimmed)
         editMessage.text?.clear()
     }
 

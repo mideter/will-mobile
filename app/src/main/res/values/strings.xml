@@ -12,4 +12,5 @@
     <string name="chat_error_prefix">Ошибка: %1$s</string>
     <string name="chat_self_prefix">Вы\n%1$s</string>
     <string name="chat_peer_prefix">Собеседник\n%1$s</string>
+    <string name="chat_message_too_long">Сообщение слишком длинное (не более %1$d символов).</string>
 </resources>
