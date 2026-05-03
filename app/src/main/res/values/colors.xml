@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#0D7377</color>
+    <color name="will_background">#ffffff</color>
+    <color name="will_ink">#1a1a1a</color>
+    <color name="will_muted">#787878</color>
+    <color name="will_row">#f8f8f8</color>
+    <color name="will_row_unread">#f1f8ff</color>
+    <color name="will_accent">#3b82f6</color>
+    <color name="will_divider">#ececec</color>
+    <color name="will_composer_bg">#fafafa</color>
 </resources>

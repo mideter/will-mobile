@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Hello World</string>
-    <string name="hello_world">Hello, World!</string>
+    <string name="app_name">Will</string>
+    <string name="connect">Подключиться</string>
+    <string name="disconnect">Отключиться</string>
+    <string name="message_hint">Сообщение…</string>
+    <string name="send_arrow">→</string>
+    <string name="hint_login">Логин</string>
+    <string name="hint_password">Пароль</string>
+    <string name="auth_required">Укажите логин и пароль (как у сервера Will: AUTH user pass).</string>
+    <string name="network_title">Сеть</string>
+    <string name="chat_connecting">Подключение к серверу…</string>
+    <string name="chat_connected">Соединение установлено.</string>
+    <string name="chat_disconnected">Отключено.</string>
+    <string name="chat_error_prefix">Ошибка: %1$s</string>
+    <string name="chat_self_prefix">Вы\n%1$s</string>
+    <string name="chat_peer_prefix">Собеседник\n%1$s</string>
 </resources>
