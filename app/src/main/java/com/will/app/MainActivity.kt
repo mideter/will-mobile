@@ -10,6 +10,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ListView
 
+
 class MainActivity : Activity() {
 
     private val bridge = WillChatBridge()

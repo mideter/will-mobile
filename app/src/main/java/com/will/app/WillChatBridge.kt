@@ -11,6 +11,7 @@ import java.net.Socket
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
+
 /**
  * TCP к серверу: отправка строк с \\n, приём входящих сообщений в фоне и колбэки в главный поток.
  */
