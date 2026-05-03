@@ -170,7 +170,7 @@ class WillChatBridge {
 
     companion object {
         private const val DEFAULT_HOST = "83.217.202.145"
-        private const val DEFAULT_PORT = 8080
+        private const val DEFAULT_PORT = 7770
         private const val CONNECT_TIMEOUT_MS = 15_000
     }
 }
