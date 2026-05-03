@@ -8,6 +8,7 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -28,6 +29,9 @@ class WillChatBridge {
     private var reader: BufferedReader? = null
     private var recvThread: Thread? = null
     private val stopping = AtomicBoolean(false)
+    private val sendExecutor = Executors.newSingleThreadExecutor { Thread(it, "will-send") }
+    /** Тот же [Listener], что передали в последний успешный/ожидающий connect — для ошибок отправки с фона. */
+    private var callbacks: Listener? = null
 
     fun isConnected(): Boolean = synchronized(lock) {
         socket?.isConnected == true && !stopping.get()
@@ -36,6 +40,7 @@ class WillChatBridge {
     fun connectDefaultServer(listener: Listener) {
         disconnectServer()
         stopping.set(false)
+        callbacks = listener
 
         val thread = Thread({
             try {
@@ -67,6 +72,7 @@ class WillChatBridge {
                     post(listener) { onConnectionChanged(false) }
                 }
                 cleanupLocked()
+                callbacks = null
             } finally {
                 synchronized(lock) {
                     if (recvThread === Thread.currentThread()) {
@@ -82,15 +88,22 @@ class WillChatBridge {
     }
 
     fun sendLine(line: String) {
-        try {
-            synchronized(lock) {
-                val w = writer ?: return
-                w.write(line)
-                w.write("\n")
-                w.flush()
+        // Сеть на UI-потоке даёт StrictMode → NetworkOnMainThreadException → сокет считают «сломанным».
+        sendExecutor.execute {
+            try {
+                synchronized(lock) {
+                    val w = writer ?: return@execute
+                    w.write(line)
+                    w.write("\n")
+                    w.flush()
+                }
+            } catch (e: Exception) {
+                val cb = callbacks
+                if (cb != null && !stopping.get()) {
+                    post(cb) { onError(e.message ?: e.toString()) }
+                }
+                disconnectServer()
             }
-        } catch (_: Exception) {
-            disconnectServer()
         }
     }
 
@@ -118,6 +131,7 @@ class WillChatBridge {
             recvThread = null
         }
         stopping.set(false)
+        callbacks = null
     }
 
     private fun recvLoop(r: BufferedReader, listener: Listener) {
