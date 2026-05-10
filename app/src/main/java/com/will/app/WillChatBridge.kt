@@ -2,18 +2,21 @@ package com.will.app
 
 import android.os.Handler
 import android.os.Looper
-import java.io.BufferedReader
-import java.io.BufferedWriter
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.EOFException
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
-
 /**
- * TCP к серверу: отправка строк с \\n, приём входящих сообщений в фоне и колбэки в главный поток.
+ * TCP к серверу Will: тот же кадровый протокол, что у `TcpFrame` в проекте will —
+ * **4 байта длины пейлоада (big-endian, uint32)** и **сырой UTF-8** без завершающего `\n`.
+ * Одна строка в UI чата отправляется и приходит как **один кадр**; приём — в потоке `will-recv`, колбэки — на главном потоке.
  */
 class WillChatBridge {
 
@@ -26,13 +29,16 @@ class WillChatBridge {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val lock = Any()
     private var socket: Socket? = null
-    private var writer: BufferedWriter? = null
-    private var reader: BufferedReader? = null
+    private var dataOut: DataOutputStream? = null
+    private var dataIn: DataInputStream? = null
     private var recvThread: Thread? = null
     private val stopping = AtomicBoolean(false)
     private val sendExecutor = Executors.newSingleThreadExecutor { Thread(it, "will-send") }
+
     /** Тот же [Listener], что передали в последний успешный/ожидающий connect — для ошибок отправки с фона. */
     private var callbacks: Listener? = null
+
+    private val headerScratch = ByteArray(4)
 
     fun isConnected(): Boolean = synchronized(lock) {
         socket?.isConnected == true && !stopping.get()
@@ -49,8 +55,8 @@ class WillChatBridge {
                 s.tcpNoDelay = true
                 s.connect(InetSocketAddress(DEFAULT_HOST, DEFAULT_PORT), CONNECT_TIMEOUT_MS)
 
-                val w = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))
-                val r = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
+                val socketIn = DataInputStream(s.getInputStream())
+                val socketOut = DataOutputStream(s.getOutputStream())
 
                 synchronized(lock) {
                     if (stopping.get()) {
@@ -61,12 +67,12 @@ class WillChatBridge {
                         return@Thread
                     }
                     socket = s
-                    writer = w
-                    reader = r
+                    dataIn = socketIn
+                    dataOut = socketOut
                 }
 
                 post(listener) { onConnectionChanged(true) }
-                recvLoop(r, listener)
+                recvLoop(socketIn, listener)
             } catch (e: Exception) {
                 if (!stopping.get()) {
                     post(listener) { onError(e.message ?: e.toString()) }
@@ -92,11 +98,23 @@ class WillChatBridge {
         // Сеть на UI-потоке даёт StrictMode → NetworkOnMainThreadException → сокет считают «сломанным».
         sendExecutor.execute {
             try {
+                val bytes = line.toByteArray(Charsets.UTF_8)
+                if (bytes.size > MAX_PAYLOAD_BYTES) {
+                    val cb = callbacks
+                    if (cb != null && !stopping.get()) {
+                        post(cb) {
+                            onError("Сообщение длиннее допустимого для протокола ($MAX_PAYLOAD_BYTES байт)")
+                        }
+                    }
+                    return@execute
+                }
                 synchronized(lock) {
-                    val w = writer ?: return@execute
-                    w.write(line)
-                    w.write("\n")
-                    w.flush()
+                    val out = dataOut ?: return@execute
+                    out.writeInt(bytes.size)
+                    if (bytes.isNotEmpty()) {
+                        out.write(bytes)
+                    }
+                    out.flush()
                 }
             } catch (e: Exception) {
                 val cb = callbacks
@@ -120,8 +138,8 @@ class WillChatBridge {
             } catch (_: Exception) {
             }
             socket = null
-            writer = null
-            reader = null
+            dataOut = null
+            dataIn = null
             recvThread
         }
         try {
@@ -135,12 +153,43 @@ class WillChatBridge {
         callbacks = null
     }
 
-    private fun recvLoop(r: BufferedReader, listener: Listener) {
+    private fun recvLoop(input: DataInputStream, listener: Listener) {
         try {
             while (!stopping.get()) {
-                val line = r.readLine() ?: break
-                if (line.isEmpty()) continue
-                post(listener) { onPeerMessage(line) }
+                try {
+                    input.readFully(headerScratch)
+                } catch (_: EOFException) {
+                    break
+                }
+                val payloadLenUnsigned =
+                    ByteBuffer.wrap(headerScratch).order(ByteOrder.BIG_ENDIAN).int.toLong() and 0xFFFF_FFFFL
+                if (payloadLenUnsigned > MAX_PAYLOAD_BYTES) {
+                    if (!stopping.get()) {
+                        post(listener) {
+                            onError("Некорректный заголовок кадра (длина вне допустимого диапазона)")
+                        }
+                    }
+                    break
+                }
+                val payloadLen = payloadLenUnsigned.toInt()
+                val body = if (payloadLen == 0) {
+                    ByteArray(0)
+                } else {
+                    try {
+                        ByteArray(payloadLen).also { input.readFully(it) }
+                    } catch (_: EOFException) {
+                        if (!stopping.get()) {
+                            post(listener) { onError("Соединение разорвано во время получения сообщения") }
+                        }
+                        break
+                    }
+                }
+                val text = String(body, Charsets.UTF_8)
+                post(listener) { onPeerMessage(text) }
+            }
+        } catch (_: IOException) {
+            if (!stopping.get()) {
+                post(listener) { onError("Соединение разорвано") }
             }
         } catch (_: Exception) {
             if (!stopping.get()) {
@@ -159,8 +208,8 @@ class WillChatBridge {
             } catch (_: Exception) {
             }
             socket = null
-            writer = null
-            reader = null
+            dataOut = null
+            dataIn = null
         }
     }
 
@@ -172,5 +221,8 @@ class WillChatBridge {
         private const val DEFAULT_HOST = "83.217.202.145"
         private const val DEFAULT_PORT = 7770
         private const val CONNECT_TIMEOUT_MS = 15_000
+
+        /** Как `TcpFrame::max_payload_bytes` в will: 2^20 байт. */
+        private const val MAX_PAYLOAD_BYTES = 1 shl 20
     }
 }
