@@ -54,6 +54,7 @@ class WillChatBridge {
                 val s = Socket()
                 s.tcpNoDelay = true
                 s.connect(InetSocketAddress(DEFAULT_HOST, DEFAULT_PORT), CONNECT_TIMEOUT_MS)
+                s.keepAlive = true
 
                 val socketIn = DataInputStream(s.getInputStream())
                 val socketOut = DataOutputStream(s.getOutputStream())
