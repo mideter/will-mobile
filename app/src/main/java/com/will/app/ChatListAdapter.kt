@@ -2,14 +2,12 @@ package com.will.app
 
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.ForegroundColorSpan
-import android.text.style.RelativeSizeSpan
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
+import android.widget.ImageView
 import android.widget.TextView
 
 enum class ChatLineKind { SYSTEM, SELF, PEER }
@@ -60,45 +58,40 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         val view = convertView ?: inflater.inflate(R.layout.item_chat_line, parent, false)
         val tv = view.findViewById<TextView>(R.id.chatLineText)
+        val icon = view.findViewById<ImageView>(R.id.serverReceiptIcon)
         val line = lines[position]
 
-        val display: CharSequence = when (line.kind) {
-            ChatLineKind.SYSTEM -> line.text
-            ChatLineKind.SELF -> selfLineCharSequence(line)
-            ChatLineKind.PEER -> context.getString(R.string.chat_peer_prefix, line.text)
-        }
-        tv.text = display
+        icon.visibility = View.GONE
+        icon.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        icon.contentDescription = null
 
         when (line.kind) {
             ChatLineKind.SYSTEM -> {
+                tv.text = line.text
+                tv.gravity = Gravity.START
                 tv.setTextColor(context.getColor(R.color.will_muted))
-                tv.background = null
+                view.background = null
             }
             ChatLineKind.SELF -> {
+                tv.text = context.getString(R.string.chat_self_prefix, line.text)
+                tv.gravity = Gravity.END
                 tv.setTextColor(context.getColor(R.color.will_ink))
-                tv.background = rowDrawable(R.color.will_row)
+                view.background = rowDrawable(R.color.will_row)
+                if (line.selfServerAcked) {
+                    icon.visibility = View.VISIBLE
+                    icon.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                    icon.contentDescription = context.getString(R.string.chat_server_receipt_cd)
+                }
             }
             ChatLineKind.PEER -> {
+                tv.text = context.getString(R.string.chat_peer_prefix, line.text)
+                tv.gravity = Gravity.START
                 tv.setTextColor(context.getColor(R.color.will_ink))
                 val bg = if (line.peerUnread) R.color.will_row_unread else R.color.will_row
-                tv.background = rowDrawable(bg)
+                view.background = rowDrawable(bg)
             }
         }
         return view
-    }
-
-    /** Одна приглушённая галочка: сервер подтвердил приём (WillMessage ack). */
-    private fun selfLineCharSequence(line: ChatLine): CharSequence {
-        val base = context.getString(R.string.chat_self_prefix, line.text)
-        if (!line.selfServerAcked) return base
-        val suffix = "  \u2713"
-        val ss = SpannableString(base + suffix)
-        val start = base.length
-        val end = ss.length
-        val tickColor = context.getColor(R.color.will_muted)
-        ss.setSpan(RelativeSizeSpan(0.78f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        ss.setSpan(ForegroundColorSpan(tickColor), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        return ss
     }
 
     private fun rowDrawable(colorRes: Int): GradientDrawable {

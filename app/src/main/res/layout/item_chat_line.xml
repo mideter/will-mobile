@@ -1,12 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/chatLineText"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:lineSpacingMultiplier="1.15"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
     android:paddingStart="18dp"
     android:paddingTop="14dp"
     android:paddingEnd="18dp"
-    android:paddingBottom="14dp"
-    android:textIsSelectable="false"
-    android:textSize="15sp" />
+    android:paddingBottom="14dp">
+
+    <TextView
+        android:id="@+id/chatLineText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:lineSpacingMultiplier="1.15"
+        android:textIsSelectable="false"
+        android:textSize="15sp" />
+
+    <ImageView
+        android:id="@+id/serverReceiptIcon"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_marginStart="6dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_server_receipt"
+        android:visibility="gone" />
+</LinearLayout>
