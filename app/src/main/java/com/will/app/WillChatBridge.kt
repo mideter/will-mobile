@@ -14,14 +14,19 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * TCP к серверу Will: тот же кадровый протокол, что у `TcpFrame` в проекте will —
- * **4 байта длины пейлоада (big-endian, uint32)** и **сырой UTF-8** без завершающего `\n`.
- * Одна строка в UI чата отправляется и приходит как **один кадр**; приём — в потоке `will-recv`, колбэки — на главном потоке.
+ * TCP к серверу Will: кадр как у `TcpFrame` (**4 байта длины пейлоада BE uint32** + пейлоад),
+ * внутри пейлоада — **`WillMessage` из проекта will**: первый байт типа, дальше тело.
+ *
+ * - клиент → сервер: `0x01` + UTF-8 текста (`kUserChat`);
+ * - сервер → клиент после приёма: отдельный кадр `0x02` (`kServerReceiptAck`);
+ * - сообщения от пиров: кадр `0x01` + UTF-8 (как рассылает сервер).
  */
 class WillChatBridge {
 
     interface Listener {
         fun onPeerMessage(text: String)
+        /** Отдельный кадр-подтверждение от сервера (не текст в чат). */
+        fun onServerReceiptConfirmed()
         fun onError(message: String)
         fun onConnectionChanged(connected: Boolean)
     }
@@ -99,22 +104,30 @@ class WillChatBridge {
         // Сеть на UI-потоке даёт StrictMode → NetworkOnMainThreadException → сокет считают «сломанным».
         sendExecutor.execute {
             try {
-                val bytes = line.toByteArray(Charsets.UTF_8)
-                if (bytes.size > MAX_PAYLOAD_BYTES) {
+                val utf8 = line.toByteArray(Charsets.UTF_8)
+                val payloadLen = 1 + utf8.size
+                if (payloadLen > MAX_PAYLOAD_BYTES) {
                     val cb = callbacks
                     if (cb != null && !stopping.get()) {
                         post(cb) {
-                            onError("Сообщение длиннее допустимого для протокола ($MAX_PAYLOAD_BYTES байт)")
+                            onError(
+                                "Сообщение длиннее допустимого для протокола " +
+                                    "(пейлоад не более $MAX_PAYLOAD_BYTES байт, с учётом типа)",
+                            )
                         }
                     }
                     return@execute
                 }
+                val payload = ByteArray(payloadLen).also {
+                    it[0] = USER_CHAT_TYPE
+                    if (utf8.isNotEmpty()) {
+                        System.arraycopy(utf8, 0, it, 1, utf8.size)
+                    }
+                }
                 synchronized(lock) {
                     val out = dataOut ?: return@execute
-                    out.writeInt(bytes.size)
-                    if (bytes.isNotEmpty()) {
-                        out.write(bytes)
-                    }
+                    out.writeInt(payload.size)
+                    out.write(payload)
                     out.flush()
                 }
             } catch (e: Exception) {
@@ -185,8 +198,18 @@ class WillChatBridge {
                         break
                     }
                 }
-                val text = String(body, Charsets.UTF_8)
-                post(listener) { onPeerMessage(text) }
+                when (val action = decodeInboundPayload(body)) {
+                    is InboundDecodeAction.PeerText -> post(listener) {
+                        onPeerMessage(action.text)
+                    }
+                    InboundDecodeAction.ServerAck -> post(listener) { onServerReceiptConfirmed() }
+                    is InboundDecodeAction.ProtocolError -> {
+                        if (!stopping.get()) {
+                            post(listener) { onError(action.message) }
+                        }
+                        break
+                    }
+                }
             }
         } catch (_: IOException) {
             if (!stopping.get()) {
@@ -218,6 +241,34 @@ class WillChatBridge {
         mainHandler.post { listener.block() }
     }
 
+    private sealed class InboundDecodeAction {
+        data class PeerText(val text: String) : InboundDecodeAction()
+        data object ServerAck : InboundDecodeAction()
+        data class ProtocolError(val message: String) : InboundDecodeAction()
+    }
+
+    /** Соответствует `MessengerClient::receiveMessage` / `WillMessage` в will. */
+    private fun decodeInboundPayload(body: ByteArray): InboundDecodeAction {
+        if (body.isEmpty()) {
+            return InboundDecodeAction.ProtocolError("Пустой пейлоад кадра (протокол WillMessage)")
+        }
+        val t = body[0].toInt() and 0xFF
+        if (body.size == 1 && t == SERVER_RECEIPT_ACK_TYPE) {
+            return InboundDecodeAction.ServerAck
+        }
+        if (body[0] == USER_CHAT_TYPE) {
+            val text = if (body.size == 1) {
+                ""
+            } else {
+                body.copyOfRange(1, body.size).decodeToString(Charsets.UTF_8)
+            }
+            return InboundDecodeAction.PeerText(text)
+        }
+        return InboundDecodeAction.ProtocolError(
+            "Неизвестный тип сообщения (0x${t.toString(16)}), длина ${body.size}",
+        )
+    }
+
     companion object {
         private const val DEFAULT_HOST = "83.217.202.145"
         private const val DEFAULT_PORT = 7770
@@ -225,5 +276,11 @@ class WillChatBridge {
 
         /** Как `TcpFrame::max_payload_bytes` в will: 2^20 байт. */
         private const val MAX_PAYLOAD_BYTES = 1 shl 20
+
+        /** `WillMessage::kUserChat` */
+        private const val USER_CHAT_TYPE: Byte = 1
+
+        /** `WillMessage::kServerReceiptAck` */
+        private const val SERVER_RECEIPT_ACK_TYPE = 2
     }
 }

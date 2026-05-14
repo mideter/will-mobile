@@ -28,6 +28,11 @@ class MainActivity : Activity() {
             appendChatLine(ChatLineKind.PEER, text, peerUnread = unread)
         }
 
+        override fun onServerReceiptConfirmed() {
+            if (isFinishing) return
+            appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_server_receipt))
+        }
+
         override fun onError(message: String) {
             if (isFinishing) return
             AlertDialog.Builder(this@MainActivity)
