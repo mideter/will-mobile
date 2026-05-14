@@ -73,7 +73,7 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
                 view.background = null
             }
             ChatLineKind.SELF -> {
-                tv.text = context.getString(R.string.chat_self_prefix, line.text)
+                tv.text = line.text
                 tv.gravity = Gravity.END
                 tv.setTextColor(context.getColor(R.color.will_ink))
                 view.background = rowDrawable(R.color.will_row)
@@ -84,7 +84,7 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
                 }
             }
             ChatLineKind.PEER -> {
-                tv.text = context.getString(R.string.chat_peer_prefix, line.text)
+                tv.text = line.text
                 tv.gravity = Gravity.START
                 tv.setTextColor(context.getColor(R.color.will_ink))
                 val bg = if (line.peerUnread) R.color.will_row_unread else R.color.will_row
