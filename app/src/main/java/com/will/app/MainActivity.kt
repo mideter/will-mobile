@@ -9,6 +9,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ListView
+import java.util.ArrayDeque
 
 
 class MainActivity : Activity() {
@@ -21,6 +22,9 @@ class MainActivity : Activity() {
     private lateinit var btnSend: Button
     private lateinit var btnConnect: Button
 
+    /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
+    private val pendingSelfAckPositions = ArrayDeque<Int>()
+
     private val bridgeListener = object : WillChatBridge.Listener {
         override fun onPeerMessage(text: String) {
             if (isFinishing) return
@@ -30,7 +34,8 @@ class MainActivity : Activity() {
 
         override fun onServerReceiptConfirmed() {
             if (isFinishing) return
-            appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_server_receipt))
+            val pos = pendingSelfAckPositions.pollFirst() ?: return
+            chatAdapter.markSelfServerAckedAt(pos)
         }
 
         override fun onError(message: String) {
@@ -45,6 +50,9 @@ class MainActivity : Activity() {
 
         override fun onConnectionChanged(connected: Boolean) {
             if (isFinishing) return
+            if (!connected) {
+                pendingSelfAckPositions.clear()
+            }
             setConnectedUi(connected)
             if (connected) {
                 appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_connected))
@@ -147,6 +155,7 @@ class MainActivity : Activity() {
             return
         }
         appendChatLine(ChatLineKind.SELF, trimmed)
+        pendingSelfAckPositions.addLast(chatAdapter.count - 1)
         bridge.sendLine(trimmed)
         editMessage.text?.clear()
     }

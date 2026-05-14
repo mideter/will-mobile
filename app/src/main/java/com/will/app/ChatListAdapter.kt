@@ -2,6 +2,10 @@ package com.will.app
 
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +18,8 @@ data class ChatLine(
     val kind: ChatLineKind,
     val text: String,
     var peerUnread: Boolean = false,
+    /** Только для [ChatLineKind.SELF]: сервер принял кадр (WillMessage ack). */
+    var selfServerAcked: Boolean = false,
 )
 
 class ChatListAdapter(private val context: Context) : BaseAdapter() {
@@ -37,6 +43,14 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         if (changed) notifyDataSetChanged()
     }
 
+    fun markSelfServerAckedAt(position: Int) {
+        if (position < 0 || position >= lines.size) return
+        val line = lines[position]
+        if (line.kind != ChatLineKind.SELF || line.selfServerAcked) return
+        line.selfServerAcked = true
+        notifyDataSetChanged()
+    }
+
     override fun getCount(): Int = lines.size
 
     override fun getItem(position: Int): ChatLine = lines[position]
@@ -48,9 +62,9 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         val tv = view.findViewById<TextView>(R.id.chatLineText)
         val line = lines[position]
 
-        val display = when (line.kind) {
+        val display: CharSequence = when (line.kind) {
             ChatLineKind.SYSTEM -> line.text
-            ChatLineKind.SELF -> context.getString(R.string.chat_self_prefix, line.text)
+            ChatLineKind.SELF -> selfLineCharSequence(line)
             ChatLineKind.PEER -> context.getString(R.string.chat_peer_prefix, line.text)
         }
         tv.text = display
@@ -71,6 +85,20 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
             }
         }
         return view
+    }
+
+    /** Одна приглушённая галочка: сервер подтвердил приём (WillMessage ack). */
+    private fun selfLineCharSequence(line: ChatLine): CharSequence {
+        val base = context.getString(R.string.chat_self_prefix, line.text)
+        if (!line.selfServerAcked) return base
+        val suffix = "  \u2713"
+        val ss = SpannableString(base + suffix)
+        val start = base.length
+        val end = ss.length
+        val tickColor = context.getColor(R.color.will_muted)
+        ss.setSpan(RelativeSizeSpan(0.78f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        ss.setSpan(ForegroundColorSpan(tickColor), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        return ss
     }
 
     private fun rowDrawable(colorRes: Int): GradientDrawable {

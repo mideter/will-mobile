@@ -260,7 +260,7 @@ class WillChatBridge {
             val text = if (body.size == 1) {
                 ""
             } else {
-                body.copyOfRange(1, body.size).decodeToString(Charsets.UTF_8)
+                body.decodeToString(1, body.size)
             }
             return InboundDecodeAction.PeerText(text)
         }
