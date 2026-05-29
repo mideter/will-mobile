@@ -9,6 +9,8 @@ import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ListView
+import android.widget.TextView
+import android.widget.Toast
 import java.util.ArrayDeque
 
 
@@ -21,6 +23,7 @@ class MainActivity : Activity() {
     private lateinit var editMessage: EditText
     private lateinit var btnSend: Button
     private lateinit var btnConnect: Button
+    private lateinit var connectionStatus: TextView
 
     /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
     private val pendingSelfAckPositions = ArrayDeque<Int>()
@@ -51,7 +54,7 @@ class MainActivity : Activity() {
             if (isFinishing) return
             historyLoaded = true
             setComposerEnabled(true)
-            appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_connected))
+            setConnectionStatus(null)
         }
 
         override fun onError(message: String) {
@@ -61,7 +64,7 @@ class MainActivity : Activity() {
                 .setMessage(message)
                 .setPositiveButton(android.R.string.ok, null)
                 .show()
-            appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_error_prefix, message))
+            setConnectionStatus(null)
         }
 
         override fun onConnectionChanged(connected: Boolean) {
@@ -70,12 +73,12 @@ class MainActivity : Activity() {
                 historyLoaded = false
                 pendingSelfAckPositions.clear()
                 setConnectedUi(connected = false)
-                appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_disconnected))
+                setConnectionStatus(R.string.chat_disconnected)
                 return
             }
             historyLoaded = false
             setConnectedUi(connected = true, composerEnabled = false)
-            appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_loading_history))
+            setConnectionStatus(R.string.chat_loading_history)
         }
     }
 
@@ -88,6 +91,7 @@ class MainActivity : Activity() {
         editMessage = findViewById(R.id.editMessage)
         btnSend = findViewById(R.id.btnSend)
         btnConnect = findViewById(R.id.btnConnect)
+        connectionStatus = findViewById(R.id.connectionStatus)
 
         chatAdapter = ChatListAdapter(this)
         chatList.adapter = chatAdapter
@@ -149,6 +153,16 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun setConnectionStatus(textRes: Int?) {
+        if (textRes == null) {
+            connectionStatus.text = ""
+            connectionStatus.visibility = View.GONE
+        } else {
+            connectionStatus.setText(textRes)
+            connectionStatus.visibility = View.VISIBLE
+        }
+    }
+
     private fun onToggleConnect() {
         if (bridge.isConnected()) {
             bridge.disconnectServer()
@@ -158,7 +172,7 @@ class MainActivity : Activity() {
         chatAdapter.clear()
         pendingSelfAckPositions.clear()
         historyLoaded = false
-        appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_connecting))
+        setConnectionStatus(R.string.chat_connecting)
         bridge.connectDefaultServer(bridgeListener)
     }
 
@@ -168,10 +182,11 @@ class MainActivity : Activity() {
         if (trimmed.isEmpty()) return
         val maxLen = resources.getInteger(R.integer.max_message_length)
         if (trimmed.length > maxLen) {
-            appendChatLine(
-                ChatLineKind.SYSTEM,
+            Toast.makeText(
+                this,
                 getString(R.string.chat_message_too_long, maxLen),
-            )
+                Toast.LENGTH_SHORT,
+            ).show()
             return
         }
         appendChatLine(ChatLineKind.SELF, trimmed)

@@ -38,6 +38,18 @@
                 android:textColor="@color/will_ink"
                 android:textSize="13sp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/connectionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="2dp"
+            android:paddingBottom="6dp"
+            android:textColor="@color/will_muted"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="@string/chat_connecting"
+            tools:visibility="visible" />
     </LinearLayout>
 
     <ListView
