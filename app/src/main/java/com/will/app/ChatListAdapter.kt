@@ -30,6 +30,12 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         notifyDataSetChanged()
     }
 
+    fun clear() {
+        if (lines.isEmpty()) return
+        lines.clear()
+        notifyDataSetChanged()
+    }
+
     fun markPeerRead() {
         var changed = false
         for (line in lines) {

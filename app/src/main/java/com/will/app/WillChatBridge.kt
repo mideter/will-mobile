@@ -17,9 +17,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * TCP к серверу Will: кадр как у `TcpFrame` (**4 байта длины пейлоада BE uint32** + пейлоад),
  * внутри пейлоада — **`WillMessage` из проекта will**: первый байт типа, дальше тело.
  *
- * - клиент → сервер: `0x01` + UTF-8 текста (`kUserChat`);
- * - сервер → клиент после приёма: отдельный кадр `0x02` (`kServerReceiptAck`);
- * - сообщения от пиров: кадр `0x01` + UTF-8 (как рассылает сервер).
+ * - клиент → сервер: `0x01` + UTF-8 (`UserChat`), `0x03` + u32 BE limit (`HistoryRequest`);
+ * - сервер → клиент: `0x02` ack, `0x01` peer chat, `0x04`/`0x05` история.
  */
 class WillChatBridge {
 
@@ -27,6 +26,8 @@ class WillChatBridge {
         fun onPeerMessage(text: String)
         /** Отдельный кадр-подтверждение от сервера (не текст в чат). */
         fun onServerReceiptConfirmed()
+        fun onHistoryItem(text: String, isMine: Boolean)
+        fun onHistoryLoaded()
         fun onError(message: String)
         fun onConnectionChanged(connected: Boolean)
     }
@@ -78,6 +79,7 @@ class WillChatBridge {
                 }
 
                 post(listener) { onConnectionChanged(true) }
+                requestHistoryOnConnectThread(HISTORY_LIMIT_ON_CONNECT)
                 recvLoop(socketIn, listener)
             } catch (e: Exception) {
                 if (!stopping.get()) {
@@ -124,12 +126,7 @@ class WillChatBridge {
                         System.arraycopy(utf8, 0, it, 1, utf8.size)
                     }
                 }
-                synchronized(lock) {
-                    val out = dataOut ?: return@execute
-                    out.writeInt(payload.size)
-                    out.write(payload)
-                    out.flush()
-                }
+                sendPayloadLocked(payload)
             } catch (e: Exception) {
                 val cb = callbacks
                 if (cb != null && !stopping.get()) {
@@ -165,6 +162,32 @@ class WillChatBridge {
         }
         stopping.set(false)
         callbacks = null
+    }
+
+    /** На потоке connect, до [recvLoop]. */
+    private fun requestHistoryOnConnectThread(limit: Int) {
+        if (limit !in 1..MAX_HISTORY_REQUEST_LIMIT) {
+            throw IllegalArgumentException(
+                "Лимит истории должен быть от 1 до $MAX_HISTORY_REQUEST_LIMIT",
+            )
+        }
+        val payload = ByteArray(5).also {
+            it[0] = HISTORY_REQUEST_TYPE
+            ByteBuffer.wrap(it, 1, 4).order(ByteOrder.BIG_ENDIAN).putInt(limit)
+        }
+        synchronized(lock) {
+            sendPayloadLocked(payload)
+        }
+    }
+
+    private fun sendPayloadLocked(payload: ByteArray) {
+        if (payload.size > MAX_PAYLOAD_BYTES) {
+            throw IOException("Пейлоад превышает лимит протокола")
+        }
+        val out = dataOut ?: throw IOException("Нет соединения")
+        out.writeInt(payload.size)
+        out.write(payload)
+        out.flush()
     }
 
     private fun recvLoop(input: DataInputStream, listener: Listener) {
@@ -203,6 +226,10 @@ class WillChatBridge {
                         onPeerMessage(action.text)
                     }
                     InboundDecodeAction.ServerAck -> post(listener) { onServerReceiptConfirmed() }
+                    is InboundDecodeAction.HistoryItem -> post(listener) {
+                        onHistoryItem(action.text, action.isMine)
+                    }
+                    InboundDecodeAction.HistoryEnd -> post(listener) { onHistoryLoaded() }
                     is InboundDecodeAction.ProtocolError -> {
                         if (!stopping.get()) {
                             post(listener) { onError(action.message) }
@@ -244,10 +271,12 @@ class WillChatBridge {
     private sealed class InboundDecodeAction {
         data class PeerText(val text: String) : InboundDecodeAction()
         data object ServerAck : InboundDecodeAction()
+        data class HistoryItem(val text: String, val isMine: Boolean) : InboundDecodeAction()
+        data object HistoryEnd : InboundDecodeAction()
         data class ProtocolError(val message: String) : InboundDecodeAction()
     }
 
-    /** Соответствует `MessengerClient::receiveMessage` / `WillMessage` в will. */
+    /** Соответствует `WillClient::receiveMessage` / `WillMessage` в will. */
     private fun decodeInboundPayload(body: ByteArray): InboundDecodeAction {
         if (body.isEmpty()) {
             return InboundDecodeAction.ProtocolError("Пустой пейлоад кадра (протокол WillMessage)")
@@ -256,6 +285,9 @@ class WillChatBridge {
         if (body.size == 1 && t == SERVER_RECEIPT_ACK_TYPE) {
             return InboundDecodeAction.ServerAck
         }
+        if (body.size == 1 && t == HISTORY_END_TYPE) {
+            return InboundDecodeAction.HistoryEnd
+        }
         if (body[0] == USER_CHAT_TYPE) {
             val text = if (body.size == 1) {
                 ""
@@ -263,6 +295,22 @@ class WillChatBridge {
                 body.decodeToString(1, body.size)
             }
             return InboundDecodeAction.PeerText(text)
+        }
+        if (t == HISTORY_ITEM_TYPE) {
+            if (body.size < 14) {
+                return InboundDecodeAction.ProtocolError("Некорректный HistoryItem (слишком короткий)")
+            }
+            val bodyLen = ByteBuffer.wrap(body, 10, 4).order(ByteOrder.BIG_ENDIAN).int
+            if (bodyLen < 0 || 14 + bodyLen != body.size) {
+                return InboundDecodeAction.ProtocolError("Некорректный HistoryItem (длина тела)")
+            }
+            val isMine = body[9] != 0.toByte()
+            val text = if (bodyLen == 0) {
+                ""
+            } else {
+                body.decodeToString(14, body.size)
+            }
+            return InboundDecodeAction.HistoryItem(text, isMine)
         }
         return InboundDecodeAction.ProtocolError(
             "Неизвестный тип сообщения (0x${t.toString(16)}), длина ${body.size}",
@@ -277,10 +325,25 @@ class WillChatBridge {
         /** Как `TcpFrame::max_payload_bytes` в will: 2^20 байт. */
         private const val MAX_PAYLOAD_BYTES = 1 shl 20
 
-        /** `WillMessage::kUserChat` */
+        /** `WillMessage::MaxHistoryRequestLimit` */
+        private const val MAX_HISTORY_REQUEST_LIMIT = 1000
+
+        /** Как `--history N` в will-client. */
+        private const val HISTORY_LIMIT_ON_CONNECT = 50
+
+        /** `WillMessage::UserChat` */
         private const val USER_CHAT_TYPE: Byte = 1
 
-        /** `WillMessage::kServerReceiptAck` */
+        /** `WillMessage::ServerReceiptAck` */
         private const val SERVER_RECEIPT_ACK_TYPE = 2
+
+        /** `WillMessage::HistoryRequest` */
+        private const val HISTORY_REQUEST_TYPE: Byte = 3
+
+        /** `WillMessage::HistoryItem` */
+        private const val HISTORY_ITEM_TYPE = 4
+
+        /** `WillMessage::HistoryEnd` */
+        private const val HISTORY_END_TYPE = 5
     }
 }

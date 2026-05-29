@@ -25,6 +25,9 @@ class MainActivity : Activity() {
     /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
     private val pendingSelfAckPositions = ArrayDeque<Int>()
 
+    /** История с сервера получена; можно отправлять сообщения. */
+    private var historyLoaded = false
+
     private val bridgeListener = object : WillChatBridge.Listener {
         override fun onPeerMessage(text: String) {
             if (isFinishing) return
@@ -36,6 +39,19 @@ class MainActivity : Activity() {
             if (isFinishing) return
             val pos = pendingSelfAckPositions.pollFirst() ?: return
             chatAdapter.markSelfServerAckedAt(pos)
+        }
+
+        override fun onHistoryItem(text: String, isMine: Boolean) {
+            if (isFinishing) return
+            val kind = if (isMine) ChatLineKind.SELF else ChatLineKind.PEER
+            appendChatLine(kind, text)
+        }
+
+        override fun onHistoryLoaded() {
+            if (isFinishing) return
+            historyLoaded = true
+            setComposerEnabled(true)
+            appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_connected))
         }
 
         override fun onError(message: String) {
@@ -51,14 +67,15 @@ class MainActivity : Activity() {
         override fun onConnectionChanged(connected: Boolean) {
             if (isFinishing) return
             if (!connected) {
+                historyLoaded = false
                 pendingSelfAckPositions.clear()
-            }
-            setConnectedUi(connected)
-            if (connected) {
-                appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_connected))
-            } else {
+                setConnectedUi(connected = false)
                 appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_disconnected))
+                return
             }
+            historyLoaded = false
+            setConnectedUi(connected = true, composerEnabled = false)
+            appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_loading_history))
         }
     }
 
@@ -115,7 +132,7 @@ class MainActivity : Activity() {
     private fun showComposer() {
         if (composerWrap.visibility == View.VISIBLE) return
         composerWrap.visibility = View.VISIBLE
-        if (bridge.isConnected()) {
+        if (bridge.isConnected() && historyLoaded) {
             editMessage.requestFocus()
         }
     }
@@ -138,12 +155,15 @@ class MainActivity : Activity() {
             return
         }
 
+        chatAdapter.clear()
+        pendingSelfAckPositions.clear()
+        historyLoaded = false
         appendChatLine(ChatLineKind.SYSTEM, getString(R.string.chat_connecting))
         bridge.connectDefaultServer(bridgeListener)
     }
 
     private fun onSend() {
-        if (!bridge.isConnected()) return
+        if (!bridge.isConnected() || !historyLoaded) return
         val trimmed = editMessage.text?.toString()?.trim().orEmpty()
         if (trimmed.isEmpty()) return
         val maxLen = resources.getInteger(R.integer.max_message_length)
@@ -160,9 +180,13 @@ class MainActivity : Activity() {
         editMessage.text?.clear()
     }
 
-    private fun setConnectedUi(connected: Boolean) {
+    private fun setConnectedUi(connected: Boolean, composerEnabled: Boolean = connected) {
         btnConnect.setText(if (connected) R.string.disconnect else R.string.connect)
-        editMessage.isEnabled = connected
-        btnSend.isEnabled = connected
+        setComposerEnabled(composerEnabled)
+    }
+
+    private fun setComposerEnabled(enabled: Boolean) {
+        editMessage.isEnabled = enabled
+        btnSend.isEnabled = enabled
     }
 }

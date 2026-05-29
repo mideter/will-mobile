@@ -7,6 +7,7 @@
     <string name="send_arrow">→</string>
     <string name="network_title">Сеть</string>
     <string name="chat_connecting">Подключение к серверу…</string>
+    <string name="chat_loading_history">Загрузка истории…</string>
     <string name="chat_connected">Соединение установлено.</string>
     <string name="chat_disconnected">Отключено.</string>
     <string name="chat_error_prefix">Ошибка: %1$s</string>
