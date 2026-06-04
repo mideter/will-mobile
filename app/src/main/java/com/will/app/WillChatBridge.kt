@@ -17,8 +17,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * TCP к серверу Will: кадр как у `TcpFrame` (**4 байта длины пейлоада BE uint32** + пейлоад),
  * внутри пейлоада — **`WillMessage` из проекта will**: первый байт типа, дальше тело.
  *
- * - клиент → сервер: `0x01` + UTF-8 (`UserChat`), `0x03` + u32 BE limit (`HistoryRequest`);
- * - сервер → клиент: `0x02` ack, `0x01` peer chat, `0x04`/`0x05` история.
+ * Handshake (как `WillClient::authenticate`): `LoginRequest` → `LoginResponse` → `BindToken`,
+ * затем `HistoryRequest` и приём истории/чата.
+ *
+ * - клиент → сервер: `0x01` UserChat, `0x03` HistoryRequest, `0x06` LoginRequest, `0x08` BindToken;
+ * - сервер → клиент: `0x02` ack, `0x01` peer chat, `0x04`/`0x05` история, `0x07` LoginResponse, `0x09` AuthRequired.
  */
 class WillChatBridge {
 
@@ -30,6 +33,7 @@ class WillChatBridge {
         fun onHistoryLoaded()
         fun onError(message: String)
         fun onConnectionChanged(connected: Boolean)
+        fun onAuthenticating() {}
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -50,7 +54,7 @@ class WillChatBridge {
         socket?.isConnected == true && !stopping.get()
     }
 
-    fun connectDefaultServer(listener: Listener) {
+    fun connect(host: String, port: Int, login: String, password: String, listener: Listener) {
         disconnectServer()
         stopping.set(false)
         callbacks = listener
@@ -59,7 +63,7 @@ class WillChatBridge {
             try {
                 val s = Socket()
                 s.tcpNoDelay = true
-                s.connect(InetSocketAddress(DEFAULT_HOST, DEFAULT_PORT), CONNECT_TIMEOUT_MS)
+                s.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
                 s.keepAlive = true
 
                 val socketIn = DataInputStream(s.getInputStream())
@@ -78,6 +82,10 @@ class WillChatBridge {
                     dataOut = socketOut
                 }
 
+                post(listener) { onAuthenticating() }
+                synchronized(lock) {
+                    authenticateBlocking(login, password, socketIn)
+                }
                 post(listener) { onConnectionChanged(true) }
                 requestHistoryOnConnectThread(HISTORY_LIMIT_ON_CONNECT)
                 recvLoop(socketIn, listener)
@@ -164,6 +172,14 @@ class WillChatBridge {
         callbacks = null
     }
 
+    private fun authenticateBlocking(login: String, password: String, input: DataInputStream) {
+        sendPayloadLocked(encodeLoginRequest(login, password))
+        val response = readPayloadBlocking(input)
+        val token = parseLoginResponseToken(response)
+            ?: throw IOException(loginFailureMessage(response))
+        sendPayloadLocked(encodeBindToken(token))
+    }
+
     /** На потоке connect, до [recvLoop]. */
     private fun requestHistoryOnConnectThread(limit: Int) {
         if (limit !in 1..MAX_HISTORY_REQUEST_LIMIT) {
@@ -190,36 +206,38 @@ class WillChatBridge {
         out.flush()
     }
 
+    private fun readPayloadBlocking(input: DataInputStream): ByteArray {
+        try {
+            input.readFully(headerScratch)
+        } catch (_: EOFException) {
+            throw IOException("Соединение разорвано")
+        }
+        val payloadLenUnsigned =
+            ByteBuffer.wrap(headerScratch).order(ByteOrder.BIG_ENDIAN).int.toLong() and 0xFFFF_FFFFL
+        if (payloadLenUnsigned > MAX_PAYLOAD_BYTES) {
+            throw IOException("Некорректный заголовок кадра (длина вне допустимого диапазона)")
+        }
+        val payloadLen = payloadLenUnsigned.toInt()
+        if (payloadLen == 0) {
+            throw IOException("Пустой пейлоад кадра (протокол WillMessage)")
+        }
+        return try {
+            ByteArray(payloadLen).also { input.readFully(it) }
+        } catch (_: EOFException) {
+            throw IOException("Соединение разорвано во время получения сообщения")
+        }
+    }
+
     private fun recvLoop(input: DataInputStream, listener: Listener) {
         try {
             while (!stopping.get()) {
-                try {
-                    input.readFully(headerScratch)
-                } catch (_: EOFException) {
-                    break
-                }
-                val payloadLenUnsigned =
-                    ByteBuffer.wrap(headerScratch).order(ByteOrder.BIG_ENDIAN).int.toLong() and 0xFFFF_FFFFL
-                if (payloadLenUnsigned > MAX_PAYLOAD_BYTES) {
+                val body = try {
+                    readPayloadBlocking(input)
+                } catch (e: IOException) {
                     if (!stopping.get()) {
-                        post(listener) {
-                            onError("Некорректный заголовок кадра (длина вне допустимого диапазона)")
-                        }
+                        post(listener) { onError(e.message ?: e.toString()) }
                     }
                     break
-                }
-                val payloadLen = payloadLenUnsigned.toInt()
-                val body = if (payloadLen == 0) {
-                    ByteArray(0)
-                } else {
-                    try {
-                        ByteArray(payloadLen).also { input.readFully(it) }
-                    } catch (_: EOFException) {
-                        if (!stopping.get()) {
-                            post(listener) { onError("Соединение разорвано во время получения сообщения") }
-                        }
-                        break
-                    }
                 }
                 when (val action = decodeInboundPayload(body)) {
                     is InboundDecodeAction.PeerText -> post(listener) {
@@ -288,6 +306,9 @@ class WillChatBridge {
         if (body.size == 1 && t == HISTORY_END_TYPE) {
             return InboundDecodeAction.HistoryEnd
         }
+        if (body.size == 1 && t == AUTH_REQUIRED_TYPE) {
+            return InboundDecodeAction.ProtocolError("Требуется авторизация (BindToken на сессии)")
+        }
         if (body[0] == USER_CHAT_TYPE) {
             val text = if (body.size == 1) {
                 ""
@@ -312,18 +333,25 @@ class WillChatBridge {
             }
             return InboundDecodeAction.HistoryItem(text, isMine)
         }
+        if (t == LOGIN_RESPONSE_TYPE) {
+            return InboundDecodeAction.ProtocolError("Неожиданный LoginResponse после авторизации")
+        }
         return InboundDecodeAction.ProtocolError(
             "Неизвестный тип сообщения (0x${t.toString(16)}), длина ${body.size}",
         )
     }
 
     companion object {
-        private const val DEFAULT_HOST = "83.217.202.145"
-        private const val DEFAULT_PORT = 7770
+        const val DEFAULT_HOST = "83.217.202.145"
+        const val DEFAULT_PORT = 7770
+
         private const val CONNECT_TIMEOUT_MS = 15_000
 
         /** Как `TcpFrame::max_payload_bytes` в will: 2^20 байт. */
-        private const val MAX_PAYLOAD_BYTES = 1 shl 20
+        const val MAX_PAYLOAD_BYTES = 1 shl 20
+
+        /** `WillMessage::MaxAuthFieldBytes` */
+        const val MAX_AUTH_FIELD_BYTES = 4096
 
         /** `WillMessage::MaxHistoryRequestLimit` */
         private const val MAX_HISTORY_REQUEST_LIMIT = 1000
@@ -345,5 +373,102 @@ class WillChatBridge {
 
         /** `WillMessage::HistoryEnd` */
         private const val HISTORY_END_TYPE = 5
+
+        /** `WillMessage::LoginRequest` */
+        private const val LOGIN_REQUEST_TYPE: Byte = 6
+
+        /** `WillMessage::LoginResponse` */
+        private const val LOGIN_RESPONSE_TYPE = 7
+
+        /** `WillMessage::BindToken` */
+        private const val BIND_TOKEN_TYPE: Byte = 8
+
+        /** `WillMessage::AuthRequired` */
+        private const val AUTH_REQUIRED_TYPE = 9
+
+        /** `WillMessage::LoginErrorInvalidCredentials` */
+        private const val LOGIN_ERROR_INVALID_CREDENTIALS: Int = 1
+
+        /** `WillMessage::LoginErrorExpiredToken` */
+        private const val LOGIN_ERROR_EXPIRED_TOKEN: Int = 2
+
+        fun encodeLoginRequest(login: String, password: String): ByteArray {
+            val loginBytes = login.toByteArray(Charsets.UTF_8)
+            val passwordBytes = password.toByteArray(Charsets.UTF_8)
+            if (login.isEmpty() || password.isEmpty()) {
+                throw IllegalArgumentException("Логин и пароль не могут быть пустыми")
+            }
+            if (loginBytes.size > MAX_AUTH_FIELD_BYTES || passwordBytes.size > MAX_AUTH_FIELD_BYTES) {
+                throw IllegalArgumentException(
+                    "Логин или пароль длиннее $MAX_AUTH_FIELD_BYTES байт UTF-8",
+                )
+            }
+            val out = ByteArray(1 + 4 + loginBytes.size + 4 + passwordBytes.size)
+            var offset = 0
+            out[offset++] = LOGIN_REQUEST_TYPE
+            offset = appendLengthPrefixedField(out, offset, loginBytes)
+            appendLengthPrefixedField(out, offset, passwordBytes)
+            return out
+        }
+
+        fun encodeBindToken(token: String): ByteArray {
+            val tokenBytes = token.toByteArray(Charsets.UTF_8)
+            if (token.isEmpty()) {
+                throw IllegalArgumentException("Токен не может быть пустым")
+            }
+            if (tokenBytes.size > MAX_AUTH_FIELD_BYTES) {
+                throw IllegalArgumentException("Токен длиннее $MAX_AUTH_FIELD_BYTES байт UTF-8")
+            }
+            val out = ByteArray(1 + 4 + tokenBytes.size)
+            var offset = 0
+            out[offset++] = BIND_TOKEN_TYPE
+            appendLengthPrefixedField(out, offset, tokenBytes)
+            return out
+        }
+
+        private fun appendLengthPrefixedField(buf: ByteArray, offset: Int, field: ByteArray): Int {
+            ByteBuffer.wrap(buf, offset, 4).order(ByteOrder.BIG_ENDIAN).putInt(field.size)
+            var next = offset + 4
+            if (field.isNotEmpty()) {
+                System.arraycopy(field, 0, buf, next, field.size)
+                next += field.size
+            }
+            return next
+        }
+
+        private fun parseLoginResponseToken(payload: ByteArray): String? {
+            if (payload.isEmpty() || payload[0].toInt() and 0xFF != LOGIN_RESPONSE_TYPE) {
+                return null
+            }
+            if (payload.size < 2) {
+                return null
+            }
+            val success = payload[1] != 0.toByte()
+            if (!success) {
+                return null
+            }
+            if (payload.size < 6) {
+                return null
+            }
+            val tokenLen = ByteBuffer.wrap(payload, 2, 4).order(ByteOrder.BIG_ENDIAN).int
+            if (tokenLen <= 0 || tokenLen > MAX_AUTH_FIELD_BYTES || 6 + tokenLen != payload.size) {
+                return null
+            }
+            return payload.decodeToString(6, payload.size)
+        }
+
+        private fun loginFailureMessage(payload: ByteArray): String {
+            if (payload.size == 3 &&
+                payload[0].toInt() and 0xFF == LOGIN_RESPONSE_TYPE &&
+                payload[1] == 0.toByte()
+            ) {
+                return when (payload[2].toInt() and 0xFF) {
+                    LOGIN_ERROR_INVALID_CREDENTIALS -> "Неверный логин или пароль"
+                    LOGIN_ERROR_EXPIRED_TOKEN -> "Сессия истекла, войдите снова"
+                    else -> "Ошибка входа (код ${payload[2].toInt() and 0xFF})"
+                }
+            }
+            return "Ошибка входа"
+        }
     }
 }

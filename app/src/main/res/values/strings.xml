@@ -6,8 +6,13 @@
     <string name="message_hint">Сообщение…</string>
     <string name="send_arrow">→</string>
     <string name="network_title">Сеть</string>
+    <string name="login_hint">Логин</string>
+    <string name="password_hint">Пароль</string>
     <string name="chat_connecting">Подключение к серверу…</string>
+    <string name="chat_authenticating">Вход на сервер…</string>
     <string name="chat_loading_history">Загрузка истории…</string>
+    <string name="chat_login_empty">Введите логин и пароль</string>
+    <string name="chat_auth_field_too_long">Логин или пароль длиннее %1$d байт UTF-8</string>
     <string name="chat_connected">Соединение установлено.</string>
     <string name="chat_disconnected">Отключено.</string>
     <string name="chat_error_prefix">Ошибка: %1$s</string>

@@ -26,6 +26,8 @@ class MainActivity : Activity() {
     private lateinit var editMessage: EditText
     private lateinit var btnSend: Button
     private lateinit var btnConnect: Button
+    private lateinit var editLogin: EditText
+    private lateinit var editPassword: EditText
     private lateinit var connectionStatus: TextView
 
     /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
@@ -70,6 +72,11 @@ class MainActivity : Activity() {
             setConnectionStatus(null)
         }
 
+        override fun onAuthenticating() {
+            if (isFinishing) return
+            setConnectionStatus(R.string.chat_authenticating)
+        }
+
         override fun onConnectionChanged(connected: Boolean) {
             if (isFinishing) return
             if (!connected) {
@@ -95,6 +102,8 @@ class MainActivity : Activity() {
         editMessage = findViewById(R.id.editMessage)
         btnSend = findViewById(R.id.btnSend)
         btnConnect = findViewById(R.id.btnConnect)
+        editLogin = findViewById(R.id.editLogin)
+        editPassword = findViewById(R.id.editPassword)
         connectionStatus = findViewById(R.id.connectionStatus)
 
         chatAdapter = ChatListAdapter(this)
@@ -201,11 +210,36 @@ class MainActivity : Activity() {
             return
         }
 
+        val login = editLogin.text?.toString()?.trim().orEmpty()
+        val password = editPassword.text?.toString()?.orEmpty() ?: ""
+        if (login.isEmpty() || password.isEmpty()) {
+            Toast.makeText(this, R.string.chat_login_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val loginBytes = login.toByteArray(Charsets.UTF_8)
+        val passwordBytes = password.toByteArray(Charsets.UTF_8)
+        if (loginBytes.size > WillChatBridge.MAX_AUTH_FIELD_BYTES ||
+            passwordBytes.size > WillChatBridge.MAX_AUTH_FIELD_BYTES
+        ) {
+            Toast.makeText(
+                this,
+                getString(R.string.chat_auth_field_too_long, WillChatBridge.MAX_AUTH_FIELD_BYTES),
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+
         chatAdapter.clear()
         pendingSelfAckPositions.clear()
         historyLoaded = false
         setConnectionStatus(R.string.chat_connecting)
-        bridge.connectDefaultServer(bridgeListener)
+        bridge.connect(
+            WillChatBridge.DEFAULT_HOST,
+            WillChatBridge.DEFAULT_PORT,
+            login,
+            password,
+            bridgeListener,
+        )
     }
 
     private fun onSend() {
@@ -229,6 +263,8 @@ class MainActivity : Activity() {
 
     private fun setConnectedUi(connected: Boolean, composerEnabled: Boolean = connected) {
         btnConnect.setText(if (connected) R.string.disconnect else R.string.connect)
+        editLogin.isEnabled = !connected
+        editPassword.isEnabled = !connected
         setComposerEnabled(composerEnabled)
     }
 

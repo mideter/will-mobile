@@ -1,6 +1,7 @@
 *.iml
 .gradle
 .android-sdk
+.android-home
 local.properties
 /local.properties
 /.idea

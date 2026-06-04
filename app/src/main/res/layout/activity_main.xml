@@ -17,6 +17,40 @@
         android:paddingEnd="16dp"
         android:paddingBottom="4dp">
 
+        <EditText
+            android:id="@+id/editLogin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:hint="@string/login_hint"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:paddingStart="4dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="2dp"
+            android:text="admin"
+            android:textColor="@color/will_ink"
+            android:textColorHint="@color/will_muted"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/editPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:hint="@string/password_hint"
+            android:importantForAutofill="no"
+            android:inputType="textPassword"
+            android:paddingStart="4dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="4dp"
+            android:text="admin"
+            android:textColor="@color/will_ink"
+            android:textColorHint="@color/will_muted"
+            android:textSize="14sp" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
