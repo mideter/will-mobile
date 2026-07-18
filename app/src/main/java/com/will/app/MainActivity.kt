@@ -19,13 +19,6 @@ import java.util.ArrayDeque
 
 class MainActivity : Activity() {
 
-    private enum class AuthPhase {
-        Idle,
-        RequestingOtp,
-        AwaitingCode,
-        Connected,
-    }
-
     private val bridge = WillChatBridge()
     private lateinit var chatAdapter: ChatListAdapter
     private lateinit var chatList: ListView
@@ -33,8 +26,6 @@ class MainActivity : Activity() {
     private lateinit var editMessage: EditText
     private lateinit var btnSend: Button
     private lateinit var btnConnect: Button
-    private lateinit var editPhone: EditText
-    private lateinit var editOtpCode: EditText
     private lateinit var connectionStatus: TextView
 
     /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
@@ -43,7 +34,8 @@ class MainActivity : Activity() {
     /** История с сервера получена; можно отправлять сообщения. */
     private var historyLoaded = false
 
-    private var authPhase = AuthPhase.Idle
+    private var connected = false
+    private var connecting = false
 
     private val bridgeListener = object : WillChatBridge.Listener {
         override fun onPeerMessage(text: String) {
@@ -78,34 +70,28 @@ class MainActivity : Activity() {
                 .setMessage(message)
                 .setPositiveButton(android.R.string.ok, null)
                 .show()
-            resetAuthUi()
+            resetConnectUi()
         }
 
-        override fun onRequestingOtp() {
+        override fun onAuthenticating() {
             if (isFinishing) return
-            setAuthPhase(AuthPhase.RequestingOtp)
-            setConnectionStatus(R.string.chat_requesting_otp)
+            setConnectionStatus(R.string.chat_authenticating)
         }
 
-        override fun onOtpSent() {
+        override fun onConnectionChanged(isConnected: Boolean) {
             if (isFinishing) return
-            setAuthPhase(AuthPhase.AwaitingCode)
-            setConnectionStatus(R.string.chat_otp_sent)
-            editOtpCode.visibility = View.VISIBLE
-            editOtpCode.requestFocus()
-        }
-
-        override fun onConnectionChanged(connected: Boolean) {
-            if (isFinishing) return
-            if (!connected) {
+            if (!isConnected) {
                 historyLoaded = false
                 pendingSelfAckPositions.clear()
-                resetAuthUi()
+                resetConnectUi()
                 setConnectionStatus(R.string.chat_disconnected)
                 return
             }
             historyLoaded = false
-            setAuthPhase(AuthPhase.Connected)
+            connecting = false
+            connected = true
+            btnConnect.setText(R.string.disconnect)
+            btnConnect.isEnabled = true
             setComposerEnabled(false)
             setConnectionStatus(R.string.chat_loading_history)
         }
@@ -121,8 +107,6 @@ class MainActivity : Activity() {
         editMessage = findViewById(R.id.editMessage)
         btnSend = findViewById(R.id.btnSend)
         btnConnect = findViewById(R.id.btnConnect)
-        editPhone = findViewById(R.id.editPhone)
-        editOtpCode = findViewById(R.id.editOtpCode)
         connectionStatus = findViewById(R.id.connectionStatus)
 
         chatAdapter = ChatListAdapter(this)
@@ -147,16 +131,7 @@ class MainActivity : Activity() {
             }
         }
 
-        editOtpCode.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE && authPhase == AuthPhase.AwaitingCode) {
-                onToggleConnect()
-                true
-            } else {
-                false
-            }
-        }
-
-        setAuthPhase(AuthPhase.Idle)
+        resetConnectUi()
     }
 
     override fun onResume() {
@@ -234,98 +209,38 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun setAuthPhase(phase: AuthPhase) {
-        authPhase = phase
-        when (phase) {
-            AuthPhase.Idle -> {
-                btnConnect.setText(R.string.action_send_otp)
-                btnConnect.isEnabled = true
-                editPhone.isEnabled = true
-                editOtpCode.isEnabled = true
-                editOtpCode.visibility = View.GONE
-                editOtpCode.text?.clear()
-            }
-            AuthPhase.RequestingOtp -> {
-                btnConnect.isEnabled = false
-                editPhone.isEnabled = false
-                editOtpCode.visibility = View.GONE
-            }
-            AuthPhase.AwaitingCode -> {
-                btnConnect.setText(R.string.action_verify_otp)
-                btnConnect.isEnabled = true
-                editPhone.isEnabled = false
-                editOtpCode.isEnabled = true
-                editOtpCode.visibility = View.VISIBLE
-            }
-            AuthPhase.Connected -> {
-                btnConnect.setText(R.string.disconnect)
-                btnConnect.isEnabled = true
-                editPhone.isEnabled = false
-                editOtpCode.isEnabled = false
-                editOtpCode.visibility = View.GONE
-            }
-        }
-    }
-
-    private fun resetAuthUi() {
-        setAuthPhase(AuthPhase.Idle)
+    private fun resetConnectUi() {
+        connecting = false
+        connected = false
+        btnConnect.setText(R.string.connect)
+        btnConnect.isEnabled = true
         setComposerEnabled(false)
     }
 
     private fun onToggleConnect() {
-        when (authPhase) {
-            AuthPhase.Connected -> {
-                bridge.disconnectServer()
-                return
-            }
-            AuthPhase.AwaitingCode -> {
-                submitOtpCode()
-                return
-            }
-            AuthPhase.RequestingOtp -> return
-            AuthPhase.Idle -> requestOtp()
+        if (connected || bridge.isConnected()) {
+            bridge.disconnectServer()
+            return
         }
+        if (connecting) return
+        connect()
     }
 
-    private fun requestOtp() {
-        val rawPhone = editPhone.text?.toString()?.trim().orEmpty()
-        if (rawPhone.isEmpty()) {
-            Toast.makeText(this, R.string.chat_phone_empty, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val phone = WillChatBridge.normalizePhoneE164(rawPhone)
-        if (phone == null) {
-            Toast.makeText(this, R.string.chat_phone_invalid, Toast.LENGTH_SHORT).show()
-            return
-        }
-
+    private fun connect() {
         chatAdapter.clear()
         pendingSelfAckPositions.clear()
         historyLoaded = false
+        connecting = true
+        btnConnect.isEnabled = false
         setConnectionStatus(R.string.chat_connecting)
-        bridge.requestOtp(
+
+        val deviceToken = DeviceTokenStore.loadOrCreate(this)
+        bridge.connect(
             WillChatBridge.DEFAULT_HOST,
             WillChatBridge.DEFAULT_PORT,
-            phone,
+            deviceToken,
             bridgeListener,
         )
-    }
-
-    private fun submitOtpCode() {
-        val code = editOtpCode.text?.toString()?.trim().orEmpty()
-        if (code.isEmpty()) {
-            Toast.makeText(this, R.string.chat_otp_empty, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!WillChatBridge.isValidOtpCode(code)) {
-            Toast.makeText(this, R.string.chat_otp_invalid, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        btnConnect.isEnabled = false
-        editOtpCode.isEnabled = false
-        setConnectionStatus(R.string.chat_verifying_otp)
-        bridge.submitOtpCode(code)
     }
 
     private fun onSend() {

@@ -10,22 +10,21 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * TCP к серверу Will: кадр как у `TcpFrame` (**4 байта длины пейлоада BE uint32** + пейлоад),
  * внутри пейлоада — **`WireMessage` из проекта will**: первый байт типа, дальше тело.
  *
- * Handshake (как `WillClient::authenticate_phone`): `OtpPhoneRequest` → `OtpSent` →
- * `OtpCodeSubmit` → `OtpVerifyResponse` → `BindToken`, затем `HistoryRequest` и приём истории/чата.
+ * Handshake (как `WillClient::authenticate_device`): `BindToken` → `AuthOk`,
+ * затем `HistoryRequest` и приём истории/чата.
  *
- * - клиент → сервер: `0x01` UserChat, `0x03` HistoryRequest, `0x06` OtpPhoneRequest,
- *   `0x08` BindToken, `0x0A` OtpCodeSubmit;
- * - сервер → клиент: `0x02` ack, `0x01` peer chat, `0x04`/`0x05` история, `0x07` OtpSent,
- *   `0x09` AuthRequired, `0x0B` OtpVerifyResponse.
+ * Heartbeat (как `WillClient::try_handle_ping`): сервер шлёт `Ping`, клиент отвечает `Pong`.
+ *
+ * - клиент → сервер: `0x01` UserChat, `0x03` HistoryRequest, `0x07` Pong, `0x08` BindToken;
+ * - сервер → клиент: `0x02` ack, `0x01` peer chat, `0x04`/`0x05` история,
+ *   `0x06` Ping, `0x09` AuthRequired, `0x0C` AuthOk.
  */
 class WillChatBridge {
 
@@ -37,8 +36,7 @@ class WillChatBridge {
         fun onHistoryLoaded()
         fun onError(message: String)
         fun onConnectionChanged(connected: Boolean)
-        fun onRequestingOtp() {}
-        fun onOtpSent() {}
+        fun onAuthenticating() {}
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -53,23 +51,26 @@ class WillChatBridge {
     /** Тот же [Listener], что передали в последний успешный/ожидающий connect — для ошибок отправки с фона. */
     private var callbacks: Listener? = null
 
-    private val awaitingOtpCode = AtomicBoolean(false)
-    private var otpCodeQueue: ArrayBlockingQueue<String>? = null
-
     private val headerScratch = ByteArray(4)
 
     fun isConnected(): Boolean = synchronized(lock) {
-        socket?.isConnected == true && !stopping.get() && !awaitingOtpCode.get()
+        socket?.isConnected == true && !stopping.get()
     }
 
-    fun isAwaitingOtpCode(): Boolean = awaitingOtpCode.get()
+    fun connect(host: String, port: Int, deviceToken: String, listener: Listener) {
+        if (!DeviceTokenStore.isValid(deviceToken)) {
+            post(listener) {
+                onError(
+                    "Некорректный device token " +
+                        "(ожидается ${DeviceTokenStore.MIN_LENGTH}–${DeviceTokenStore.MAX_LENGTH} hex)",
+                )
+            }
+            return
+        }
 
-    fun requestOtp(host: String, port: Int, phoneE164: String, listener: Listener) {
         disconnectServer()
         stopping.set(false)
         callbacks = listener
-        awaitingOtpCode.set(false)
-        otpCodeQueue = ArrayBlockingQueue(1)
 
         val thread = Thread({
             try {
@@ -94,9 +95,9 @@ class WillChatBridge {
                     dataOut = socketOut
                 }
 
-                post(listener) { onRequestingOtp() }
+                post(listener) { onAuthenticating() }
                 synchronized(lock) {
-                    authenticateOtpBlocking(phoneE164, socketIn, listener)
+                    authenticateDeviceBlocking(deviceToken, socketIn)
                 }
                 post(listener) { onConnectionChanged(true) }
                 requestHistoryOnConnectThread(HISTORY_LIMIT_ON_CONNECT)
@@ -109,8 +110,6 @@ class WillChatBridge {
                 cleanupLocked()
                 callbacks = null
             } finally {
-                awaitingOtpCode.set(false)
-                otpCodeQueue = null
                 synchronized(lock) {
                     if (recvThread === Thread.currentThread()) {
                         recvThread = null
@@ -122,25 +121,6 @@ class WillChatBridge {
             recvThread = thread
         }
         thread.start()
-    }
-
-    fun submitOtpCode(code: String) {
-        if (!isValidOtpCode(code)) {
-            val cb = callbacks
-            if (cb != null) {
-                post(cb) { onError("Код должен содержать от 4 до 8 цифр") }
-            }
-            return
-        }
-        val queue = otpCodeQueue
-        if (queue == null || !awaitingOtpCode.get()) {
-            val cb = callbacks
-            if (cb != null) {
-                post(cb) { onError("Нет ожидающего запроса OTP") }
-            }
-            return
-        }
-        queue.offer(code)
     }
 
     fun sendLine(line: String) {
@@ -180,8 +160,6 @@ class WillChatBridge {
 
     fun disconnectServer() {
         stopping.set(true)
-        awaitingOtpCode.set(false)
-        otpCodeQueue?.offer(OTP_CODE_CANCELLED)
         val t = synchronized(lock) {
             try {
                 socket?.shutdownInput()
@@ -204,37 +182,27 @@ class WillChatBridge {
             recvThread = null
         }
         stopping.set(false)
-        otpCodeQueue = null
         callbacks = null
     }
 
-    private fun authenticateOtpBlocking(phoneE164: String, input: DataInputStream, listener: Listener) {
-        sendPayloadLocked(encodeOtpPhoneRequest(phoneE164))
+    /** Как `WillClient::authenticate_device` (+ `try_handle_ping` на пути ожидания AuthOk). */
+    private fun authenticateDeviceBlocking(deviceToken: String, input: DataInputStream) {
+        sendPayloadLocked(encodeBindToken(deviceToken))
 
-        val phoneResponse = readPayloadBlocking(input)
-        when (val phoneResult = parseOtpPhoneResponse(phoneResponse)) {
-            is OtpPhoneResponseResult.Sent -> { /* ok */ }
-            is OtpPhoneResponseResult.Failure -> throw IOException(phoneResult.message)
-            OtpPhoneResponseResult.Unexpected -> throw IOException("Неожиданный ответ на запрос OTP")
+        while (true) {
+            val response = readPayloadBlocking(input)
+            if (isPingPayload(response)) {
+                sendPayloadLocked(encodePong())
+                continue
+            }
+            when (parseAuthResponse(response)) {
+                AuthResponseResult.Ok -> return
+                AuthResponseResult.Required ->
+                    throw IOException("Авторизация отклонена (AuthRequired)")
+                AuthResponseResult.Unexpected ->
+                    throw IOException("Ожидался AuthOk после BindToken")
+            }
         }
-
-        awaitingOtpCode.set(true)
-        post(listener) { onOtpSent() }
-
-        val queue = otpCodeQueue ?: throw IOException("Нет соединения")
-        val code = queue.poll(OTP_CODE_WAIT_MS, TimeUnit.MILLISECONDS)
-            ?: throw IOException("Время ожидания кода истекло")
-        if (code === OTP_CODE_CANCELLED) {
-            throw IOException("Отключено")
-        }
-
-        awaitingOtpCode.set(false)
-        sendPayloadLocked(encodeOtpCodeSubmit(code))
-
-        val verifyResponse = readPayloadBlocking(input)
-        val token = parseOtpVerifyResponseToken(verifyResponse)
-            ?: throw IOException(otpVerifyFailureMessage(verifyResponse))
-        sendPayloadLocked(encodeBindToken(token))
     }
 
     /** На потоке connect, до [recvLoop]. */
@@ -305,6 +273,19 @@ class WillChatBridge {
                         onHistoryItem(action.text, action.isMine)
                     }
                     InboundDecodeAction.HistoryEnd -> post(listener) { onHistoryLoaded() }
+                    InboundDecodeAction.Ping -> {
+                        // Как WillClient::try_handle_ping — ответить Pong на том же потоке.
+                        try {
+                            synchronized(lock) {
+                                sendPayloadLocked(encodePong())
+                            }
+                        } catch (e: Exception) {
+                            if (!stopping.get()) {
+                                post(listener) { onError(e.message ?: e.toString()) }
+                            }
+                            break
+                        }
+                    }
                     is InboundDecodeAction.ProtocolError -> {
                         if (!stopping.get()) {
                             post(listener) { onError(action.message) }
@@ -348,13 +329,14 @@ class WillChatBridge {
         data object ServerAck : InboundDecodeAction()
         data class HistoryItem(val text: String, val isMine: Boolean) : InboundDecodeAction()
         data object HistoryEnd : InboundDecodeAction()
+        data object Ping : InboundDecodeAction()
         data class ProtocolError(val message: String) : InboundDecodeAction()
     }
 
-    private sealed class OtpPhoneResponseResult {
-        data object Sent : OtpPhoneResponseResult()
-        data class Failure(val message: String) : OtpPhoneResponseResult()
-        data object Unexpected : OtpPhoneResponseResult()
+    private enum class AuthResponseResult {
+        Ok,
+        Required,
+        Unexpected,
     }
 
     /** Соответствует `WillClient::receiveMessage` / `WireMessage` в will. */
@@ -371,6 +353,12 @@ class WillChatBridge {
         }
         if (body.size == 1 && t == AUTH_REQUIRED_TYPE) {
             return InboundDecodeAction.ProtocolError("Требуется авторизация (BindToken на сессии)")
+        }
+        if (body.size == 1 && t == AUTH_OK_TYPE) {
+            return InboundDecodeAction.ProtocolError("Неожиданный AuthOk после авторизации")
+        }
+        if (body.size == 1 && t == PING_TYPE) {
+            return InboundDecodeAction.Ping
         }
         if (body[0] == USER_CHAT_TYPE) {
             val text = if (body.size == 1) {
@@ -396,11 +384,6 @@ class WillChatBridge {
             }
             return InboundDecodeAction.HistoryItem(text, isMine)
         }
-        if (t == OTP_SENT_TYPE || t == OTP_VERIFY_RESPONSE_TYPE) {
-            return InboundDecodeAction.ProtocolError(
-                "Неожиданный OTP-кадр после авторизации (0x${t.toString(16)})",
-            )
-        }
         return InboundDecodeAction.ProtocolError(
             "Неизвестный тип сообщения (0x${t.toString(16)}), длина ${body.size}",
         )
@@ -409,13 +392,8 @@ class WillChatBridge {
     companion object {
         const val DEFAULT_HOST = "83.217.202.145"
         const val DEFAULT_PORT = 7770
-        const val DEFAULT_PHONE = "+15551234567"
 
         private const val CONNECT_TIMEOUT_MS = 15_000
-        private const val OTP_CODE_WAIT_MS = 300_000L
-
-        /** Sentinel для разблокировки ожидания кода при disconnect. */
-        private val OTP_CODE_CANCELLED = ""
 
         /** Как `TcpFrame::max_payload_bytes` в will: 2^20 байт. */
         const val MAX_PAYLOAD_BYTES = 1 shl 20
@@ -444,11 +422,11 @@ class WillChatBridge {
         /** `WireMessage::Type::HistoryEnd` */
         private const val HISTORY_END_TYPE = 5
 
-        /** `WireMessage::Type::OtpPhoneRequest` */
-        private const val OTP_PHONE_REQUEST_TYPE: Byte = 6
+        /** `WireMessage::Type::Ping` */
+        private const val PING_TYPE = 6
 
-        /** `WireMessage::Type::OtpSent` */
-        private const val OTP_SENT_TYPE = 7
+        /** `WireMessage::Type::Pong` */
+        private const val PONG_TYPE: Byte = 7
 
         /** `WireMessage::Type::BindToken` */
         private const val BIND_TOKEN_TYPE: Byte = 8
@@ -456,91 +434,21 @@ class WillChatBridge {
         /** `WireMessage::Type::AuthRequired` */
         private const val AUTH_REQUIRED_TYPE = 9
 
-        /** `WireMessage::Type::OtpCodeSubmit` */
-        private const val OTP_CODE_SUBMIT_TYPE: Byte = 10
+        /** `WireMessage::Type::AuthOk` */
+        private const val AUTH_OK_TYPE = 12
 
-        /** `WireMessage::Type::OtpVerifyResponse` */
-        private const val OTP_VERIFY_RESPONSE_TYPE = 11
+        fun encodePong(): ByteArray = byteArrayOf(PONG_TYPE)
 
-        /** `OtpVerifyResponseMessage::Error::InvalidPhone` */
-        private const val OTP_ERROR_INVALID_PHONE = 1
-
-        /** `OtpVerifyResponseMessage::Error::RateLimited` */
-        private const val OTP_ERROR_RATE_LIMITED = 2
-
-        /** `OtpVerifyResponseMessage::Error::InvalidCode` */
-        private const val OTP_ERROR_INVALID_CODE = 3
-
-        /** `OtpVerifyResponseMessage::Error::Expired` */
-        private const val OTP_ERROR_EXPIRED = 4
-
-        /** `OtpVerifyResponseMessage::Error::Internal` */
-        private const val OTP_ERROR_INTERNAL = 5
-
-        fun normalizePhoneE164(phone: String): String? {
-            val stripped = buildString {
-                for (c in phone) {
-                    if (c == ' ' || c == '-' || c == '(' || c == ')') continue
-                    append(c)
-                }
-            }
-            if (stripped.isEmpty()) return null
-
-            var normalized = stripped
-            if (normalized.startsWith("00")) {
-                normalized = "+" + normalized.substring(2)
-            }
-            if (!normalized.startsWith("+")) {
-                if (!normalized.all { it in '0'..'9' }) return null
-                normalized = "+$normalized"
-            }
-            if (normalized.length < 2 || normalized[0] != '+') return null
-
-            val digits = normalized.substring(1)
-            if (digits.length !in 8..15) return null
-            if (digits[0] !in '1'..'9') return null
-            if (!digits.all { it in '0'..'9' }) return null
-            return normalized
-        }
-
-        fun isValidOtpCode(code: String): Boolean {
-            if (code.length !in 4..8) return false
-            return code.all { it in '0'..'9' }
-        }
-
-        fun encodeOtpPhoneRequest(phoneE164: String): ByteArray {
-            val phoneBytes = phoneE164.toByteArray(Charsets.UTF_8)
-            if (normalizePhoneE164(phoneE164) == null) {
-                throw IllegalArgumentException("Некорректный номер телефона E.164")
-            }
-            val total = 1 + phoneBytes.size
-            if (total > MAX_PAYLOAD_BYTES) {
-                throw IllegalArgumentException("Номер телефона слишком длинный для протокола")
-            }
-            return ByteArray(total).also {
-                it[0] = OTP_PHONE_REQUEST_TYPE
-                if (phoneBytes.isNotEmpty()) {
-                    System.arraycopy(phoneBytes, 0, it, 1, phoneBytes.size)
-                }
-            }
-        }
-
-        fun encodeOtpCodeSubmit(code: String): ByteArray {
-            if (!isValidOtpCode(code)) {
-                throw IllegalArgumentException("Код должен содержать от 4 до 8 цифр")
-            }
-            val codeBytes = code.toByteArray(Charsets.US_ASCII)
-            return ByteArray(1 + codeBytes.size).also {
-                it[0] = OTP_CODE_SUBMIT_TYPE
-                System.arraycopy(codeBytes, 0, it, 1, codeBytes.size)
-            }
-        }
+        private fun isPingPayload(payload: ByteArray): Boolean =
+            payload.size == 1 && (payload[0].toInt() and 0xFF) == PING_TYPE
 
         fun encodeBindToken(token: String): ByteArray {
-            val tokenBytes = token.toByteArray(Charsets.UTF_8)
-            if (token.isEmpty()) {
-                throw IllegalArgumentException("Токен не может быть пустым")
+            if (!DeviceTokenStore.isValid(token)) {
+                throw IllegalArgumentException(
+                    "Токен должен быть hex длиной ${DeviceTokenStore.MIN_LENGTH}–${DeviceTokenStore.MAX_LENGTH}",
+                )
             }
+            val tokenBytes = token.toByteArray(Charsets.UTF_8)
             if (tokenBytes.size > MAX_TOKEN_BYTES) {
                 throw IllegalArgumentException("Токен длиннее $MAX_TOKEN_BYTES байт UTF-8")
             }
@@ -561,55 +469,15 @@ class WillChatBridge {
             return next
         }
 
-        private fun parseOtpPhoneResponse(payload: ByteArray): OtpPhoneResponseResult {
-            if (payload.size == 1 && payload[0].toInt() and 0xFF == OTP_SENT_TYPE) {
-                return OtpPhoneResponseResult.Sent
-            }
-            if (payload.size == 3 &&
-                payload[0].toInt() and 0xFF == OTP_VERIFY_RESPONSE_TYPE &&
-                payload[1] == 0.toByte()
-            ) {
-                return OtpPhoneResponseResult.Failure(otpVerifyFailureMessage(payload))
-            }
-            return OtpPhoneResponseResult.Unexpected
-        }
-
-        private fun parseOtpVerifyResponseToken(payload: ByteArray): String? {
-            if (payload.isEmpty() || payload[0].toInt() and 0xFF != OTP_VERIFY_RESPONSE_TYPE) {
-                return null
-            }
-            if (payload.size < 2) {
-                return null
-            }
-            val success = payload[1] != 0.toByte()
-            if (!success) {
-                return null
-            }
-            if (payload.size < 6) {
-                return null
-            }
-            val tokenLen = ByteBuffer.wrap(payload, 2, 4).order(ByteOrder.BIG_ENDIAN).int
-            if (tokenLen <= 0 || tokenLen > MAX_TOKEN_BYTES || 6 + tokenLen != payload.size) {
-                return null
-            }
-            return payload.decodeToString(6, payload.size)
-        }
-
-        private fun otpVerifyFailureMessage(payload: ByteArray): String {
-            if (payload.size == 3 &&
-                payload[0].toInt() and 0xFF == OTP_VERIFY_RESPONSE_TYPE &&
-                payload[1] == 0.toByte()
-            ) {
-                return when (payload[2].toInt() and 0xFF) {
-                    OTP_ERROR_INVALID_PHONE -> "Некорректный номер телефона"
-                    OTP_ERROR_RATE_LIMITED -> "Слишком много запросов, попробуйте позже"
-                    OTP_ERROR_INVALID_CODE -> "Неверный код"
-                    OTP_ERROR_EXPIRED -> "Код истёк, запросите новый"
-                    OTP_ERROR_INTERNAL -> "Внутренняя ошибка сервера"
-                    else -> "Ошибка OTP (код ${payload[2].toInt() and 0xFF})"
+        private fun parseAuthResponse(payload: ByteArray): AuthResponseResult {
+            if (payload.size == 1) {
+                val t = payload[0].toInt() and 0xFF
+                when (t) {
+                    AUTH_OK_TYPE -> return AuthResponseResult.Ok
+                    AUTH_REQUIRED_TYPE -> return AuthResponseResult.Required
                 }
             }
-            return "Ошибка OTP"
+            return AuthResponseResult.Unexpected
         }
     }
 }
