@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Will</string>
-    <string name="connect">Подключиться</string>
-    <string name="disconnect">Отключиться</string>
     <string name="message_hint">Сообщение…</string>
+    <string name="chat_reconnecting">Переподключение…</string>
     <string name="send_arrow">→</string>
     <string name="network_title">Сеть</string>
     <string name="chat_connecting">Подключение к серверу…</string>

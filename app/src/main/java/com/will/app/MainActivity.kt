@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
@@ -20,12 +22,12 @@ import java.util.ArrayDeque
 class MainActivity : Activity() {
 
     private val bridge = WillChatBridge()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var chatAdapter: ChatListAdapter
     private lateinit var chatList: ListView
     private lateinit var composerWrap: View
     private lateinit var editMessage: EditText
     private lateinit var btnSend: Button
-    private lateinit var btnConnect: Button
     private lateinit var connectionStatus: TextView
 
     /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
@@ -34,8 +36,12 @@ class MainActivity : Activity() {
     /** История с сервера получена; можно отправлять сообщения. */
     private var historyLoaded = false
 
-    private var connected = false
     private var connecting = false
+
+    private val reconnectRunnable = Runnable {
+        if (isFinishing || connecting || bridge.isConnected()) return@Runnable
+        connect(isReconnect = true)
+    }
 
     private val bridgeListener = object : WillChatBridge.Listener {
         override fun onPeerMessage(text: String) {
@@ -70,7 +76,11 @@ class MainActivity : Activity() {
                 .setMessage(message)
                 .setPositiveButton(android.R.string.ok, null)
                 .show()
-            resetConnectUi()
+            connecting = false
+            historyLoaded = false
+            pendingSelfAckPositions.clear()
+            setComposerEnabled(false)
+            scheduleReconnect()
         }
 
         override fun onAuthenticating() {
@@ -83,15 +93,14 @@ class MainActivity : Activity() {
             if (!isConnected) {
                 historyLoaded = false
                 pendingSelfAckPositions.clear()
-                resetConnectUi()
+                connecting = false
+                setComposerEnabled(false)
                 setConnectionStatus(R.string.chat_disconnected)
+                scheduleReconnect()
                 return
             }
             historyLoaded = false
             connecting = false
-            connected = true
-            btnConnect.setText(R.string.disconnect)
-            btnConnect.isEnabled = true
             setComposerEnabled(false)
             setConnectionStatus(R.string.chat_loading_history)
         }
@@ -106,7 +115,6 @@ class MainActivity : Activity() {
         composerWrap = findViewById(R.id.composerWrap)
         editMessage = findViewById(R.id.editMessage)
         btnSend = findViewById(R.id.btnSend)
-        btnConnect = findViewById(R.id.btnConnect)
         connectionStatus = findViewById(R.id.connectionStatus)
 
         chatAdapter = ChatListAdapter(this)
@@ -119,7 +127,6 @@ class MainActivity : Activity() {
             false
         }
 
-        btnConnect.setOnClickListener { onToggleConnect() }
         btnSend.setOnClickListener { onSend() }
 
         editMessage.setOnEditorActionListener { _, actionId, _ ->
@@ -131,12 +138,15 @@ class MainActivity : Activity() {
             }
         }
 
-        resetConnectUi()
+        connect(isReconnect = false)
     }
 
     override fun onResume() {
         super.onResume()
         markPeerMessagesRead()
+        if (!connecting && !bridge.isConnected()) {
+            connect(isReconnect = true)
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -147,6 +157,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(reconnectRunnable)
         bridge.disconnectServer()
         super.onDestroy()
     }
@@ -209,30 +220,22 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun resetConnectUi() {
-        connecting = false
-        connected = false
-        btnConnect.setText(R.string.connect)
-        btnConnect.isEnabled = true
-        setComposerEnabled(false)
+    private fun scheduleReconnect() {
+        mainHandler.removeCallbacks(reconnectRunnable)
+        mainHandler.postDelayed(reconnectRunnable, RECONNECT_DELAY_MS)
     }
 
-    private fun onToggleConnect() {
-        if (connected || bridge.isConnected()) {
-            bridge.disconnectServer()
-            return
-        }
-        if (connecting) return
-        connect()
-    }
-
-    private fun connect() {
+    private fun connect(isReconnect: Boolean) {
+        if (connecting || bridge.isConnected()) return
+        mainHandler.removeCallbacks(reconnectRunnable)
         chatAdapter.clear()
         pendingSelfAckPositions.clear()
         historyLoaded = false
         connecting = true
-        btnConnect.isEnabled = false
-        setConnectionStatus(R.string.chat_connecting)
+        setComposerEnabled(false)
+        setConnectionStatus(
+            if (isReconnect) R.string.chat_reconnecting else R.string.chat_connecting,
+        )
 
         val deviceToken = DeviceTokenStore.loadOrCreate(this)
         bridge.connect(
@@ -265,5 +268,9 @@ class MainActivity : Activity() {
     private fun setComposerEnabled(enabled: Boolean) {
         editMessage.isEnabled = enabled
         btnSend.isEnabled = enabled
+    }
+
+    companion object {
+        private const val RECONNECT_DELAY_MS = 3_000L
     }
 }

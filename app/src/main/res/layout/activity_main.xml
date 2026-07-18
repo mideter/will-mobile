@@ -17,29 +17,6 @@
         android:paddingEnd="16dp"
         android:paddingBottom="4dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="end"
-            android:orientation="horizontal"
-            android:paddingTop="4dp">
-
-            <Button
-                android:id="@+id/btnConnect"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minHeight="0dp"
-                android:paddingStart="8dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="4dp"
-                android:text="@string/connect"
-                android:textAllCaps="false"
-                android:textColor="@color/will_ink"
-                android:textSize="13sp" />
-        </LinearLayout>
-
         <TextView
             android:id="@+id/connectionStatus"
             android:layout_width="match_parent"
