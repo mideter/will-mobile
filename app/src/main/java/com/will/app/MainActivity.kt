@@ -178,7 +178,6 @@ class MainActivity : Activity() {
         }
 
         val headerWrap = findViewById<View>(R.id.headerWrap)
-        val baseHeaderPaddingTop = headerWrap.paddingTop
         headerWrap.setOnApplyWindowInsetsListener { view, insets ->
             val statusBarTop = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 insets.getInsets(WindowInsets.Type.statusBars()).top
@@ -188,7 +187,7 @@ class MainActivity : Activity() {
             }
             view.setPadding(
                 view.paddingLeft,
-                baseHeaderPaddingTop + statusBarTop,
+                statusBarTop,
                 view.paddingRight,
                 view.paddingBottom,
             )
