@@ -46,10 +46,10 @@ class MainActivity : Activity() {
     }
 
     private val bridgeListener = object : WillChatBridge.Listener {
-        override fun onPeerMessage(text: String) {
+        override fun onPeerMessage(authorName: String, text: String) {
             if (isFinishing) return
             val unread = !hasWindowFocus()
-            appendChatLine(ChatLineKind.PEER, text, peerUnread = unread)
+            appendChatLine(ChatLineKind.PEER, text, peerUnread = unread, authorName = authorName)
         }
 
         override fun onServerReceiptConfirmed() {
@@ -58,10 +58,17 @@ class MainActivity : Activity() {
             chatAdapter.markSelfServerAckedAt(pos)
         }
 
-        override fun onHistoryItem(text: String, isMine: Boolean) {
+        override fun onHistoryItem(authorName: String, text: String, isMine: Boolean) {
             if (isFinishing) return
             val kind = if (isMine) ChatLineKind.SELF else ChatLineKind.PEER
-            historyBuffer.add(ChatLine(kind, text, selfServerAcked = isMine))
+            historyBuffer.add(
+                ChatLine(
+                    kind,
+                    text,
+                    selfServerAcked = isMine,
+                    authorName = if (isMine) "" else authorName,
+                ),
+            )
         }
 
         override fun onHistoryLoaded() {
@@ -215,8 +222,13 @@ class MainActivity : Activity() {
         chatAdapter.markPeerRead()
     }
 
-    private fun appendChatLine(kind: ChatLineKind, text: String, peerUnread: Boolean = false) {
-        chatAdapter.append(ChatLine(kind, text, peerUnread))
+    private fun appendChatLine(
+        kind: ChatLineKind,
+        text: String,
+        peerUnread: Boolean = false,
+        authorName: String = "",
+    ) {
+        chatAdapter.append(ChatLine(kind, text, peerUnread, authorName = authorName))
         scrollChatToEnd()
     }
 

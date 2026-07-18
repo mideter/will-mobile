@@ -22,6 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Heartbeat (как `WillClient::try_handle_ping`): сервер шлёт `Ping`, клиент отвечает `Pong`.
  *
+ * UserChat: `type` + length-prefixed name (клиент шлёт пустое; сервер подставляет автора) + body.
+ * HistoryItem: `type` + id u64 + is_mine + length-prefixed name + body_len u32 + body.
+ *
  * - клиент → сервер: `0x01` UserChat, `0x03` HistoryRequest, `0x07` Pong, `0x08` BindToken;
  * - сервер → клиент: `0x02` ack, `0x01` peer chat, `0x04`/`0x05` история,
  *   `0x06` Ping, `0x09` AuthRequired, `0x0C` AuthOk.
@@ -29,10 +32,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 class WillChatBridge {
 
     interface Listener {
-        fun onPeerMessage(text: String)
+        fun onPeerMessage(authorName: String, text: String)
         /** Отдельный кадр-подтверждение от сервера (не текст в чат). */
         fun onServerReceiptConfirmed()
-        fun onHistoryItem(text: String, isMine: Boolean)
+        fun onHistoryItem(authorName: String, text: String, isMine: Boolean)
         fun onHistoryLoaded()
         fun onError(message: String)
         fun onConnectionChanged(connected: Boolean)
@@ -127,9 +130,9 @@ class WillChatBridge {
         // Сеть на UI-потоке даёт StrictMode → NetworkOnMainThreadException → сокет считают «сломанным».
         sendExecutor.execute {
             try {
-                val utf8 = line.toByteArray(Charsets.UTF_8)
-                val payloadLen = 1 + utf8.size
-                if (payloadLen > MAX_PAYLOAD_BYTES) {
+                // Как WillClient: UserChat с пустым name — сервер подставит author_name.
+                val payload = encodeUserChat("", line)
+                if (payload.size > MAX_PAYLOAD_BYTES) {
                     val cb = callbacks
                     if (cb != null && !stopping.get()) {
                         post(cb) {
@@ -140,12 +143,6 @@ class WillChatBridge {
                         }
                     }
                     return@execute
-                }
-                val payload = ByteArray(payloadLen).also {
-                    it[0] = USER_CHAT_TYPE
-                    if (utf8.isNotEmpty()) {
-                        System.arraycopy(utf8, 0, it, 1, utf8.size)
-                    }
                 }
                 sendPayloadLocked(payload)
             } catch (e: Exception) {
@@ -266,11 +263,11 @@ class WillChatBridge {
                 }
                 when (val action = decodeInboundPayload(body)) {
                     is InboundDecodeAction.PeerText -> post(listener) {
-                        onPeerMessage(action.text)
+                        onPeerMessage(action.authorName, action.text)
                     }
                     InboundDecodeAction.ServerAck -> post(listener) { onServerReceiptConfirmed() }
                     is InboundDecodeAction.HistoryItem -> post(listener) {
-                        onHistoryItem(action.text, action.isMine)
+                        onHistoryItem(action.authorName, action.text, action.isMine)
                     }
                     InboundDecodeAction.HistoryEnd -> post(listener) { onHistoryLoaded() }
                     InboundDecodeAction.Ping -> {
@@ -325,9 +322,13 @@ class WillChatBridge {
     }
 
     private sealed class InboundDecodeAction {
-        data class PeerText(val text: String) : InboundDecodeAction()
+        data class PeerText(val authorName: String, val text: String) : InboundDecodeAction()
         data object ServerAck : InboundDecodeAction()
-        data class HistoryItem(val text: String, val isMine: Boolean) : InboundDecodeAction()
+        data class HistoryItem(
+            val authorName: String,
+            val text: String,
+            val isMine: Boolean,
+        ) : InboundDecodeAction()
         data object HistoryEnd : InboundDecodeAction()
         data object Ping : InboundDecodeAction()
         data class ProtocolError(val message: String) : InboundDecodeAction()
@@ -361,28 +362,41 @@ class WillChatBridge {
             return InboundDecodeAction.Ping
         }
         if (body[0] == USER_CHAT_TYPE) {
-            val text = if (body.size == 1) {
+            var offset = 1
+            val name = readLengthPrefixedStringAllowEmpty(body, offset)
+                ?: return InboundDecodeAction.ProtocolError("Некорректный UserChat (name)")
+            offset = name.nextOffset
+            val text = if (offset >= body.size) {
                 ""
             } else {
-                body.decodeToString(1, body.size)
+                body.decodeToString(offset, body.size)
             }
-            return InboundDecodeAction.PeerText(text)
+            return InboundDecodeAction.PeerText(name.value, text)
         }
         if (t == HISTORY_ITEM_TYPE) {
-            if (body.size < 14) {
+            // type(1) + id(8) + is_mine(1) + name + body_len(4) + body
+            if (body.size < 10) {
                 return InboundDecodeAction.ProtocolError("Некорректный HistoryItem (слишком короткий)")
             }
-            val bodyLen = ByteBuffer.wrap(body, 10, 4).order(ByteOrder.BIG_ENDIAN).int
-            if (bodyLen < 0 || 14 + bodyLen != body.size) {
+            val isMine = body[9] != 0.toByte()
+            var offset = 10
+            val name = readLengthPrefixedStringAllowEmpty(body, offset)
+                ?: return InboundDecodeAction.ProtocolError("Некорректный HistoryItem (name)")
+            offset = name.nextOffset
+            if (offset + 4 > body.size) {
                 return InboundDecodeAction.ProtocolError("Некорректный HistoryItem (длина тела)")
             }
-            val isMine = body[9] != 0.toByte()
+            val bodyLen = ByteBuffer.wrap(body, offset, 4).order(ByteOrder.BIG_ENDIAN).int
+            offset += 4
+            if (bodyLen < 0 || offset + bodyLen != body.size) {
+                return InboundDecodeAction.ProtocolError("Некорректный HistoryItem (длина тела)")
+            }
             val text = if (bodyLen == 0) {
                 ""
             } else {
-                body.decodeToString(14, body.size)
+                body.decodeToString(offset, body.size)
             }
-            return InboundDecodeAction.HistoryItem(text, isMine)
+            return InboundDecodeAction.HistoryItem(name.value, text, isMine)
         }
         return InboundDecodeAction.ProtocolError(
             "Неизвестный тип сообщения (0x${t.toString(16)}), длина ${body.size}",
@@ -398,8 +412,8 @@ class WillChatBridge {
         /** Как `TcpFrame::max_payload_bytes` в will: 2^20 байт. */
         const val MAX_PAYLOAD_BYTES = 1 shl 20
 
-        /** Максимальная длина токена в BindToken (length-prefixed string). */
-        private const val MAX_TOKEN_BYTES = 4096
+        /** Как `WireMessageCodec::Internal::MaxAuthFieldBytes`. */
+        private const val MAX_AUTH_FIELD_BYTES = 4096
 
         /** `WillMessage::MaxHistoryRequestLimit` */
         private const val MAX_HISTORY_REQUEST_LIMIT = 1000
@@ -437,10 +451,28 @@ class WillChatBridge {
         /** `WireMessage::Type::AuthOk` */
         private const val AUTH_OK_TYPE = 12
 
+        private data class LengthPrefixedString(val value: String, val nextOffset: Int)
+
         fun encodePong(): ByteArray = byteArrayOf(PONG_TYPE)
 
         private fun isPingPayload(payload: ByteArray): Boolean =
             payload.size == 1 && (payload[0].toInt() and 0xFF) == PING_TYPE
+
+        /** Как `UserChatMessage::encode`: type + length-prefixed name + body. */
+        fun encodeUserChat(name: String, body: String): ByteArray {
+            val nameBytes = name.toByteArray(Charsets.UTF_8)
+            if (nameBytes.size > MAX_AUTH_FIELD_BYTES) {
+                throw IllegalArgumentException("Имя длиннее $MAX_AUTH_FIELD_BYTES байт UTF-8")
+            }
+            val bodyBytes = body.toByteArray(Charsets.UTF_8)
+            val out = ByteArray(1 + 4 + nameBytes.size + bodyBytes.size)
+            out[0] = USER_CHAT_TYPE
+            var offset = appendLengthPrefixedField(out, 1, nameBytes)
+            if (bodyBytes.isNotEmpty()) {
+                System.arraycopy(bodyBytes, 0, out, offset, bodyBytes.size)
+            }
+            return out
+        }
 
         fun encodeBindToken(token: String): ByteArray {
             if (!DeviceTokenStore.isValid(token)) {
@@ -449,13 +481,12 @@ class WillChatBridge {
                 )
             }
             val tokenBytes = token.toByteArray(Charsets.UTF_8)
-            if (tokenBytes.size > MAX_TOKEN_BYTES) {
-                throw IllegalArgumentException("Токен длиннее $MAX_TOKEN_BYTES байт UTF-8")
+            if (tokenBytes.size > MAX_AUTH_FIELD_BYTES) {
+                throw IllegalArgumentException("Токен длиннее $MAX_AUTH_FIELD_BYTES байт UTF-8")
             }
             val out = ByteArray(1 + 4 + tokenBytes.size)
-            var offset = 0
-            out[offset++] = BIND_TOKEN_TYPE
-            appendLengthPrefixedField(out, offset, tokenBytes)
+            out[0] = BIND_TOKEN_TYPE
+            appendLengthPrefixedField(out, 1, tokenBytes)
             return out
         }
 
@@ -467,6 +498,27 @@ class WillChatBridge {
                 next += field.size
             }
             return next
+        }
+
+        /**
+         * Как `WireMessageCodec::Internal::read_length_prefixed_string_allow_empty`.
+         * @return null при ошибке разбора
+         */
+        private fun readLengthPrefixedStringAllowEmpty(
+            payload: ByteArray,
+            offset: Int,
+        ): LengthPrefixedString? {
+            if (offset + 4 > payload.size) return null
+            val len = ByteBuffer.wrap(payload, offset, 4).order(ByteOrder.BIG_ENDIAN).int
+            if (len < 0 || len > MAX_AUTH_FIELD_BYTES) return null
+            val next = offset + 4
+            if (next + len > payload.size) return null
+            val value = if (len == 0) {
+                ""
+            } else {
+                payload.decodeToString(next, next + len)
+            }
+            return LengthPrefixedString(value, next + len)
         }
 
         private fun parseAuthResponse(payload: ByteArray): AuthResponseResult {

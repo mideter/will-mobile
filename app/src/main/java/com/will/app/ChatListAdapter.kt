@@ -18,6 +18,8 @@ data class ChatLine(
     var peerUnread: Boolean = false,
     /** Только для [ChatLineKind.SELF]: сервер принял кадр (WillMessage ack). */
     var selfServerAcked: Boolean = false,
+    /** Имя автора для peer (и истории peer); как `HistoryItemMessage::name` / UserChat name. */
+    val authorName: String = "",
 )
 
 class ChatListAdapter(private val context: Context) : BaseAdapter() {
@@ -90,7 +92,7 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         for (i in 0 until length) {
             val a = lines[localStart + i]
             val b = items[i]
-            if (a.kind != b.kind || a.text != b.text) return false
+            if (a.kind != b.kind || a.text != b.text || a.authorName != b.authorName) return false
         }
         return true
     }
@@ -149,7 +151,8 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
                 }
             }
             ChatLineKind.PEER -> {
-                tv.text = line.text
+                val tag = line.authorName.ifEmpty { "peer" }
+                tv.text = context.getString(R.string.chat_peer_line, tag, line.text)
                 tv.gravity = Gravity.START
                 tv.setTextColor(context.getColor(R.color.will_ink))
                 val bg = if (line.peerUnread) R.color.will_row_unread else R.color.will_row
