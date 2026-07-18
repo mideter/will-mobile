@@ -39,14 +39,15 @@
         android:divider="@color/will_divider"
         android:dividerHeight="1dp"
         android:listSelector="@android:color/transparent"
-        android:scrollbars="vertical" />
+        android:scrollbars="vertical"
+        android:stackFromBottom="true"
+        android:transcriptMode="normal" />
 
     <LinearLayout
         android:id="@+id/composerWrap"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/will_composer_bg"
-        android:fitsSystemWindows="true"
         android:orientation="vertical"
         android:paddingTop="1dp"
         android:visibility="gone">

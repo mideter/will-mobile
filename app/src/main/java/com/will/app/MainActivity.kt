@@ -72,8 +72,7 @@ class MainActivity : Activity() {
             setComposerEnabled(true)
             setConnectionStatus(null)
             if (added > 0) {
-                val pos = chatAdapter.count - 1
-                if (pos >= 0) chatList.setSelection(pos)
+                scrollChatToEnd()
             }
         }
 
@@ -206,16 +205,20 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun scrollChatToEnd() {
+        val pos = chatAdapter.count - 1
+        if (pos >= 0) {
+            chatList.setSelection(pos)
+        }
+    }
+
     private fun markPeerMessagesRead() {
         chatAdapter.markPeerRead()
     }
 
     private fun appendChatLine(kind: ChatLineKind, text: String, peerUnread: Boolean = false) {
         chatAdapter.append(ChatLine(kind, text, peerUnread))
-        val pos = chatAdapter.count - 1
-        if (pos >= 0) {
-            chatList.setSelection(pos)
-        }
+        scrollChatToEnd()
     }
 
     private fun setConnectionStatus(textRes: Int?) {
