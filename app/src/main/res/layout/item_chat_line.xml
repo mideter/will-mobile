@@ -2,44 +2,45 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="bottom"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:paddingStart="18dp"
     android:paddingTop="14dp"
     android:paddingEnd="18dp"
     android:paddingBottom="14dp">
 
-    <LinearLayout
-        android:layout_width="0dp"
+    <TextView
+        android:id="@+id/chatLineAuthor"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_marginBottom="3dp"
+        android:textColor="@color/will_muted"
+        android:textSize="11sp"
+        android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/chatLineAuthor"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
-            android:textColor="@color/will_muted"
-            android:textSize="11sp"
-            android:visibility="gone" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:baselineAligned="true"
+        android:gravity="bottom"
+        android:orientation="horizontal">
 
         <TextView
             android:id="@+id/chatLineText"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:lineSpacingMultiplier="1.15"
             android:textIsSelectable="false"
             android:textSize="15sp" />
-    </LinearLayout>
 
-    <ImageView
-        android:id="@+id/serverReceiptIcon"
-        android:layout_width="9dp"
-        android:layout_height="9dp"
-        android:layout_marginStart="4dp"
-        android:importantForAccessibility="no"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_server_receipt"
-        android:visibility="gone" />
+        <ImageView
+            android:id="@+id/serverReceiptIcon"
+            android:layout_width="9dp"
+            android:layout_height="9dp"
+            android:layout_marginStart="4dp"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_server_receipt"
+            android:visibility="gone" />
+    </LinearLayout>
 </LinearLayout>

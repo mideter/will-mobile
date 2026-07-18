@@ -146,10 +146,13 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
                 tv.gravity = Gravity.END
                 tv.setTextColor(context.getColor(R.color.will_ink))
                 view.background = rowDrawable(R.color.will_row)
+                // INVISIBLE, не GONE: место под галочку сразу, без сдвига текста при ack.
                 if (line.selfServerAcked) {
                     icon.visibility = View.VISIBLE
                     icon.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
                     icon.contentDescription = context.getString(R.string.chat_server_receipt_cd)
+                } else {
+                    icon.visibility = View.INVISIBLE
                 }
             }
             ChatLineKind.PEER -> {
