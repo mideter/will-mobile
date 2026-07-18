@@ -124,10 +124,12 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         val view = convertView ?: inflater.inflate(R.layout.item_chat_line, parent, false)
+        val author = view.findViewById<TextView>(R.id.chatLineAuthor)
         val tv = view.findViewById<TextView>(R.id.chatLineText)
         val icon = view.findViewById<ImageView>(R.id.serverReceiptIcon)
         val line = lines[position]
 
+        author.visibility = View.GONE
         icon.visibility = View.GONE
         icon.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         icon.contentDescription = null
@@ -151,15 +153,25 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
                 }
             }
             ChatLineKind.PEER -> {
-                val tag = line.authorName.ifEmpty { "peer" }
-                tv.text = context.getString(R.string.chat_peer_line, tag, line.text)
+                tv.text = line.text
                 tv.gravity = Gravity.START
                 tv.setTextColor(context.getColor(R.color.will_ink))
                 val bg = if (line.peerUnread) R.color.will_row_unread else R.color.will_row
                 view.background = rowDrawable(bg)
+                if (shouldShowPeerAuthor(position, line)) {
+                    author.text = line.authorName.ifEmpty { "peer" }
+                    author.visibility = View.VISIBLE
+                }
             }
         }
         return view
+    }
+
+    /** Подпись автора только у первого сообщения в серии от того же peer. */
+    private fun shouldShowPeerAuthor(position: Int, line: ChatLine): Boolean {
+        if (position == 0) return true
+        val prev = lines[position - 1]
+        return prev.kind != ChatLineKind.PEER || prev.authorName != line.authorName
     }
 
     private fun rowDrawable(colorRes: Int): GradientDrawable {

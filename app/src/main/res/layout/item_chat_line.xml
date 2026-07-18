@@ -9,14 +9,29 @@
     android:paddingEnd="18dp"
     android:paddingBottom="14dp">
 
-    <TextView
-        android:id="@+id/chatLineText"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:lineSpacingMultiplier="1.15"
-        android:textIsSelectable="false"
-        android:textSize="15sp" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/chatLineAuthor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="3dp"
+            android:textColor="@color/will_muted"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/chatLineText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:lineSpacingMultiplier="1.15"
+            android:textIsSelectable="false"
+            android:textSize="15sp" />
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/serverReceiptIcon"

@@ -13,5 +13,4 @@
     <string name="chat_error_prefix">Ошибка: %1$s</string>
     <string name="chat_message_too_long">Сообщение слишком длинное (не более %1$d символов).</string>
     <string name="chat_server_receipt_cd">Сервер получил сообщение</string>
-    <string name="chat_peer_line">[%1$s] %2$s</string>
 </resources>
