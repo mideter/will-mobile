@@ -4,7 +4,7 @@
     <color name="will_background">#ffffff</color>
     <color name="will_ink">#1a1a1a</color>
     <color name="will_muted">#787878</color>
-    <color name="will_tick_icon">#94a3b8</color>
+    <color name="will_tick_icon">#c0c0c0</color>
     <color name="will_row">#f8f8f8</color>
     <color name="will_row_unread">#f1f8ff</color>
     <color name="will_accent">#3b82f6</color>

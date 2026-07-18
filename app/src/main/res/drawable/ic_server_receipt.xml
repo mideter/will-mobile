@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="12dp"
-    android:height="12dp"
+    android:width="9dp"
+    android:height="9dp"
     android:viewportWidth="12"
     android:viewportHeight="12">
     <!-- Тот же контур, что в will MainWindow::makeServerReceiptIcon (QPainterPath). -->
@@ -9,7 +9,7 @@
         android:pathData="M 2,6.2 L 4.9,9 L 10,3.5"
         android:fillColor="@android:color/transparent"
         android:strokeColor="@color/will_tick_icon"
-        android:strokeWidth="1.15"
+        android:strokeWidth="0.9"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
 </vector>
