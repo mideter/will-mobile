@@ -36,6 +36,65 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         notifyDataSetChanged()
     }
 
+    /**
+     * Подставляет историю с сервера без мигания: сохраняет уже показанные строки,
+     * дописывает только новые; хвост локальных (например неотправленное) не трогает.
+     * @return сколько строк добавлено
+     */
+    fun applyHistoryReplay(items: List<ChatLine>): Int {
+        if (items.isEmpty()) return 0
+        if (lines.isEmpty()) {
+            lines.addAll(items)
+            notifyDataSetChanged()
+            return items.size
+        }
+
+        var bestOverlap = 0
+        var bestTrailingSkip = 0
+        val maxTrailingSkip = lines.size
+        for (trailingSkip in 0..maxTrailingSkip) {
+            val effectiveSize = lines.size - trailingSkip
+            val maxOverlap = minOf(effectiveSize, items.size)
+            for (overlap in maxOverlap downTo 1) {
+                if (overlap <= bestOverlap) break
+                if (regionMatches(effectiveSize - overlap, items, overlap)) {
+                    bestOverlap = overlap
+                    bestTrailingSkip = trailingSkip
+                    break
+                }
+            }
+            if (bestOverlap == items.size) break
+        }
+
+        var acksChanged = false
+        val localStart = lines.size - bestTrailingSkip - bestOverlap
+        for (i in 0 until bestOverlap) {
+            val local = lines[localStart + i]
+            if (local.kind == ChatLineKind.SELF && !local.selfServerAcked) {
+                local.selfServerAcked = true
+                acksChanged = true
+            }
+        }
+
+        val toAdd = items.subList(bestOverlap, items.size)
+        if (toAdd.isEmpty()) {
+            if (acksChanged) notifyDataSetChanged()
+            return 0
+        }
+        lines.addAll(toAdd)
+        notifyDataSetChanged()
+        return toAdd.size
+    }
+
+    private fun regionMatches(localStart: Int, items: List<ChatLine>, length: Int): Boolean {
+        for (i in 0 until length) {
+            val a = lines[localStart + i]
+            val b = items[i]
+            if (a.kind != b.kind || a.text != b.text) return false
+        }
+        return true
+    }
+
     fun markPeerRead() {
         var changed = false
         for (line in lines) {

@@ -1,7 +1,6 @@
 package com.will.app
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -33,6 +32,9 @@ class MainActivity : Activity() {
     /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
     private val pendingSelfAckPositions = ArrayDeque<Int>()
 
+    /** Буфер HistoryItem до HistoryEnd — чтобы не мигать чатом при reconnect. */
+    private val historyBuffer = ArrayList<ChatLine>()
+
     /** История с сервера получена; можно отправлять сообщения. */
     private var historyLoaded = false
 
@@ -59,27 +61,31 @@ class MainActivity : Activity() {
         override fun onHistoryItem(text: String, isMine: Boolean) {
             if (isFinishing) return
             val kind = if (isMine) ChatLineKind.SELF else ChatLineKind.PEER
-            appendChatLine(kind, text)
+            historyBuffer.add(ChatLine(kind, text, selfServerAcked = isMine))
         }
 
         override fun onHistoryLoaded() {
             if (isFinishing) return
+            val added = chatAdapter.applyHistoryReplay(historyBuffer)
+            historyBuffer.clear()
             historyLoaded = true
             setComposerEnabled(true)
             setConnectionStatus(null)
+            if (added > 0) {
+                val pos = chatAdapter.count - 1
+                if (pos >= 0) chatList.setSelection(pos)
+            }
         }
 
         override fun onError(message: String) {
             if (isFinishing) return
-            AlertDialog.Builder(this@MainActivity)
-                .setTitle(R.string.network_title)
-                .setMessage(message)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
+            // Тихий обрыв: без диалога, чат на экране, авто-reconnect.
             connecting = false
             historyLoaded = false
+            historyBuffer.clear()
             pendingSelfAckPositions.clear()
             setComposerEnabled(false)
+            setConnectionStatus(R.string.chat_reconnecting)
             scheduleReconnect()
         }
 
@@ -92,14 +98,16 @@ class MainActivity : Activity() {
             if (isFinishing) return
             if (!isConnected) {
                 historyLoaded = false
+                historyBuffer.clear()
                 pendingSelfAckPositions.clear()
                 connecting = false
                 setComposerEnabled(false)
-                setConnectionStatus(R.string.chat_disconnected)
+                setConnectionStatus(R.string.chat_reconnecting)
                 scheduleReconnect()
                 return
             }
             historyLoaded = false
+            historyBuffer.clear()
             connecting = false
             setComposerEnabled(false)
             setConnectionStatus(R.string.chat_loading_history)
@@ -228,7 +236,10 @@ class MainActivity : Activity() {
     private fun connect(isReconnect: Boolean) {
         if (connecting || bridge.isConnected()) return
         mainHandler.removeCallbacks(reconnectRunnable)
-        chatAdapter.clear()
+        if (!isReconnect) {
+            chatAdapter.clear()
+        }
+        historyBuffer.clear()
         pendingSelfAckPositions.clear()
         historyLoaded = false
         connecting = true
