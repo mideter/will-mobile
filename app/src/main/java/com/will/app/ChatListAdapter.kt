@@ -56,9 +56,11 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
     }
 
     /**
-     * Подставляет историю с сервера без мигания: общий суффикс списка с префиксом
-     * [items] помечает ack и не дублирует; остальное дописывает.
-     * @return сколько строк добавлено
+     * Подставляет историю с сервера без мигания.
+     * Ищет самый длинный суффикс локального списка (без хвостовых неподтверждённых Self)
+     * как непрерывный фрагмент [items] (не только с начала), помечает ack и дописывает хвост.
+     * При отсутствии overlap — ресинк matchable-части из истории, сохраняя локальные unacked.
+     * @return сколько строк добавлено (после ресинка — дельта размера списка)
      */
     fun applyHistory(items: List<ChatLine>): Int {
         if (items.isEmpty()) return 0
@@ -68,25 +70,54 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
             return items.size
         }
 
-        var overlap = 0
-        val maxOverlap = minOf(lines.size, items.size)
-        for (o in maxOverlap downTo 1) {
-            if (regionMatches(lines.size - o, items, o)) {
-                overlap = o
-                break
+        val trailingUnacked = countTrailingUnackedSelf()
+        val matchableLen = lines.size - trailingUnacked
+
+        var matchLen = 0
+        var matchItemsEnd = 0
+        if (matchableLen > 0) {
+            val maxO = minOf(matchableLen, items.size)
+            outer@ for (o in maxO downTo 1) {
+                val localStart = matchableLen - o
+                for (itemsStart in (items.size - o) downTo 0) {
+                    if (regionMatchesAt(localStart, items, itemsStart, o)) {
+                        matchLen = o
+                        matchItemsEnd = itemsStart + o
+                        break@outer
+                    }
+                }
             }
         }
 
+        if (matchLen == 0) {
+            // Нет общего фрагмента (или только локальные unacked) — ресинк из snapshot.
+            return resyncWithHistory(items, trailingUnacked)
+        }
+
         var acksChanged = false
-        for (i in 0 until overlap) {
-            val local = lines[lines.size - overlap + i]
+        val localMatchStart = matchableLen - matchLen
+        for (i in 0 until matchLen) {
+            val local = lines[localMatchStart + i]
             if (local is ChatLine.Self && !local.selfServerAcked) {
                 local.selfServerAcked = true
                 acksChanged = true
             }
         }
 
-        val toAdd = items.subList(overlap, items.size)
+        var itemsCursor = matchItemsEnd
+        var trailIdx = matchableLen
+        while (trailIdx < lines.size && itemsCursor < items.size) {
+            if (!contentEquals(lines[trailIdx], items[itemsCursor])) break
+            val local = lines[trailIdx]
+            if (local is ChatLine.Self && !local.selfServerAcked) {
+                local.selfServerAcked = true
+                acksChanged = true
+            }
+            trailIdx++
+            itemsCursor++
+        }
+
+        val toAdd = items.subList(itemsCursor, items.size)
         if (toAdd.isEmpty()) {
             if (acksChanged) notifyDataSetChanged()
             return 0
@@ -96,22 +127,77 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         return toAdd.size
     }
 
-    private fun regionMatches(localStart: Int, items: List<ChatLine>, length: Int): Boolean {
-        for (i in 0 until length) {
-            val a = lines[localStart + i]
-            val b = items[i]
+    private fun countTrailingUnackedSelf(): Int {
+        var n = 0
+        while (n < lines.size) {
+            val line = lines[lines.size - 1 - n]
+            if (line is ChatLine.Self && !line.selfServerAcked) n++
+            else break
+        }
+        return n
+    }
 
-            val same = when {
-                a is ChatLine.Self && b is ChatLine.Self ->
-                    a.text == b.text
-                a is ChatLine.Peer && b is ChatLine.Peer ->
-                    a.text == b.text && a.authorName == b.authorName
-                else -> false
+    /** Нет общего фрагмента — заменить подтверждённую часть историей, сохранить локальные unacked. */
+    private fun resyncWithHistory(items: List<ChatLine>, trailingUnacked: Int): Int {
+        val kept = ArrayList<ChatLine>(trailingUnacked)
+        for (i in lines.size - trailingUnacked until lines.size) {
+            kept.add(lines[i])
+        }
+
+        var skipKept = 0
+        val maxK = minOf(kept.size, items.size)
+        for (k in maxK downTo 1) {
+            if (regionEquals(kept, 0, items, items.size - k, k)) {
+                skipKept = k
+                break
             }
+        }
 
-            if (!same) return false
+        val oldSize = lines.size
+        pendingSelfAckPositions.clear()
+        lines.clear()
+        lines.addAll(items)
+        for (i in skipKept until kept.size) {
+            val line = kept[i]
+            lines.add(line)
+            if (line is ChatLine.Self && !line.selfServerAcked) {
+                pendingSelfAckPositions.addLast(lines.size - 1)
+            }
+        }
+        notifyDataSetChanged()
+        return lines.size - oldSize
+    }
+
+    private fun regionMatchesAt(
+        localStart: Int,
+        items: List<ChatLine>,
+        itemsStart: Int,
+        length: Int,
+    ): Boolean {
+        for (i in 0 until length) {
+            if (!contentEquals(lines[localStart + i], items[itemsStart + i])) return false
         }
         return true
+    }
+
+    private fun regionEquals(
+        a: List<ChatLine>,
+        aStart: Int,
+        b: List<ChatLine>,
+        bStart: Int,
+        length: Int,
+    ): Boolean {
+        for (i in 0 until length) {
+            if (!contentEquals(a[aStart + i], b[bStart + i])) return false
+        }
+        return true
+    }
+
+    private fun contentEquals(a: ChatLine, b: ChatLine): Boolean = when {
+        a is ChatLine.Self && b is ChatLine.Self -> a.text == b.text
+        a is ChatLine.Peer && b is ChatLine.Peer ->
+            a.text == b.text && a.authorName == b.authorName
+        else -> false
     }
 
     private fun markSelfServerAckedAt(position: Int) {

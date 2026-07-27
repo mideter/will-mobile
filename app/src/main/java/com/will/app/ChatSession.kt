@@ -59,6 +59,15 @@ class ChatSession(
     /** Буфер HistoryItem до HistoryEnd — чтобы не мигать чатом при reconnect. */
     private val historyBuffer = ArrayList<ChatLine>()
 
+    /**
+     * Peer-сообщения, пришедшие UserChat до HistoryEnd.
+     * В UI не пускаем сразу — иначе applyHistory часто не находит overlap и дублирует snapshot.
+     */
+    private val deferredPeers = ArrayList<DeferredPeer>()
+
+    /** true с момента TCP-up до ApplyHistory (включительно обработка deferred). */
+    private var awaitingHistory = false
+
     private var connectionState: ChatConnectionState =
         ChatConnectionState.Busy(R.string.chat_connecting)
 
@@ -90,6 +99,8 @@ class ChatSession(
             emit(ChatUiEvent.ClearChat)
         }
         historyBuffer.clear()
+        deferredPeers.clear()
+        awaitingHistory = false
         setConnectionState(
             ChatConnectionState.Busy(
                 if (isReconnect) R.string.chat_reconnecting else R.string.chat_connecting,
@@ -138,6 +149,9 @@ class ChatSession(
         generation++
         sendInFlight = false
         connectAttemptActive = false
+        awaitingHistory = false
+        historyBuffer.clear()
+        deferredPeers.clear()
         mainHandler.removeCallbacks(reconnectRunnable)
         bridge.disconnectServer()
     }
@@ -145,6 +159,10 @@ class ChatSession(
     private fun listenerFor(gen: Int) = object : WillChatBridge.Listener {
         override fun onPeerMessage(authorName: String, text: String) {
             if (!isCurrent(gen)) return
+            if (awaitingHistory) {
+                deferredPeers.add(DeferredPeer(authorName, text))
+                return
+            }
             emit(ChatUiEvent.AppendPeer(authorName, text))
         }
 
@@ -163,8 +181,20 @@ class ChatSession(
 
         override fun onHistoryLoaded() {
             if (!isCurrent(gen)) return
-            emit(ChatUiEvent.ApplyHistory(historyBuffer.toList()))
+            val snapshot = historyBuffer.toList()
             historyBuffer.clear()
+            emit(ChatUiEvent.ApplyHistory(snapshot))
+
+            val pending = deferredPeers.toList()
+            deferredPeers.clear()
+            awaitingHistory = false
+
+            val skip = countDeferredAlreadyInHistory(snapshot, pending)
+            for (i in skip until pending.size) {
+                val p = pending[i]
+                emit(ChatUiEvent.AppendPeer(p.authorName, p.text))
+            }
+
             connectAttemptActive = false
             setConnectionState(ChatConnectionState.Ready)
         }
@@ -187,6 +217,8 @@ class ChatSession(
                 return
             }
             historyBuffer.clear()
+            deferredPeers.clear()
+            awaitingHistory = true
             setConnectionState(ChatConnectionState.Busy(R.string.chat_loading_history))
         }
     }
@@ -205,7 +237,9 @@ class ChatSession(
         generation++
         sendInFlight = false
         connectAttemptActive = false
+        awaitingHistory = false
         historyBuffer.clear()
+        deferredPeers.clear()
         setConnectionState(ChatConnectionState.Busy(R.string.chat_reconnecting))
         scheduleReconnect()
     }
@@ -215,8 +249,38 @@ class ChatSession(
         mainHandler.postDelayed(reconnectRunnable, RECONNECT_DELAY_MS)
     }
 
+    private data class DeferredPeer(val authorName: String, val text: String)
+
     companion object {
         private const val TAG = "ChatSession"
         private const val RECONNECT_DELAY_MS = 3_000L
+
+        /**
+         * Сколько ведущих deferred уже есть суффиксом snapshot истории
+         * (UserChat дублирует хвост HistoryItem).
+         */
+        private fun countDeferredAlreadyInHistory(
+            snapshot: List<ChatLine>,
+            pending: List<DeferredPeer>,
+        ): Int {
+            if (snapshot.isEmpty() || pending.isEmpty()) return 0
+            val maxK = minOf(snapshot.size, pending.size)
+            for (k in maxK downTo 1) {
+                var ok = true
+                for (i in 0 until k) {
+                    val hist = snapshot[snapshot.size - k + i]
+                    val peer = pending[i]
+                    if (hist !is ChatLine.Peer ||
+                        hist.text != peer.text ||
+                        hist.authorName != peer.authorName
+                    ) {
+                        ok = false
+                        break
+                    }
+                }
+                if (ok) return k
+            }
+            return 0
+        }
     }
 }
