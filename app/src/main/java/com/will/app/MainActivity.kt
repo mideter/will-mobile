@@ -2,7 +2,6 @@ package com.will.app
 
 import android.app.Activity
 import android.os.Bundle
-import android.view.MotionEvent
 import android.view.View
 import android.widget.ListView
 import android.widget.TextView
@@ -87,12 +86,7 @@ class MainActivity : Activity() {
     private fun setupChatList() {
         chatAdapter = ChatListAdapter(this)
         chatList.adapter = chatAdapter
-        chatList.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_DOWN) {
-                composer.toggleFromChatTouch()
-            }
-            false
-        }
+        composer.attachChatTapToggle(chatList)
     }
 
     override fun onResume() {

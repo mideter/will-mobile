@@ -6,7 +6,9 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
@@ -63,8 +65,47 @@ class ChatComposer(
         btnSend.isEnabled = enabled
     }
 
+    /**
+     * Тап по [chatList] показывает/прячет композер; прокрутка (сдвиг > touchSlop) — нет.
+     * Listener всегда возвращает false, чтобы ListView продолжал скроллиться.
+     */
+    fun attachChatTapToggle(chatList: View) {
+        val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
+        val touchSlopSq = touchSlop * touchSlop
+        var downX = 0f
+        var downY = 0f
+        var moved = false
+        chatList.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    moved = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (!moved) {
+                        val dx = event.x - downX
+                        val dy = event.y - downY
+                        if (dx * dx + dy * dy > touchSlopSq) {
+                            moved = true
+                        }
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!moved) {
+                        toggleFromChatTouch()
+                    }
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    moved = true
+                }
+            }
+            false
+        }
+    }
+
     /** Тап по чату: показать или спрятать (черновик только снимает фокус/IME). */
-    fun toggleFromChatTouch() {
+    private fun toggleFromChatTouch() {
         if (wrap.visibility == View.VISIBLE) {
             if (hasDraft()) {
                 editMessage.clearFocus()
