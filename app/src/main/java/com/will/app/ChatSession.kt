@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import java.util.ArrayDeque
 
 
 sealed class ChatConnectionState {
@@ -43,15 +42,16 @@ sealed class ChatUiEvent {
     data object ClearChat : ChatUiEvent()
     data class AppendPeer(val authorName: String, val text: String) : ChatUiEvent()
     data class AppendSelf(val text: String) : ChatUiEvent()
-    data class MarkSelfAcked(val position: Int) : ChatUiEvent()
+    data object ConfirmNextSelfAck : ChatUiEvent()
     data class ApplyHistory(val items: List<ChatLine>) : ChatUiEvent()
     data class ConnectionChanged(val state: ChatConnectionState) : ChatUiEvent()
 }
 
 
 /**
- * Сессия чата: TCP-bridge, reconnect, буфер истории и очередь ack своих сообщений.
+ * Сессия чата: TCP-bridge, reconnect и буфер истории.
  * UI обновляется через [Listener] на главном потоке (колбэки bridge уже на main).
+ * Очередь server-ack живёт в [ChatListAdapter] — сессия только сигналит ConfirmNextSelfAck.
  */
 class ChatSession(
     context: Context,
@@ -60,11 +60,7 @@ class ChatSession(
 
     interface Listener {
         fun isSessionActive(): Boolean
-        /**
-         * Обработка UI-события.
-         * @return для [ChatUiEvent.AppendSelf] — позиция строки; иначе 0
-         */
-        fun onEvent(event: ChatUiEvent): Int
+        fun onEvent(event: ChatUiEvent)
     }
 
     sealed class SendResult {
@@ -77,9 +73,6 @@ class ChatSession(
     private val appContext = context.applicationContext
     private val bridge = WillChatBridge()
     private val mainHandler = Handler(Looper.getMainLooper())
-
-    /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
-    private val pendingSelfAckPositions = ArrayDeque<Int>()
 
     /** Буфер HistoryItem до HistoryEnd — чтобы не мигать чатом при reconnect. */
     private val historyBuffer = ArrayList<ChatLine>()
@@ -104,8 +97,7 @@ class ChatSession(
 
         override fun onServerReceiptConfirmed() {
             if (!listener.isSessionActive()) return
-            val pos = pendingSelfAckPositions.pollFirst() ?: return
-            emit(ChatUiEvent.MarkSelfAcked(pos))
+            emit(ChatUiEvent.ConfirmNextSelfAck)
         }
 
         override fun onHistoryItem(authorName: String, text: String, isMine: Boolean) {
@@ -179,8 +171,7 @@ class ChatSession(
         if (trimmed.isEmpty()) return SendResult.Empty
         val maxLen = appContext.resources.getInteger(R.integer.max_message_length)
         if (trimmed.length > maxLen) return SendResult.TooLong(maxLen)
-        val position = emit(ChatUiEvent.AppendSelf(trimmed))
-        pendingSelfAckPositions.addLast(position)
+        emit(ChatUiEvent.AppendSelf(trimmed))
         bridge.sendLine(trimmed)
         return SendResult.Sent
     }
@@ -190,17 +181,16 @@ class ChatSession(
         bridge.disconnectServer()
     }
 
-    private fun emit(event: ChatUiEvent): Int = listener.onEvent(event)
+    private fun emit(event: ChatUiEvent) = listener.onEvent(event)
 
     private fun setConnectionState(state: ChatConnectionState) {
         connectionState = state
         emit(ChatUiEvent.ConnectionChanged(state))
     }
 
-    /** Сброс локальных буферов: история/ack ещё не валидны для текущего цикла. */
+    /** Сброс локального буфера истории перед новым циклом сессии. */
     private fun resetSessionBuffers() {
         historyBuffer.clear()
-        pendingSelfAckPositions.clear()
     }
 
     private fun enterReconnectingState() {

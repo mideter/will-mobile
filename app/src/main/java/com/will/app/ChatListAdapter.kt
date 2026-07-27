@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.TextView
+import java.util.ArrayDeque
 
 
 sealed class ChatLine {
@@ -25,15 +26,33 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
     private val lines = ArrayList<ChatLine>()
     private val inflater = LayoutInflater.from(context)
 
+    /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
+    private val pendingSelfAckPositions = ArrayDeque<Int>()
+
     fun append(line: ChatLine) {
         lines.add(line)
+        if (line is ChatLine.Self && !line.selfServerAcked) {
+            pendingSelfAckPositions.addLast(lines.size - 1)
+        }
         notifyDataSetChanged()
     }
 
     fun clear() {
+        pendingSelfAckPositions.clear()
         if (lines.isEmpty()) return
         lines.clear()
         notifyDataSetChanged()
+    }
+
+    /** Сброс очереди ack без очистки списка (reconnect / новый цикл сессии). */
+    fun clearPendingSelfAcks() {
+        pendingSelfAckPositions.clear()
+    }
+
+    /** Подтверждение следующего своего сообщения в порядке отправки. */
+    fun confirmNextSelfAck() {
+        val position = pendingSelfAckPositions.pollFirst() ?: return
+        markSelfServerAckedAt(position)
     }
 
     /**
@@ -104,7 +123,7 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         return true
     }
 
-    fun markSelfServerAckedAt(position: Int) {
+    private fun markSelfServerAckedAt(position: Int) {
         if (position < 0 || position >= lines.size) return
         val line = lines[position] as? ChatLine.Self ?: return
         if (line.selfServerAcked) return

@@ -25,43 +25,41 @@ class MainActivity : Activity() {
     private val sessionListener = object : ChatSession.Listener {
         override fun isSessionActive(): Boolean = !isFinishing
 
-        override fun onEvent(event: ChatUiEvent): Int = when (event) {
-            ChatUiEvent.ClearChat -> {
-                chatAdapter.clear()
-                0
-            }
-            is ChatUiEvent.AppendPeer -> {
-                chatAdapter.append(ChatLine.Peer(event.text, event.authorName))
-                scrollChatToEnd()
-                0
-            }
-            is ChatUiEvent.AppendSelf -> {
-                chatAdapter.append(ChatLine.Self(event.text))
-                scrollChatToEnd()
-                chatAdapter.count - 1
-            }
-            is ChatUiEvent.MarkSelfAcked -> {
-                chatAdapter.markSelfServerAckedAt(event.position)
-                0
-            }
-            is ChatUiEvent.ApplyHistory -> {
-                val added = chatAdapter.applyHistoryReplay(event.items)
-                if (added > 0) scrollChatToEnd()
-                0
-            }
-            is ChatUiEvent.ConnectionChanged -> {
-                val state = event.state
-                val statusRes = state.statusRes
-                if (statusRes == null) {
-                    connectionStatus.text = ""
-                    connectionStatus.visibility = View.GONE
-                } else {
-                    connectionStatus.setText(statusRes)
-                    connectionStatus.visibility = View.VISIBLE
+        override fun onEvent(event: ChatUiEvent) {
+            when (event) {
+                ChatUiEvent.ClearChat -> chatAdapter.clear()
+                is ChatUiEvent.AppendPeer -> {
+                    chatAdapter.append(ChatLine.Peer(event.text, event.authorName))
+                    scrollChatToEnd()
                 }
-                editMessage.isEnabled = state.composerEnabled
-                btnSend.isEnabled = state.composerEnabled
-                0
+                is ChatUiEvent.AppendSelf -> {
+                    chatAdapter.append(ChatLine.Self(event.text))
+                    scrollChatToEnd()
+                }
+                ChatUiEvent.ConfirmNextSelfAck -> chatAdapter.confirmNextSelfAck()
+                is ChatUiEvent.ApplyHistory -> {
+                    val added = chatAdapter.applyHistoryReplay(event.items)
+                    if (added > 0) scrollChatToEnd()
+                }
+                is ChatUiEvent.ConnectionChanged -> {
+                    val state = event.state
+                    // Новый цикл сессии: индексы pending-ack больше не валидны.
+                    if (state !is ChatConnectionState.Ready &&
+                        state !is ChatConnectionState.Idle
+                    ) {
+                        chatAdapter.clearPendingSelfAcks()
+                    }
+                    val statusRes = state.statusRes
+                    if (statusRes == null) {
+                        connectionStatus.text = ""
+                        connectionStatus.visibility = View.GONE
+                    } else {
+                        connectionStatus.setText(statusRes)
+                        connectionStatus.visibility = View.VISIBLE
+                    }
+                    editMessage.isEnabled = state.composerEnabled
+                    btnSend.isEnabled = state.composerEnabled
+                }
             }
         }
     }
