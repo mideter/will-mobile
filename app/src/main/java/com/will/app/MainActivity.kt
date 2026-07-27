@@ -1,12 +1,9 @@
 package com.will.app
 
 import android.app.Activity
-import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
-import android.view.WindowInsets
-import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
@@ -72,7 +69,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        applySystemBarInsets()
+        SystemBarInsets.applyToHeader(this, R.id.headerWrap)
 
         chatList = findViewById(R.id.chatList)
         composerWrap = findViewById(R.id.composerWrap)
@@ -114,33 +111,6 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         session.destroy()
         super.onDestroy()
-    }
-
-    private fun applySystemBarInsets() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            window.attributes = window.attributes.apply {
-                layoutInDisplayCutoutMode =
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
-            }
-        }
-
-        val headerWrap = findViewById<View>(R.id.headerWrap)
-        headerWrap.setOnApplyWindowInsetsListener { view, insets ->
-            val statusBarTop = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                insets.getInsets(WindowInsets.Type.statusBars()).top
-            } else {
-                @Suppress("DEPRECATION")
-                insets.systemWindowInsets.top
-            }
-            view.setPadding(
-                view.paddingLeft,
-                statusBarTop,
-                view.paddingRight,
-                view.paddingBottom,
-            )
-            insets
-        }
-        headerWrap.requestApplyInsets()
     }
 
     private fun scrollChatToEnd() {
