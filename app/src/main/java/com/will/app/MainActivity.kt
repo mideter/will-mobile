@@ -71,26 +71,35 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         SystemBarInsets.applyToHeader(this, R.id.headerWrap)
 
+        bindViews()
+        setupChatList()
+        setupComposer()
+
+        session = ChatSession(this, sessionListener)
+        session.connect(isReconnect = false)
+    }
+
+    private fun bindViews() {
         chatList = findViewById(R.id.chatList)
         composerWrap = findViewById(R.id.composerWrap)
         editMessage = findViewById(R.id.editMessage)
         btnSend = findViewById(R.id.btnSend)
         connectionStatus = findViewById(R.id.connectionStatus)
+    }
 
+    private fun setupChatList() {
         chatAdapter = ChatListAdapter(this)
         chatList.adapter = chatAdapter
-
-        session = ChatSession(this, sessionListener)
-
         chatList.setOnTouchListener { _, event ->
             if (event.action == MotionEvent.ACTION_DOWN) {
                 showComposer()
             }
             false
         }
+    }
 
+    private fun setupComposer() {
         btnSend.setOnClickListener { onSend() }
-
         editMessage.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 onSend()
@@ -99,8 +108,6 @@ class MainActivity : Activity() {
                 false
             }
         }
-
-        session.connect(isReconnect = false)
     }
 
     override fun onResume() {
