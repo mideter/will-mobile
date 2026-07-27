@@ -419,7 +419,7 @@ class WillChatBridge {
         private const val MAX_HISTORY_REQUEST_LIMIT = 1000
 
         /** Как `--history N` в will-client. */
-        private const val HISTORY_LIMIT_ON_CONNECT = 50
+        private const val HISTORY_LIMIT_ON_CONNECT = 200
 
         /** `WireMessage::Type::UserChat` */
         private const val USER_CHAT_TYPE: Byte = 1
