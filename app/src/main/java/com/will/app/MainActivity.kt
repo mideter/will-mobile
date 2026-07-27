@@ -28,44 +28,46 @@ class MainActivity : Activity() {
     private val sessionListener = object : ChatSession.Listener {
         override fun isSessionActive(): Boolean = !isFinishing
 
-        override fun clearChat() {
-            chatAdapter.clear()
-        }
-
-        override fun appendPeer(authorName: String, text: String) {
-            chatAdapter.append(ChatLine.Peer(text, authorName))
-            this@MainActivity.scrollChatToEnd()
-        }
-
-        override fun appendSelf(text: String): Int {
-            chatAdapter.append(ChatLine.Self(text))
-            this@MainActivity.scrollChatToEnd()
-            return chatAdapter.count - 1
-        }
-
-        override fun markSelfAcked(position: Int) {
-            chatAdapter.markSelfServerAckedAt(position)
-        }
-
-        override fun applyHistory(items: List<ChatLine>): Int =
-            chatAdapter.applyHistoryReplay(items)
-
-        override fun setConnectionStatus(textRes: Int?) {
-            if (textRes == null) {
-                connectionStatus.text = ""
-                connectionStatus.visibility = View.GONE
-            } else {
-                connectionStatus.setText(textRes)
-                connectionStatus.visibility = View.VISIBLE
+        override fun onEvent(event: ChatUiEvent): Int = when (event) {
+            ChatUiEvent.ClearChat -> {
+                chatAdapter.clear()
+                0
+            }
+            is ChatUiEvent.AppendPeer -> {
+                chatAdapter.append(ChatLine.Peer(event.text, event.authorName))
+                scrollChatToEnd()
+                0
+            }
+            is ChatUiEvent.AppendSelf -> {
+                chatAdapter.append(ChatLine.Self(event.text))
+                scrollChatToEnd()
+                chatAdapter.count - 1
+            }
+            is ChatUiEvent.MarkSelfAcked -> {
+                chatAdapter.markSelfServerAckedAt(event.position)
+                0
+            }
+            is ChatUiEvent.ApplyHistory -> {
+                val added = chatAdapter.applyHistoryReplay(event.items)
+                if (added > 0) scrollChatToEnd()
+                0
+            }
+            is ChatUiEvent.Status -> {
+                if (event.textRes == null) {
+                    connectionStatus.text = ""
+                    connectionStatus.visibility = View.GONE
+                } else {
+                    connectionStatus.setText(event.textRes)
+                    connectionStatus.visibility = View.VISIBLE
+                }
+                0
+            }
+            is ChatUiEvent.ComposerEnabled -> {
+                editMessage.isEnabled = event.enabled
+                btnSend.isEnabled = event.enabled
+                0
             }
         }
-
-        override fun setComposerEnabled(enabled: Boolean) {
-            editMessage.isEnabled = enabled
-            btnSend.isEnabled = enabled
-        }
-
-        override fun scrollChatToEnd() = this@MainActivity.scrollChatToEnd()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

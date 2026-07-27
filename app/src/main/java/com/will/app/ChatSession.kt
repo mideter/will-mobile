@@ -6,6 +6,18 @@ import android.os.Looper
 import android.util.Log
 import java.util.ArrayDeque
 
+
+sealed class ChatUiEvent {
+    data object ClearChat : ChatUiEvent()
+    data class AppendPeer(val authorName: String, val text: String) : ChatUiEvent()
+    data class AppendSelf(val text: String) : ChatUiEvent()
+    data class MarkSelfAcked(val position: Int) : ChatUiEvent()
+    data class ApplyHistory(val items: List<ChatLine>) : ChatUiEvent()
+    data class Status(val textRes: Int?) : ChatUiEvent()
+    data class ComposerEnabled(val enabled: Boolean) : ChatUiEvent()
+}
+
+
 /**
  * Сессия чата: TCP-bridge, reconnect, буфер истории и очередь ack своих сообщений.
  * UI обновляется через [Listener] на главном потоке (колбэки bridge уже на main).
@@ -17,16 +29,11 @@ class ChatSession(
 
     interface Listener {
         fun isSessionActive(): Boolean
-        fun clearChat()
-        fun appendPeer(authorName: String, text: String)
-        /** @return позиция добавленной строки в адаптере */
-        fun appendSelf(text: String): Int
-        fun markSelfAcked(position: Int)
-        /** @return сколько строк добавлено при replay */
-        fun applyHistory(items: List<ChatLine>): Int
-        fun setConnectionStatus(textRes: Int?)
-        fun setComposerEnabled(enabled: Boolean)
-        fun scrollChatToEnd()
+        /**
+         * Обработка UI-события.
+         * @return для [ChatUiEvent.AppendSelf] — позиция строки; иначе 0
+         */
+        fun onEvent(event: ChatUiEvent): Int
     }
 
     sealed class SendResult {
@@ -59,13 +66,13 @@ class ChatSession(
     private val bridgeListener = object : WillChatBridge.Listener {
         override fun onPeerMessage(authorName: String, text: String) {
             if (!listener.isSessionActive()) return
-            listener.appendPeer(authorName, text)
+            emit(ChatUiEvent.AppendPeer(authorName, text))
         }
 
         override fun onServerReceiptConfirmed() {
             if (!listener.isSessionActive()) return
             val pos = pendingSelfAckPositions.pollFirst() ?: return
-            listener.markSelfAcked(pos)
+            emit(ChatUiEvent.MarkSelfAcked(pos))
         }
 
         override fun onHistoryItem(authorName: String, text: String, isMine: Boolean) {
@@ -78,14 +85,11 @@ class ChatSession(
 
         override fun onHistoryLoaded() {
             if (!listener.isSessionActive()) return
-            val added = listener.applyHistory(historyBuffer)
+            emit(ChatUiEvent.ApplyHistory(historyBuffer.toList()))
             historyBuffer.clear()
             historyLoaded = true
-            listener.setComposerEnabled(true)
-            listener.setConnectionStatus(null)
-            if (added > 0) {
-                listener.scrollChatToEnd()
-            }
+            emit(ChatUiEvent.ComposerEnabled(true))
+            emit(ChatUiEvent.Status(null))
         }
 
         override fun onError(message: String) {
@@ -97,7 +101,7 @@ class ChatSession(
 
         override fun onAuthenticating() {
             if (!listener.isSessionActive()) return
-            listener.setConnectionStatus(R.string.chat_authenticating)
+            emit(ChatUiEvent.Status(R.string.chat_authenticating))
         }
 
         override fun onConnectionChanged(isConnected: Boolean) {
@@ -109,8 +113,8 @@ class ChatSession(
             historyLoaded = false
             historyBuffer.clear()
             connecting = false
-            listener.setComposerEnabled(false)
-            listener.setConnectionStatus(R.string.chat_loading_history)
+            emit(ChatUiEvent.ComposerEnabled(false))
+            emit(ChatUiEvent.Status(R.string.chat_loading_history))
         }
     }
 
@@ -120,15 +124,17 @@ class ChatSession(
         if (connecting || bridge.isConnected()) return
         mainHandler.removeCallbacks(reconnectRunnable)
         if (!isReconnect) {
-            listener.clearChat()
+            emit(ChatUiEvent.ClearChat)
         }
         historyBuffer.clear()
         pendingSelfAckPositions.clear()
         historyLoaded = false
         connecting = true
-        listener.setComposerEnabled(false)
-        listener.setConnectionStatus(
-            if (isReconnect) R.string.chat_reconnecting else R.string.chat_connecting,
+        emit(ChatUiEvent.ComposerEnabled(false))
+        emit(
+            ChatUiEvent.Status(
+                if (isReconnect) R.string.chat_reconnecting else R.string.chat_connecting,
+            ),
         )
 
         val deviceToken = DeviceTokenStore.loadOrCreate(appContext)
@@ -153,7 +159,7 @@ class ChatSession(
         if (trimmed.isEmpty()) return SendResult.Empty
         val maxLen = appContext.resources.getInteger(R.integer.max_message_length)
         if (trimmed.length > maxLen) return SendResult.TooLong(maxLen)
-        val position = listener.appendSelf(trimmed)
+        val position = emit(ChatUiEvent.AppendSelf(trimmed))
         pendingSelfAckPositions.addLast(position)
         bridge.sendLine(trimmed)
         return SendResult.Sent
@@ -164,13 +170,15 @@ class ChatSession(
         bridge.disconnectServer()
     }
 
+    private fun emit(event: ChatUiEvent): Int = listener.onEvent(event)
+
     private fun enterReconnectingState() {
         connecting = false
         historyLoaded = false
         historyBuffer.clear()
         pendingSelfAckPositions.clear()
-        listener.setComposerEnabled(false)
-        listener.setConnectionStatus(R.string.chat_reconnecting)
+        emit(ChatUiEvent.ComposerEnabled(false))
+        emit(ChatUiEvent.Status(R.string.chat_reconnecting))
         scheduleReconnect()
     }
 
