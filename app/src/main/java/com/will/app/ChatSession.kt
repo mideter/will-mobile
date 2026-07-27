@@ -110,10 +110,8 @@ class ChatSession(
                 enterReconnectingState()
                 return
             }
-            historyLoaded = false
-            historyBuffer.clear()
             connecting = false
-            emit(ChatUiEvent.ComposerEnabled(false))
+            resetSessionState()
             emit(ChatUiEvent.Status(R.string.chat_loading_history))
         }
     }
@@ -126,11 +124,8 @@ class ChatSession(
         if (!isReconnect) {
             emit(ChatUiEvent.ClearChat)
         }
-        historyBuffer.clear()
-        pendingSelfAckPositions.clear()
-        historyLoaded = false
+        resetSessionState()
         connecting = true
-        emit(ChatUiEvent.ComposerEnabled(false))
         emit(
             ChatUiEvent.Status(
                 if (isReconnect) R.string.chat_reconnecting else R.string.chat_connecting,
@@ -172,12 +167,17 @@ class ChatSession(
 
     private fun emit(event: ChatUiEvent): Int = listener.onEvent(event)
 
-    private fun enterReconnectingState() {
-        connecting = false
+    /** Сброс локального состояния: нельзя слать, история ещё не валидна. */
+    private fun resetSessionState() {
         historyLoaded = false
         historyBuffer.clear()
         pendingSelfAckPositions.clear()
         emit(ChatUiEvent.ComposerEnabled(false))
+    }
+
+    private fun enterReconnectingState() {
+        connecting = false
+        resetSessionState()
         emit(ChatUiEvent.Status(R.string.chat_reconnecting))
         scheduleReconnect()
     }
