@@ -52,19 +52,18 @@ class MainActivity : Activity() {
                 if (added > 0) scrollChatToEnd()
                 0
             }
-            is ChatUiEvent.Status -> {
-                if (event.textRes == null) {
+            is ChatUiEvent.ConnectionChanged -> {
+                val state = event.state
+                val statusRes = state.statusRes
+                if (statusRes == null) {
                     connectionStatus.text = ""
                     connectionStatus.visibility = View.GONE
                 } else {
-                    connectionStatus.setText(event.textRes)
+                    connectionStatus.setText(statusRes)
                     connectionStatus.visibility = View.VISIBLE
                 }
-                0
-            }
-            is ChatUiEvent.ComposerEnabled -> {
-                editMessage.isEnabled = event.enabled
-                btnSend.isEnabled = event.enabled
+                editMessage.isEnabled = state.composerEnabled
+                btnSend.isEnabled = state.composerEnabled
                 0
             }
         }

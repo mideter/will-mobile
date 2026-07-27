@@ -7,14 +7,45 @@ import android.util.Log
 import java.util.ArrayDeque
 
 
+sealed class ChatConnectionState {
+    abstract val statusRes: Int?
+    open val composerEnabled: Boolean get() = false
+
+    data object Idle : ChatConnectionState() {
+        override val statusRes: Int? = null
+    }
+
+    data class Connecting(val isReconnect: Boolean) : ChatConnectionState() {
+        override val statusRes: Int
+            get() = if (isReconnect) R.string.chat_reconnecting else R.string.chat_connecting
+    }
+
+    data object Authenticating : ChatConnectionState() {
+        override val statusRes: Int = R.string.chat_authenticating
+    }
+
+    data object LoadingHistory : ChatConnectionState() {
+        override val statusRes: Int = R.string.chat_loading_history
+    }
+
+    data object Ready : ChatConnectionState() {
+        override val statusRes: Int? = null
+        override val composerEnabled: Boolean = true
+    }
+
+    data object Reconnecting : ChatConnectionState() {
+        override val statusRes: Int = R.string.chat_reconnecting
+    }
+}
+
+
 sealed class ChatUiEvent {
     data object ClearChat : ChatUiEvent()
     data class AppendPeer(val authorName: String, val text: String) : ChatUiEvent()
     data class AppendSelf(val text: String) : ChatUiEvent()
     data class MarkSelfAcked(val position: Int) : ChatUiEvent()
     data class ApplyHistory(val items: List<ChatLine>) : ChatUiEvent()
-    data class Status(val textRes: Int?) : ChatUiEvent()
-    data class ComposerEnabled(val enabled: Boolean) : ChatUiEvent()
+    data class ConnectionChanged(val state: ChatConnectionState) : ChatUiEvent()
 }
 
 
@@ -53,13 +84,15 @@ class ChatSession(
     /** Буфер HistoryItem до HistoryEnd — чтобы не мигать чатом при reconnect. */
     private val historyBuffer = ArrayList<ChatLine>()
 
-    /** История с сервера получена; можно отправлять сообщения. */
-    private var historyLoaded = false
-
-    private var connecting = false
+    private var connectionState: ChatConnectionState = ChatConnectionState.Idle
 
     private val reconnectRunnable = Runnable {
-        if (!listener.isSessionActive() || connecting || bridge.isConnected()) return@Runnable
+        if (!listener.isSessionActive() ||
+            connectionState is ChatConnectionState.Connecting ||
+            bridge.isConnected()
+        ) {
+            return@Runnable
+        }
         connect(isReconnect = true)
     }
 
@@ -87,9 +120,7 @@ class ChatSession(
             if (!listener.isSessionActive()) return
             emit(ChatUiEvent.ApplyHistory(historyBuffer.toList()))
             historyBuffer.clear()
-            historyLoaded = true
-            emit(ChatUiEvent.ComposerEnabled(true))
-            emit(ChatUiEvent.Status(null))
+            setConnectionState(ChatConnectionState.Ready)
         }
 
         override fun onError(message: String) {
@@ -101,7 +132,7 @@ class ChatSession(
 
         override fun onAuthenticating() {
             if (!listener.isSessionActive()) return
-            emit(ChatUiEvent.Status(R.string.chat_authenticating))
+            setConnectionState(ChatConnectionState.Authenticating)
         }
 
         override fun onConnectionChanged(isConnected: Boolean) {
@@ -110,27 +141,21 @@ class ChatSession(
                 enterReconnectingState()
                 return
             }
-            connecting = false
-            resetSessionState()
-            emit(ChatUiEvent.Status(R.string.chat_loading_history))
+            resetSessionBuffers()
+            setConnectionState(ChatConnectionState.LoadingHistory)
         }
     }
 
-    fun isReadyForComposerFocus(): Boolean = bridge.isConnected() && historyLoaded
+    fun isReadyForComposerFocus(): Boolean = connectionState is ChatConnectionState.Ready
 
     fun connect(isReconnect: Boolean) {
-        if (connecting || bridge.isConnected()) return
+        if (connectionState is ChatConnectionState.Connecting || bridge.isConnected()) return
         mainHandler.removeCallbacks(reconnectRunnable)
         if (!isReconnect) {
             emit(ChatUiEvent.ClearChat)
         }
-        resetSessionState()
-        connecting = true
-        emit(
-            ChatUiEvent.Status(
-                if (isReconnect) R.string.chat_reconnecting else R.string.chat_connecting,
-            ),
-        )
+        resetSessionBuffers()
+        setConnectionState(ChatConnectionState.Connecting(isReconnect))
 
         val deviceToken = DeviceTokenStore.loadOrCreate(appContext)
         bridge.connect(
@@ -143,13 +168,13 @@ class ChatSession(
 
     /** Если сессия не подключена и не в процессе connect — начать reconnect. */
     fun ensureConnected() {
-        if (!connecting && !bridge.isConnected()) {
+        if (connectionState !is ChatConnectionState.Connecting && !bridge.isConnected()) {
             connect(isReconnect = true)
         }
     }
 
     fun send(text: String): SendResult {
-        if (!bridge.isConnected() || !historyLoaded) return SendResult.NotReady
+        if (connectionState !is ChatConnectionState.Ready) return SendResult.NotReady
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return SendResult.Empty
         val maxLen = appContext.resources.getInteger(R.integer.max_message_length)
@@ -167,18 +192,20 @@ class ChatSession(
 
     private fun emit(event: ChatUiEvent): Int = listener.onEvent(event)
 
-    /** Сброс локального состояния: нельзя слать, история ещё не валидна. */
-    private fun resetSessionState() {
-        historyLoaded = false
+    private fun setConnectionState(state: ChatConnectionState) {
+        connectionState = state
+        emit(ChatUiEvent.ConnectionChanged(state))
+    }
+
+    /** Сброс локальных буферов: история/ack ещё не валидны для текущего цикла. */
+    private fun resetSessionBuffers() {
         historyBuffer.clear()
         pendingSelfAckPositions.clear()
-        emit(ChatUiEvent.ComposerEnabled(false))
     }
 
     private fun enterReconnectingState() {
-        connecting = false
-        resetSessionState()
-        emit(ChatUiEvent.Status(R.string.chat_reconnecting))
+        resetSessionBuffers()
+        setConnectionState(ChatConnectionState.Reconnecting)
         scheduleReconnect()
     }
 
