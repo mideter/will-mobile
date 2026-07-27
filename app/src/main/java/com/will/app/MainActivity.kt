@@ -3,8 +3,6 @@ package com.will.app
 import android.app.Activity
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
@@ -15,13 +13,11 @@ import android.widget.EditText
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
-import java.util.ArrayDeque
 
 
 class MainActivity : Activity() {
 
-    private val bridge = WillChatBridge()
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private lateinit var session: ChatSession
     private lateinit var chatAdapter: ChatListAdapter
     private lateinit var chatList: ListView
     private lateinit var composerWrap: View
@@ -29,94 +25,51 @@ class MainActivity : Activity() {
     private lateinit var btnSend: Button
     private lateinit var connectionStatus: TextView
 
-    /** Позиции своих сообщений, ожидающих ack сервера (FIFO, как кадры на сервере). */
-    private val pendingSelfAckPositions = ArrayDeque<Int>()
+    private val sessionListener = object : ChatSession.Listener {
+        override fun isSessionActive(): Boolean = !isFinishing
 
-    /** Буфер HistoryItem до HistoryEnd — чтобы не мигать чатом при reconnect. */
-    private val historyBuffer = ArrayList<ChatLine>()
+        override fun hasWindowFocus(): Boolean = this@MainActivity.hasWindowFocus()
 
-    /** История с сервера получена; можно отправлять сообщения. */
-    private var historyLoaded = false
+        override fun clearChat() {
+            chatAdapter.clear()
+        }
 
-    private var connecting = false
-
-    private val reconnectRunnable = Runnable {
-        if (isFinishing || connecting || bridge.isConnected()) return@Runnable
-        connect(isReconnect = true)
-    }
-
-    private val bridgeListener = object : WillChatBridge.Listener {
-        override fun onPeerMessage(authorName: String, text: String) {
-            if (isFinishing) return
-            val unread = !hasWindowFocus()
+        override fun appendPeer(authorName: String, text: String, unread: Boolean) {
             appendChatLine(ChatLineKind.PEER, text, peerUnread = unread, authorName = authorName)
         }
 
-        override fun onServerReceiptConfirmed() {
-            if (isFinishing) return
-            val pos = pendingSelfAckPositions.pollFirst() ?: return
-            chatAdapter.markSelfServerAckedAt(pos)
+        override fun appendSelf(text: String): Int {
+            appendChatLine(ChatLineKind.SELF, text)
+            return chatAdapter.count - 1
         }
 
-        override fun onHistoryItem(authorName: String, text: String, isMine: Boolean) {
-            if (isFinishing) return
-            val kind = if (isMine) ChatLineKind.SELF else ChatLineKind.PEER
-            historyBuffer.add(
-                ChatLine(
-                    kind,
-                    text,
-                    selfServerAcked = isMine,
-                    authorName = if (isMine) "" else authorName,
-                ),
-            )
+        override fun markSelfAcked(position: Int) {
+            chatAdapter.markSelfServerAckedAt(position)
         }
 
-        override fun onHistoryLoaded() {
-            if (isFinishing) return
-            val added = chatAdapter.applyHistoryReplay(historyBuffer)
-            historyBuffer.clear()
-            historyLoaded = true
-            setComposerEnabled(true)
-            setConnectionStatus(null)
-            if (added > 0) {
-                scrollChatToEnd()
+        override fun applyHistory(items: List<ChatLine>): Int =
+            chatAdapter.applyHistoryReplay(items)
+
+        override fun setConnectionStatus(textRes: Int?) {
+            if (textRes == null) {
+                connectionStatus.text = ""
+                connectionStatus.visibility = View.GONE
+            } else {
+                connectionStatus.setText(textRes)
+                connectionStatus.visibility = View.VISIBLE
             }
         }
 
-        override fun onError(message: String) {
-            if (isFinishing) return
-            // Тихий обрыв: без диалога, чат на экране, авто-reconnect.
-            connecting = false
-            historyLoaded = false
-            historyBuffer.clear()
-            pendingSelfAckPositions.clear()
-            setComposerEnabled(false)
-            setConnectionStatus(R.string.chat_reconnecting)
-            scheduleReconnect()
+        override fun setComposerEnabled(enabled: Boolean) {
+            editMessage.isEnabled = enabled
+            btnSend.isEnabled = enabled
         }
 
-        override fun onAuthenticating() {
-            if (isFinishing) return
-            setConnectionStatus(R.string.chat_authenticating)
-        }
-
-        override fun onConnectionChanged(isConnected: Boolean) {
-            if (isFinishing) return
-            if (!isConnected) {
-                historyLoaded = false
-                historyBuffer.clear()
-                pendingSelfAckPositions.clear()
-                connecting = false
-                setComposerEnabled(false)
-                setConnectionStatus(R.string.chat_reconnecting)
-                scheduleReconnect()
-                return
+        override fun scrollChatToEnd() {
+            val pos = chatAdapter.count - 1
+            if (pos >= 0) {
+                chatList.setSelection(pos)
             }
-            historyLoaded = false
-            historyBuffer.clear()
-            connecting = false
-            setComposerEnabled(false)
-            setConnectionStatus(R.string.chat_loading_history)
         }
     }
 
@@ -133,6 +86,8 @@ class MainActivity : Activity() {
 
         chatAdapter = ChatListAdapter(this)
         chatList.adapter = chatAdapter
+
+        session = ChatSession(this, sessionListener)
 
         chatList.setOnTouchListener { _, event ->
             if (event.action == MotionEvent.ACTION_DOWN) {
@@ -152,27 +107,24 @@ class MainActivity : Activity() {
             }
         }
 
-        connect(isReconnect = false)
+        session.connect(isReconnect = false)
     }
 
     override fun onResume() {
         super.onResume()
-        markPeerMessagesRead()
-        if (!connecting && !bridge.isConnected()) {
-            connect(isReconnect = true)
-        }
+        chatAdapter.markPeerRead
+        session.ensureConnected()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            markPeerMessagesRead()
+            chatAdapter.markPeerRead()
         }
     }
 
     override fun onDestroy() {
-        mainHandler.removeCallbacks(reconnectRunnable)
-        bridge.disconnectServer()
+        session.destroy()
         super.onDestroy()
     }
 
@@ -206,20 +158,9 @@ class MainActivity : Activity() {
     private fun showComposer() {
         if (composerWrap.visibility == View.VISIBLE) return
         composerWrap.visibility = View.VISIBLE
-        if (bridge.isConnected() && historyLoaded) {
+        if (session.isReadyForComposerFocus()) {
             editMessage.requestFocus()
         }
-    }
-
-    private fun scrollChatToEnd() {
-        val pos = chatAdapter.count - 1
-        if (pos >= 0) {
-            chatList.setSelection(pos)
-        }
-    }
-
-    private fun markPeerMessagesRead() {
-        chatAdapter.markPeerRead()
     }
 
     private fun appendChatLine(
@@ -229,73 +170,23 @@ class MainActivity : Activity() {
         authorName: String = "",
     ) {
         chatAdapter.append(ChatLine(kind, text, peerUnread, authorName = authorName))
-        scrollChatToEnd()
-    }
-
-    private fun setConnectionStatus(textRes: Int?) {
-        if (textRes == null) {
-            connectionStatus.text = ""
-            connectionStatus.visibility = View.GONE
-        } else {
-            connectionStatus.setText(textRes)
-            connectionStatus.visibility = View.VISIBLE
-        }
-    }
-
-    private fun scheduleReconnect() {
-        mainHandler.removeCallbacks(reconnectRunnable)
-        mainHandler.postDelayed(reconnectRunnable, RECONNECT_DELAY_MS)
-    }
-
-    private fun connect(isReconnect: Boolean) {
-        if (connecting || bridge.isConnected()) return
-        mainHandler.removeCallbacks(reconnectRunnable)
-        if (!isReconnect) {
-            chatAdapter.clear()
-        }
-        historyBuffer.clear()
-        pendingSelfAckPositions.clear()
-        historyLoaded = false
-        connecting = true
-        setComposerEnabled(false)
-        setConnectionStatus(
-            if (isReconnect) R.string.chat_reconnecting else R.string.chat_connecting,
-        )
-
-        val deviceToken = DeviceTokenStore.loadOrCreate(this)
-        bridge.connect(
-            WillChatBridge.DEFAULT_HOST,
-            WillChatBridge.DEFAULT_PORT,
-            deviceToken,
-            bridgeListener,
-        )
+        sessionListener.scrollChatToEnd()
     }
 
     private fun onSend() {
-        if (!bridge.isConnected() || !historyLoaded) return
-        val trimmed = editMessage.text?.toString()?.trim().orEmpty()
-        if (trimmed.isEmpty()) return
         val maxLen = resources.getInteger(R.integer.max_message_length)
-        if (trimmed.length > maxLen) {
-            Toast.makeText(
-                this,
-                getString(R.string.chat_message_too_long, maxLen),
-                Toast.LENGTH_SHORT,
-            ).show()
-            return
+        when (
+            val result = session.send(editMessage.text?.toString().orEmpty(), maxLen)
+        ) {
+            is ChatSession.SendResult.TooLong -> {
+                Toast.makeText(
+                    this,
+                    getString(R.string.chat_message_too_long, result.maxLen),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+            ChatSession.SendResult.Sent -> editMessage.text?.clear()
+            ChatSession.SendResult.NotReady, ChatSession.SendResult.Empty -> Unit
         }
-        appendChatLine(ChatLineKind.SELF, trimmed)
-        pendingSelfAckPositions.addLast(chatAdapter.count - 1)
-        bridge.sendLine(trimmed)
-        editMessage.text?.clear()
-    }
-
-    private fun setComposerEnabled(enabled: Boolean) {
-        editMessage.isEnabled = enabled
-        btnSend.isEnabled = enabled
-    }
-
-    companion object {
-        private const val RECONNECT_DELAY_MS = 3_000L
     }
 }
