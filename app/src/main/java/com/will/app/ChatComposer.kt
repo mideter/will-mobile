@@ -141,9 +141,9 @@ class ChatComposer(
 
     companion object {
         /** Простой без ввода — спрятать пустой композер. */
-        private const val IDLE_HIDE_MS = 4_000L
+        private const val IDLE_HIDE_MS = 16_000L
 
         /** После потери фокуса; короче idle, чтобы не мешать «→». */
-        private const val FOCUS_LOSS_HIDE_MS = 250L
+        private const val FOCUS_LOSS_HIDE_MS = 1_000L
     }
 }
