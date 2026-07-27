@@ -34,12 +34,12 @@ class MainActivity : Activity() {
 
         override fun appendPeer(authorName: String, text: String) {
             chatAdapter.append(ChatLine.Peer(text, authorName))
-            scrollChatToEnd()
+            this@MainActivity.scrollChatToEnd()
         }
 
         override fun appendSelf(text: String): Int {
             chatAdapter.append(ChatLine.Self(text))
-            scrollChatToEnd()
+            this@MainActivity.scrollChatToEnd()
             return chatAdapter.count - 1
         }
 
@@ -65,12 +65,7 @@ class MainActivity : Activity() {
             btnSend.isEnabled = enabled
         }
 
-        override fun scrollChatToEnd() {
-            val pos = chatAdapter.count - 1
-            if (pos >= 0) {
-                chatList.setSelection(pos)
-            }
-        }
+        override fun scrollChatToEnd() = this@MainActivity.scrollChatToEnd()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -145,6 +140,13 @@ class MainActivity : Activity() {
             insets
         }
         headerWrap.requestApplyInsets()
+    }
+
+    private fun scrollChatToEnd() {
+        val pos = chatAdapter.count - 1
+        if (pos >= 0) {
+            chatList.setSelection(pos)
+        }
     }
 
     private fun showComposer() {
