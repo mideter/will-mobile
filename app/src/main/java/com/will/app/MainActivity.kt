@@ -35,27 +35,31 @@ class MainActivity : Activity() {
                 is ChatUiEvent.AppendSelf -> {
                     chatAdapter.append(ChatLine.Self(event.text))
                     scrollChatToEnd()
+                    val typed = editMessage.text?.toString().orEmpty()
+                    if (typed.trim() == event.text) {
+                        editMessage.text?.clear()
+                    }
                 }
                 ChatUiEvent.ConfirmNextSelfAck -> chatAdapter.confirmNextSelfAck()
                 is ChatUiEvent.ApplyHistory -> {
-                    val added = chatAdapter.applyHistoryReplay(event.items)
+                    val added = chatAdapter.applyHistory(event.items)
                     if (added > 0) scrollChatToEnd()
                 }
                 is ChatUiEvent.ConnectionChanged -> {
                     val state = event.state
-                    // Новый цикл сессии: индексы pending-ack больше не валидны.
-                    if (state !is ChatConnectionState.Ready &&
-                        state !is ChatConnectionState.Idle
-                    ) {
+                    // Новый цикл: индексы pending-ack больше не валидны.
+                    if (state !is ChatConnectionState.Ready) {
                         chatAdapter.clearPendingSelfAcks()
                     }
-                    val statusRes = state.statusRes
-                    if (statusRes == null) {
-                        connectionStatus.text = ""
-                        connectionStatus.visibility = View.GONE
-                    } else {
-                        connectionStatus.setText(statusRes)
-                        connectionStatus.visibility = View.VISIBLE
+                    when (state) {
+                        is ChatConnectionState.Busy -> {
+                            connectionStatus.setText(state.statusRes)
+                            connectionStatus.visibility = View.VISIBLE
+                        }
+                        ChatConnectionState.Ready -> {
+                            connectionStatus.text = ""
+                            connectionStatus.visibility = View.GONE
+                        }
                     }
                     editMessage.isEnabled = state.composerEnabled
                     btnSend.isEnabled = state.composerEnabled
@@ -142,8 +146,10 @@ class MainActivity : Activity() {
                     Toast.LENGTH_SHORT,
                 ).show()
             }
-            ChatSession.SendResult.Sent -> editMessage.text?.clear()
-            ChatSession.SendResult.NotReady, ChatSession.SendResult.Empty -> Unit
+            ChatSession.SendResult.Accepted,
+            ChatSession.SendResult.NotReady,
+            ChatSession.SendResult.Empty,
+            -> Unit
         }
     }
 }

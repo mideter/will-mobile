@@ -56,11 +56,11 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
     }
 
     /**
-     * Подставляет историю с сервера без мигания: сохраняет уже показанные строки,
-     * дописывает только новые; хвост локальных (например неотправленное) не трогает.
+     * Подставляет историю с сервера без мигания: общий суффикс списка с префиксом
+     * [items] помечает ack и не дублирует; остальное дописывает.
      * @return сколько строк добавлено
      */
-    fun applyHistoryReplay(items: List<ChatLine>): Int {
+    fun applyHistory(items: List<ChatLine>): Int {
         if (items.isEmpty()) return 0
         if (lines.isEmpty()) {
             lines.addAll(items)
@@ -68,34 +68,25 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
             return items.size
         }
 
-        var bestOverlap = 0
-        var bestTrailingSkip = 0
-        val maxTrailingSkip = lines.size
-        for (trailingSkip in 0..maxTrailingSkip) {
-            val effectiveSize = lines.size - trailingSkip
-            val maxOverlap = minOf(effectiveSize, items.size)
-            for (overlap in maxOverlap downTo 1) {
-                if (overlap <= bestOverlap) break
-                if (regionMatches(effectiveSize - overlap, items, overlap)) {
-                    bestOverlap = overlap
-                    bestTrailingSkip = trailingSkip
-                    break
-                }
+        var overlap = 0
+        val maxOverlap = minOf(lines.size, items.size)
+        for (o in maxOverlap downTo 1) {
+            if (regionMatches(lines.size - o, items, o)) {
+                overlap = o
+                break
             }
-            if (bestOverlap == items.size) break
         }
 
         var acksChanged = false
-        val localStart = lines.size - bestTrailingSkip - bestOverlap
-        for (i in 0 until bestOverlap) {
-            val local = lines[localStart + i]
+        for (i in 0 until overlap) {
+            val local = lines[lines.size - overlap + i]
             if (local is ChatLine.Self && !local.selfServerAcked) {
                 local.selfServerAcked = true
                 acksChanged = true
             }
         }
 
-        val toAdd = items.subList(bestOverlap, items.size)
+        val toAdd = items.subList(overlap, items.size)
         if (toAdd.isEmpty()) {
             if (acksChanged) notifyDataSetChanged()
             return 0

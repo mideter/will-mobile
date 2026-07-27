@@ -126,7 +126,11 @@ class WillChatBridge {
         thread.start()
     }
 
-    fun sendLine(line: String) {
+    /**
+     * Отправка UserChat с фонового потока.
+     * [onComplete] вызывается на main: `true` если кадр записан в сокет.
+     */
+    fun sendLine(line: String, onComplete: (Boolean) -> Unit = {}) {
         // Сеть на UI-потоке даёт StrictMode → NetworkOnMainThreadException → сокет считают «сломанным».
         sendExecutor.execute {
             try {
@@ -142,14 +146,19 @@ class WillChatBridge {
                             )
                         }
                     }
+                    mainHandler.post { onComplete(false) }
                     return@execute
                 }
-                sendPayloadLocked(payload)
+                synchronized(lock) {
+                    sendPayloadLocked(payload)
+                }
+                mainHandler.post { onComplete(true) }
             } catch (e: Exception) {
                 val cb = callbacks
                 if (cb != null && !stopping.get()) {
                     post(cb) { onError(e.message ?: e.toString()) }
                 }
+                mainHandler.post { onComplete(false) }
                 disconnectServer()
             }
         }
