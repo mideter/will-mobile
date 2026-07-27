@@ -16,9 +16,8 @@ class ChatSession(
 
     interface Listener {
         fun isSessionActive(): Boolean
-        fun hasWindowFocus(): Boolean
         fun clearChat()
-        fun appendPeer(authorName: String, text: String, unread: Boolean)
+        fun appendPeer(authorName: String, text: String)
         /** @return позиция добавленной строки в адаптере */
         fun appendSelf(text: String): Int
         fun markSelfAcked(position: Int)
@@ -59,8 +58,7 @@ class ChatSession(
     private val bridgeListener = object : WillChatBridge.Listener {
         override fun onPeerMessage(authorName: String, text: String) {
             if (!listener.isSessionActive()) return
-            val unread = !listener.hasWindowFocus()
-            listener.appendPeer(authorName, text, unread)
+            listener.appendPeer(authorName, text)
         }
 
         override fun onServerReceiptConfirmed() {

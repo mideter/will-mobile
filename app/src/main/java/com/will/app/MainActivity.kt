@@ -28,14 +28,12 @@ class MainActivity : Activity() {
     private val sessionListener = object : ChatSession.Listener {
         override fun isSessionActive(): Boolean = !isFinishing
 
-        override fun hasWindowFocus(): Boolean = this@MainActivity.hasWindowFocus()
-
         override fun clearChat() {
             chatAdapter.clear()
         }
 
-        override fun appendPeer(authorName: String, text: String, unread: Boolean) {
-            appendChatLine(ChatLineKind.PEER, text, peerUnread = unread, authorName = authorName)
+        override fun appendPeer(authorName: String, text: String) {
+            appendChatLine(ChatLineKind.PEER, text, authorName = authorName)
         }
 
         override fun appendSelf(text: String): Int {
@@ -112,15 +110,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        chatAdapter.markPeerRead
         session.ensureConnected()
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            chatAdapter.markPeerRead()
-        }
     }
 
     override fun onDestroy() {
@@ -166,10 +156,9 @@ class MainActivity : Activity() {
     private fun appendChatLine(
         kind: ChatLineKind,
         text: String,
-        peerUnread: Boolean = false,
         authorName: String = "",
     ) {
-        chatAdapter.append(ChatLine(kind, text, peerUnread, authorName = authorName))
+        chatAdapter.append(ChatLine(kind, text, authorName = authorName))
         sessionListener.scrollChatToEnd()
     }
 
