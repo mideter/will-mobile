@@ -158,10 +158,7 @@ class MainActivity : Activity() {
     }
 
     private fun onSend() {
-        val maxLen = resources.getInteger(R.integer.max_message_length)
-        when (
-            val result = session.send(editMessage.text?.toString().orEmpty(), maxLen)
-        ) {
+        when (val result = session.send(editMessage.text?.toString().orEmpty())) {
             is ChatSession.SendResult.TooLong -> {
                 Toast.makeText(
                     this,

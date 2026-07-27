@@ -3,6 +3,7 @@ package com.will.app
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import java.util.ArrayDeque
 
 /**
@@ -69,9 +70,8 @@ class ChatSession(
 
         override fun onHistoryItem(authorName: String, text: String, isMine: Boolean) {
             if (!listener.isSessionActive()) return
-            
             historyBuffer.add(
-                if (isMine) ChatLine.Self(text, selfServerAcked = true) 
+                if (isMine) ChatLine.Self(text, selfServerAcked = true)
                 else ChatLine.Peer(text, authorName),
             )
         }
@@ -91,6 +91,7 @@ class ChatSession(
         override fun onError(message: String) {
             if (!listener.isSessionActive()) return
             // Тихий обрыв: без диалога, чат на экране, авто-reconnect.
+            Log.w(TAG, message)
             enterReconnectingState()
         }
 
@@ -146,10 +147,11 @@ class ChatSession(
         }
     }
 
-    fun send(text: String, maxLen: Int): SendResult {
+    fun send(text: String): SendResult {
         if (!bridge.isConnected() || !historyLoaded) return SendResult.NotReady
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return SendResult.Empty
+        val maxLen = appContext.resources.getInteger(R.integer.max_message_length)
         if (trimmed.length > maxLen) return SendResult.TooLong(maxLen)
         val position = listener.appendSelf(trimmed)
         pendingSelfAckPositions.addLast(position)
@@ -178,6 +180,7 @@ class ChatSession(
     }
 
     companion object {
+        private const val TAG = "ChatSession"
         private const val RECONNECT_DELAY_MS = 3_000L
     }
 }

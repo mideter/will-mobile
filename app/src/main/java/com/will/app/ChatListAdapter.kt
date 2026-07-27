@@ -13,9 +13,7 @@ import android.widget.TextView
 
 sealed class ChatLine {
     abstract val text: String
-    
-    data class System(override val text: String) : ChatLine()
-    
+
     data class Self(override val text: String, var selfServerAcked: Boolean = false) : ChatLine()
 
     data class Peer(override val text: String, val authorName: String = "") : ChatLine()
@@ -98,11 +96,9 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
                     a.text == b.text
                 a is ChatLine.Peer && b is ChatLine.Peer ->
                     a.text == b.text && a.authorName == b.authorName
-                a is ChatLine.System && b is ChatLine.System ->
-                    a.text == b.text
                 else -> false
             }
-        
+
             if (!same) return false
         }
         return true
@@ -135,12 +131,6 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         icon.contentDescription = null
 
         when (line) {
-            is ChatLine.System -> {
-                tv.text = line.text
-                tv.gravity = Gravity.START
-                tv.setTextColor(context.getColor(R.color.will_muted))
-                view.background = null
-            }
             is ChatLine.Self -> {
                 tv.text = line.text
                 tv.gravity = Gravity.END
