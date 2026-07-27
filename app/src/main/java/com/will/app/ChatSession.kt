@@ -69,14 +69,10 @@ class ChatSession(
 
         override fun onHistoryItem(authorName: String, text: String, isMine: Boolean) {
             if (!listener.isSessionActive()) return
-            val kind = if (isMine) ChatLineKind.SELF else ChatLineKind.PEER
+            
             historyBuffer.add(
-                ChatLine(
-                    kind,
-                    text,
-                    selfServerAcked = isMine,
-                    authorName = if (isMine) "" else authorName,
-                ),
+                if (isMine) ChatLine.Self(text, selfServerAcked = true) 
+                else ChatLine.Peer(text, authorName),
             )
         }
 

@@ -10,16 +10,17 @@ import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.TextView
 
-enum class ChatLineKind { SYSTEM, SELF, PEER }
 
-data class ChatLine(
-    val kind: ChatLineKind,
-    val text: String,
-    /** Только для [ChatLineKind.SELF]: сервер принял кадр (WillMessage ack). */
-    var selfServerAcked: Boolean = false,
-    /** Имя автора для peer (и истории peer); как `HistoryItemMessage::name` / UserChat name. */
-    val authorName: String = "",
-)
+sealed class ChatLine {
+    abstract val text: String
+    
+    data class System(override val text: String) : ChatLine()
+    
+    data class Self(override val text: String, var selfServerAcked: Boolean = false) : ChatLine()
+
+    data class Peer(override val text: String, val authorName: String = "") : ChatLine()
+}
+
 
 class ChatListAdapter(private val context: Context) : BaseAdapter() {
 
@@ -71,7 +72,7 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         val localStart = lines.size - bestTrailingSkip - bestOverlap
         for (i in 0 until bestOverlap) {
             val local = lines[localStart + i]
-            if (local.kind == ChatLineKind.SELF && !local.selfServerAcked) {
+            if (local is ChatLine.Self && !local.selfServerAcked) {
                 local.selfServerAcked = true
                 acksChanged = true
             }
@@ -91,15 +92,26 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         for (i in 0 until length) {
             val a = lines[localStart + i]
             val b = items[i]
-            if (a.kind != b.kind || a.text != b.text || a.authorName != b.authorName) return false
+
+            val same = when {
+                a is ChatLine.Self && b is ChatLine.Self ->
+                    a.text == b.text
+                a is ChatLine.Peer && b is ChatLine.Peer ->
+                    a.text == b.text && a.authorName == b.authorName
+                a is ChatLine.System && b is ChatLine.System ->
+                    a.text == b.text
+                else -> false
+            }
+        
+            if (!same) return false
         }
         return true
     }
 
     fun markSelfServerAckedAt(position: Int) {
         if (position < 0 || position >= lines.size) return
-        val line = lines[position]
-        if (line.kind != ChatLineKind.SELF || line.selfServerAcked) return
+        val line = lines[position] as? ChatLine.Self ?: return
+        if (line.selfServerAcked) return
         line.selfServerAcked = true
         notifyDataSetChanged()
     }
@@ -122,14 +134,14 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
         icon.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         icon.contentDescription = null
 
-        when (line.kind) {
-            ChatLineKind.SYSTEM -> {
+        when (line) {
+            is ChatLine.System -> {
                 tv.text = line.text
                 tv.gravity = Gravity.START
                 tv.setTextColor(context.getColor(R.color.will_muted))
                 view.background = null
             }
-            ChatLineKind.SELF -> {
+            is ChatLine.Self -> {
                 tv.text = line.text
                 tv.gravity = Gravity.END
                 tv.setTextColor(context.getColor(R.color.will_ink))
@@ -143,7 +155,7 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
                     icon.visibility = View.INVISIBLE
                 }
             }
-            ChatLineKind.PEER -> {
+            is ChatLine.Peer -> {
                 tv.text = line.text
                 tv.gravity = Gravity.START
                 tv.setTextColor(context.getColor(R.color.will_ink))
@@ -158,10 +170,10 @@ class ChatListAdapter(private val context: Context) : BaseAdapter() {
     }
 
     /** Подпись автора только у первого сообщения в серии от того же peer. */
-    private fun shouldShowPeerAuthor(position: Int, line: ChatLine): Boolean {
+    private fun shouldShowPeerAuthor(position: Int, line: ChatLine.Peer): Boolean {
         if (position == 0) return true
-        val prev = lines[position - 1]
-        return prev.kind != ChatLineKind.PEER || prev.authorName != line.authorName
+        val prev = lines[position - 1] as? ChatLine.Peer ?: return true
+        return prev.authorName != line.authorName
     }
 
     private fun rowDrawable(colorRes: Int): GradientDrawable {

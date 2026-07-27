@@ -33,11 +33,13 @@ class MainActivity : Activity() {
         }
 
         override fun appendPeer(authorName: String, text: String) {
-            appendChatLine(ChatLineKind.PEER, text, authorName = authorName)
+            chatAdapter.append(ChatLine.Peer(text, authorName))
+            scrollChatToEnd()
         }
 
         override fun appendSelf(text: String): Int {
-            appendChatLine(ChatLineKind.SELF, text)
+            chatAdapter.append(ChatLine.Self(text))
+            scrollChatToEnd()
             return chatAdapter.count - 1
         }
 
@@ -151,15 +153,6 @@ class MainActivity : Activity() {
         if (session.isReadyForComposerFocus()) {
             editMessage.requestFocus()
         }
-    }
-
-    private fun appendChatLine(
-        kind: ChatLineKind,
-        text: String,
-        authorName: String = "",
-    ) {
-        chatAdapter.append(ChatLine(kind, text, authorName = authorName))
-        sessionListener.scrollChatToEnd()
     }
 
     private fun onSend() {
