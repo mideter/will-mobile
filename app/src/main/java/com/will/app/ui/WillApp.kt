@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -22,11 +24,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
+import com.will.app.Aspect
 import com.will.app.View
 import com.will.app.WillSession
 
 /** Экраны из меню Обители; [Main] — вид из сессии (Обитель или комната). */
-private enum class Screen { Main, Dwellers, Dwellings, Supplications }
+private enum class Screen { Main, Dwellings, Supplications }
 
 /** Корень приложения: вид из состояния сессии, уведомления — снекбаром, «назад» — к Обители. */
 @Composable
@@ -34,6 +37,7 @@ fun WillApp(session: WillSession) {
     val state by session.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     var screen by rememberSaveable { mutableStateOf(Screen.Main) }
+    var going by remember { mutableStateOf(false) }
 
     LaunchedEffect(session) {
         session.notices.collect { snackbar.showSnackbar(it) }
@@ -49,7 +53,6 @@ fun WillApp(session: WillSession) {
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).imePadding()) {
             when (screen) {
-                Screen.Dwellers -> DwellersScreen(state, session, onBack = back)
                 Screen.Dwellings -> DwellingsScreen(state, session, onBack = back, onVisit = { host ->
                     session.visit(host)
                     screen = Screen.Main
@@ -58,23 +61,65 @@ fun WillApp(session: WillSession) {
                 Screen.Main -> when (view) {
                     null -> Centered("Подключение к серверу…")
                     is View.Abode -> AbodeScreen(state, view, session, menu = {
-                        AbodeMenu(waiting = state.supplications.size, onOpen = { screen = it })
+                        AbodeMenu(
+                            waiting = state.supplications.size,
+                            onOpen = { screen = it },
+                            onReception = { session.reception() },
+                            onGates = { going = true },
+                        )
                     })
-                    is View.Room -> RoomScreen(state, view, session)
+                    is View.Room -> when (view.aspect) {
+                        Aspect.Threshold -> GatesScreen(state, view, session)
+                        Aspect.Dwellers -> ReceptionScreen(state, view, session)
+                        Aspect.Words -> RoomScreen(state, view, session)
+                    }
                 }
             }
         }
     }
+
+    if (going) {
+        GoToGatesDialog(
+            onGo = { host ->
+                going = false
+                session.gates(host)
+            },
+            onDismiss = { going = false },
+        )
+    }
 }
 
+
+/** Пойти к чужим Вратам по имени хозяина. */
 @Composable
-private fun AbodeMenu(waiting: Int, onOpen: (Screen) -> Unit) {
+private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
+    var host by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Пойти к Вратам") },
+        text = {
+            OutlinedTextField(
+                value = host,
+                onValueChange = { host = it },
+                singleLine = true,
+                placeholder = { Text("Имя хозяина") },
+            )
+        },
+        confirmButton = { TextButton(onClick = { onGo(host) }, enabled = host.isNotBlank()) { Text("Пойти") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
+}
+
+
+@Composable
+private fun AbodeMenu(waiting: Int, onOpen: (Screen) -> Unit, onReception: () -> Unit, onGates: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) {
         Text(if (waiting > 0) "⋯ $waiting" else "⋯", fontSize = 20.sp)
     }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-        DropdownMenuItem(text = { Text("Обитатели") }, onClick = { open = false; onOpen(Screen.Dwellers) })
+        DropdownMenuItem(text = { Text("Обитатели — Приёмная") }, onClick = { open = false; onReception() })
+        DropdownMenuItem(text = { Text("Пойти к Вратам…") }, onClick = { open = false; onGates() })
         DropdownMenuItem(text = { Text("Мои Обители") }, onClick = { open = false; onOpen(Screen.Dwellings) })
         DropdownMenuItem(
             text = { Text(if (waiting > 0) "Прошения ($waiting)" else "Прошения") },

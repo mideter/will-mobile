@@ -9,81 +9,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.will.app.Kind
 import com.will.app.WillSession
 import com.will.app.WillState
-
-/**
- * Обитатели моей Обители: принять по имени, задать род. Тому, кто принял и меня,
- * можно подать Прошение — стать его Послушником.
- */
-@Composable
-fun DwellersScreen(state: WillState, session: WillSession, onBack: () -> Unit) {
-    LaunchedEffect(Unit) {
-        session.listDwellers()
-        session.listDwellings()
-    }
-    val mutual = state.dwellings.map { it.name }.toSet()
-    var name by remember { mutableStateOf("") }
-
-    Column(Modifier.fillMaxSize()) {
-        Header(title = "Обитатели", subtitle = "Кого я принял в свою Обитель", onBack = onBack)
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                placeholder = { Text("Имя, чтобы принять") },
-            )
-            TextButton(
-                onClick = {
-                    session.admit(name)
-                    name = ""
-                },
-                enabled = name.isNotBlank(),
-            ) { Text("Принять") }
-        }
-        if (state.dwellers.isEmpty()) Hint("В вашей Обители никто не обитает")
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(state.dwellers, key = { it.name }) { dweller ->
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-                    Text(dweller.name, fontSize = 16.sp)
-                    Row {
-                        for (kind in Kind.entries) {
-                            val chosen = kind == dweller.kind
-                            TextButton(onClick = { if (!chosen) session.regard(dweller.name, kind) }) {
-                                Text(
-                                    WillSession.kindName(kind),
-                                    color = if (chosen) WillColors.Accent else WillColors.Muted,
-                                    fontWeight = if (chosen) FontWeight.Medium else FontWeight.Normal,
-                                )
-                            }
-                        }
-                    }
-                    if (dweller.name in mutual) {
-                        TextButton(onClick = { session.ask(dweller.name) }) { Text("Просить стать Тренером") }
-                    }
-                }
-                HorizontalDivider(color = WillColors.Divider)
-            }
-        }
-    }
-}
 
 /** Обители, где я обитаю: хозяин и как он меня видит. */
 @Composable

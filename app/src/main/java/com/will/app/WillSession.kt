@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import will.v1.MessengerOuterClass.ClientEvent
 import will.v1.MessengerOuterClass.DwellerKind
+import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.ServerEvent
 import will.v1.MessengerOuterClass.Word
@@ -55,6 +56,9 @@ enum class Kind { Acquaintance, Neighbour, Friend }
 
 data class Person(val name: String, val kind: Kind)
 
+/** Что отражает комната. */
+enum class Aspect { Words, Threshold, Dwellers }
+
 /** Что перед глазами: Обитель (своя, когда [host] пуст) или комната в ней. */
 sealed interface View {
     val host: String
@@ -65,12 +69,20 @@ sealed interface View {
         val waiting: List<Waiting> = emptyList(),
     ) : View
 
-    /** [writable] — здесь пишут: своя Келья; Ведение — у Тренера. Так говорит сервер. */
+    /**
+     * Комната. [aspect] — что она отражает: слова (Келья, Узы), порог (Врата) или
+     * обитателей (Приёмная). [writable] — здесь пишут: своя Келья; Ведение — у Тренера.
+     * Во Вратах — [gatesOpen] и, хозяину, [waiting]; в Приёмной — [people].
+     */
     data class Room(
         override val host: String,
         val room: String,
+        val aspect: Aspect = Aspect.Words,
         val writable: Boolean = false,
         val words: List<WordItem> = emptyList(),
+        val gatesOpen: Boolean = false,
+        val waiting: List<String> = emptyList(),
+        val people: List<Person> = emptyList(),
     ) : View
 }
 
@@ -152,6 +164,12 @@ class WillSession(context: Context) {
     /** Комната Обители, на которую смотришь. */
     fun enter(room: String) = look(_state.value.view?.host.orEmpty(), room)
 
+    /** К Вратам хозяина, чтобы он впустил. */
+    fun gates(host: String) = look(host.trim(), GATES)
+
+    /** В свою Приёмную — к своим обитателям. */
+    fun reception() = look("", RECEPTION)
+
     /** Из комнаты — к её Обители; из чужой Обители — домой. */
     fun back(): Boolean {
         val view = _state.value.view ?: return false
@@ -181,10 +199,7 @@ class WillSession(context: Context) {
         home()
     }
 
-    fun admit(name: String) {
-        send(clientEvent { admit = admit { this.name = name.trim() } })
-        listDwellers()
-    }
+    fun admit(name: String) = send(clientEvent { admit = admit { this.name = name.trim() } })
 
     fun regard(name: String, kind: Kind) {
         val wire = when (kind) {
@@ -193,7 +208,6 @@ class WillSession(context: Context) {
             Kind.Friend -> DwellerKind.FRIEND
         }
         send(clientEvent { regard = regard { this.name = name; this.kind = wire } })
-        listDwellers()
     }
 
     fun ask(name: String) = send(clientEvent { supplicate = supplicate { addresseeName = name } })
@@ -247,7 +261,7 @@ class WillSession(context: Context) {
                 gathering = if (turned.room.isEmpty()) {
                     View.Abode(turned.abodeOf)
                 } else {
-                    View.Room(turned.abodeOf, turned.room, turned.writable)
+                    View.Room(turned.abodeOf, turned.room, turned.aspect.toAspect(), turned.writable)
                 }
                 _state.update { it.copy(loading = true) }
             }
@@ -285,8 +299,32 @@ class WillSession(context: Context) {
                 _notices.tryEmit("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
                 listDwellings()
             }
-            ServerEvent.EventCase.DWELLERS -> _state.update { s ->
-                s.copy(dwellers = event.dwellers.dwellersList.map { Person(it.name, it.kind.toKind()) })
+            ServerEvent.EventCase.DWELLERS -> {
+                val people = event.dwellers.dwellersList.map { Person(it.name, it.kind.toKind()) }
+                // В Приёмной — её обитатели; своя Приёмная — это и мои обитатели.
+                val gatheringReception = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
+                if (gatheringReception != null) gathering = gatheringReception.copy(people = people)
+                _state.update { s ->
+                    val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
+                    val reception = gatheringReception ?: shown
+                    s.copy(
+                        dwellers = if (reception == null || reception.host.isEmpty()) people else s.dwellers,
+                        view = if (shown != null) shown.copy(people = people) else s.view,
+                    )
+                }
+            }
+            ServerEvent.EventCase.THRESHOLD -> {
+                val open = event.threshold.open
+                val waiting = event.threshold.waitingList
+                val gatheringGates = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Threshold }
+                if (gatheringGates != null) {
+                    gathering = gatheringGates.copy(gatesOpen = open, waiting = waiting)
+                } else {
+                    _state.update { s ->
+                        val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Threshold } ?: return@update s
+                        s.copy(view = shown.copy(gatesOpen = open, waiting = waiting))
+                    }
+                }
             }
             ServerEvent.EventCase.DWELLINGS -> _state.update { s ->
                 s.copy(dwellings = event.dwellings.dwellingsList.map { Person(it.hostName, it.kind.toKind()) })
@@ -323,10 +361,20 @@ class WillSession(context: Context) {
         private const val RECONNECT_DELAY_MS = 3_000L
         private const val HISTORY_LIMIT = 200
 
+        /** Имена стандартных комнат, как их называет сервер. */
+        const val GATES = "Врата"
+        const val RECEPTION = "Приёмная"
+
         fun kindName(kind: Kind): String = when (kind) {
             Kind.Acquaintance -> "знакомый"
             Kind.Neighbour -> "ближний"
             Kind.Friend -> "друг"
+        }
+
+        private fun RoomAspect.toAspect(): Aspect = when (this) {
+            RoomAspect.THRESHOLD -> Aspect.Threshold
+            RoomAspect.DWELLERS -> Aspect.Dwellers
+            else -> Aspect.Words
         }
 
         private fun DwellerKind.toKind(): Kind = when (this) {
