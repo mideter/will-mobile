@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import will.v1.MessengerGrpcKt
 import will.v1.MessengerOuterClass.ClientEvent
 import will.v1.MessengerOuterClass.DwellerKind
+import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.ServerEvent
 import will.v1.bindToken
 import will.v1.chatMessage
@@ -48,10 +49,10 @@ class WillChatBridge {
         /** Вход принят; [name] — имя своей души. */
         fun onAuthenticated(name: String) {}
         /**
-         * Взгляд перенесён: дальше придут слова нового места до `HistoryEnd`.
-         * [visiting] — это чужая Обитель, где пишет только хозяин.
+         * Взгляд перенесён: дальше придёт то, что видно на новом месте, до `HistoryEnd`.
+         * [writable] — здесь можно писать: это своя комната (Келья или комната Уз).
          */
-        fun onTurned(where: String, visiting: Boolean) {}
+        fun onTurned(where: String, writable: Boolean) {}
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -131,13 +132,10 @@ class WillChatBridge {
                             // Сервер следом шлёт слова нового места и HistoryEnd.
                             historyPending = true
                             val turned = event.turned
-                            val where = when {
-                                turned.abodeOf.isNotEmpty() -> "Обитель ${turned.abodeOf}"
-                                turned.tieWith.isNotEmpty() -> "Узы с ${turned.tieWith}"
-                                else -> "Своя Обитель"
-                            }
-                            val visiting = turned.abodeOf.isNotEmpty()
-                            post(listener) { onTurned(where, visiting) }
+                            val abode = if (turned.abodeOf.isEmpty()) "Своя Обитель" else "Обитель ${turned.abodeOf}"
+                            val where = if (turned.room.isEmpty()) abode else "$abode · ${turned.room}"
+                            val writable = turned.abodeOf.isEmpty() && turned.room.isNotEmpty()
+                            post(listener) { onTurned(where, writable) }
                         }
                         ServerEvent.EventCase.DWELLING -> {
                             val dwelling = event.dwelling
@@ -157,12 +155,36 @@ class WillChatBridge {
                             }
                             post(listener) { onNotice(text) }
                         }
+                        ServerEvent.EventCase.ROOMS -> {
+                            val rooms = event.rooms.roomsList
+                            val text = if (rooms.isEmpty()) {
+                                "Ни одна комната вам здесь не открыта."
+                            } else {
+                                "Комнаты: " + rooms.joinToString(", ") { "${it.name} (${partName(it.part)})" } +
+                                    " — /room <имя>"
+                            }
+                            post(listener) { onNotice(text) }
+                        }
+                        ServerEvent.EventCase.OUTSTANDING -> {
+                            val waiting = event.outstanding.behestsList
+                            if (waiting.isEmpty()) {
+                                post(listener) { onNotice("Ничего не ждёт.") }
+                            }
+                            for (item in waiting) {
+                                post(listener) { onNotice("Ждёт в ${item.room}: ${item.behest.body}") }
+                            }
+                        }
                         ServerEvent.EventCase.SUPPLICATION_OFFER ->
                             post(listener) { onNotice("Прошение от ${event.supplicationOffer.suppliantName}") }
                         ServerEvent.EventCase.TIE_FORMED ->
                             post(listener) { onNotice("Узы с ${event.tieFormed.counterpartName}") }
                         ServerEvent.EventCase.STIRRED ->
-                            post(listener) { onNotice("Новое слово в Узах с ${event.stirred.tieWith}") }
+                            post(listener) {
+                                onNotice(
+                                    "Новое слово от ${event.stirred.authorName} в комнате ${event.stirred.room} — " +
+                                        "/room ${event.stirred.room}",
+                                )
+                            }
                         else -> {}
                     }
                 }
@@ -230,6 +252,11 @@ class WillChatBridge {
         /** Debug — локальный сервер (эмулятор видит хост как 10.0.2.2), release — удалённый. */
         val DEFAULT_HOST: String = BuildConfig.WILL_HOST
         const val DEFAULT_PORT = 7770
+
+        fun partName(part: RoomPart): String = when (part) {
+            RoomPart.OUTER -> "внешняя"
+            else -> "внутренняя"
+        }
 
         fun kindName(kind: DwellerKind): String = when (kind) {
             DwellerKind.NEIGHBOUR -> "ближний"

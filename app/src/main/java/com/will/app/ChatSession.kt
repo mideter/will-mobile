@@ -6,7 +6,9 @@ import android.os.Looper
 import android.util.Log
 import will.v1.MessengerOuterClass.ClientEvent
 import will.v1.MessengerOuterClass.DwellerKind
+import will.v1.MessengerOuterClass.RoomPart
 import will.v1.admit
+import will.v1.arrange
 import will.v1.clientEvent
 import will.v1.listDwellers
 import will.v1.regard
@@ -93,8 +95,8 @@ class ChatSession(
     /** Куда перенесён взгляд; сообщается после загрузки слов нового места. */
     private var turnedTo: String? = null
 
-    /** Взгляд на чужой Обители: там пишет только хозяин, принимаются лишь команды. */
-    private var visiting = false
+    /** Здесь можно писать: своя комната. В корне Обители и в чужих комнатах — лишь команды. */
+    private var writable = false
 
     /** Имя своей души; сообщается один раз, когда станет известно. */
     private var ownName: String? = null
@@ -153,9 +155,9 @@ class ChatSession(
         if (trimmed.startsWith("/")) {
             return sendCommand(trimmed)
         }
-        if (visiting) {
-            // Текст остаётся в поле: в чужой Обители пишет только хозяин.
-            emit(ChatUiEvent.AppendNotice("В чужой Обители пишет только хозяин — /home, чтобы вернуться"))
+        if (!writable) {
+            // Текст остаётся в поле: пишут только в своих комнатах.
+            emit(ChatUiEvent.AppendNotice("Здесь не пишут: войдите в свою комнату — /room Келья"))
             return SendResult.Accepted
         }
 
@@ -176,11 +178,13 @@ class ChatSession(
     }
 
     /**
-     * Команды как в консольном клиенте: `/admit`, `/regard`, `/dwellers`, `/visit`, `/home`.
+     * Команды как в консольном клиенте: `/room`, `/arrange`, `/admit`, `/regard`, `/dwellers`,
+     * `/visit`, `/home`. Имена комнат — остаток строки: в них бывают пробелы.
      */
     private fun sendCommand(line: String): SendResult {
         val parts = line.substring(1).trim().split(Regex("\\s+"))
         val name = parts.getOrNull(1).orEmpty()
+        val restAfter = { count: Int -> parts.drop(count).joinToString(" ") }
         val event: ClientEvent? = when (parts[0]) {
             "admit" -> if (name.isEmpty()) null else clientEvent { admit = admit { this.name = name } }
             "regard" -> {
@@ -197,7 +201,25 @@ class ChatSession(
                 }
             }
             "dwellers" -> clientEvent { listDwellers = listDwellers {} }
-            "visit" -> if (name.isEmpty()) null else clientEvent { turn = turn { abodeOf = name } }
+            "visit" -> if (name.isEmpty()) {
+                null
+            } else {
+                clientEvent { turn = turn { abodeOf = name; room = restAfter(2) } }
+            }
+            "room" -> if (name.isEmpty()) null else clientEvent { turn = turn { room = restAfter(1) } }
+            "arrange" -> {
+                val part = when (name) {
+                    "inner", "внутренняя" -> RoomPart.INNER
+                    "outer", "внешняя" -> RoomPart.OUTER
+                    else -> null
+                }
+                val room = restAfter(2)
+                if (part == null || room.isEmpty()) {
+                    null
+                } else {
+                    clientEvent { arrange = arrange { this.room = room; this.part = part } }
+                }
+            }
             "home" -> clientEvent { turn = turn {} }
             else -> null
         }
@@ -287,17 +309,17 @@ class ChatSession(
 
         override fun onAuthenticated(name: String) {
             if (!isCurrent(gen)) return
-            // Каждый вход начинается дома.
-            visiting = false
+            // Каждый вход начинается у своей Обители: там не пишут, только смотрят обзор.
+            writable = false
             if (ownName != name) {
                 ownName = name
                 announceName = true
             }
         }
 
-        override fun onTurned(where: String, visiting: Boolean) {
+        override fun onTurned(where: String, writable: Boolean) {
             if (!isCurrent(gen)) return
-            this@ChatSession.visiting = visiting
+            this@ChatSession.writable = writable
             emit(ChatUiEvent.ClearChat)
             historyBuffer.clear()
             deferredPeers.clear()
@@ -356,7 +378,8 @@ class ChatSession(
         private const val RECONNECT_DELAY_MS = 3_000L
 
         private const val COMMAND_USAGE =
-            "Команды: /admit <имя>, /regard <имя> знакомый|ближний|друг, /dwellers, /visit <имя>, /home"
+            "Команды: /room <комната>, /arrange внутренняя|внешняя <комната>, /home, " +
+                "/admit <имя>, /regard <имя> знакомый|ближний|друг, /dwellers, /visit <имя> [комната]"
 
         /**
          * Сколько ведущих deferred уже есть суффиксом snapshot истории
