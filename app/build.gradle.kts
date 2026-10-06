@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.protobuf")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val grpcVersion = "1.68.1"
@@ -26,15 +27,19 @@ android {
 
     buildFeatures {
         buildConfig = true
+        compose = true
     }
 
     buildTypes {
         debug {
             // The emulator reaches the host machine's local server as 10.0.2.2.
             buildConfigField("String", "WILL_HOST", "\"10.0.2.2\"")
+            // `-PwillPort=…` points a debug build at another local server.
+            buildConfigField("int", "WILL_PORT", (project.findProperty("willPort") ?: "7770").toString())
         }
         release {
             buildConfigField("String", "WILL_HOST", "\"83.217.202.145\"")
+            buildConfigField("int", "WILL_PORT", "7770")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -87,7 +92,14 @@ protobuf {
 }
 
 dependencies {
-    // No AndroidX deps. gRPC over OkHttp with lite protobuf, Kotlin stubs on coroutines.
+    // Jetpack Compose for the interface.
+    implementation(platform("androidx.compose:compose-bom:2024.10.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.9.3")
+
+    // gRPC over OkHttp with lite protobuf, Kotlin stubs on coroutines.
     implementation("io.grpc:grpc-okhttp:$grpcVersion")
     implementation("io.grpc:grpc-protobuf-lite:$grpcVersion")
     implementation("io.grpc:grpc-stub:$grpcVersion")
