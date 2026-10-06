@@ -45,8 +45,13 @@ class WillChatBridge {
         fun onAuthenticating() {}
         /** Короткое уведомление сервера (отказ, подтверждение действия, обитатели). */
         fun onNotice(message: String) {}
-        /** Взгляд перенесён: дальше придут слова нового места до `HistoryEnd`. */
-        fun onTurned(where: String) {}
+        /** Вход принят; [name] — имя своей души. */
+        fun onAuthenticated(name: String) {}
+        /**
+         * Взгляд перенесён: дальше придут слова нового места до `HistoryEnd`.
+         * [visiting] — это чужая Обитель, где пишет только хозяин.
+         */
+        fun onTurned(where: String, visiting: Boolean) {}
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -94,6 +99,8 @@ class WillChatBridge {
                     when (event.eventCase) {
                         ServerEvent.EventCase.AUTH_OK -> {
                             connected = true
+                            val name = event.authOk.name
+                            post(listener) { onAuthenticated(name) }
                             post(listener) { onConnectionChanged(true) }
                             historyPending = true
                             out.send(
@@ -129,7 +136,8 @@ class WillChatBridge {
                                 turned.tieWith.isNotEmpty() -> "Узы с ${turned.tieWith}"
                                 else -> "Своя Обитель"
                             }
-                            post(listener) { onTurned(where) }
+                            val visiting = turned.abodeOf.isNotEmpty()
+                            post(listener) { onTurned(where, visiting) }
                         }
                         ServerEvent.EventCase.DWELLING -> {
                             val dwelling = event.dwelling

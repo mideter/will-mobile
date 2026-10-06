@@ -93,6 +93,13 @@ class ChatSession(
     /** Куда перенесён взгляд; сообщается после загрузки слов нового места. */
     private var turnedTo: String? = null
 
+    /** Взгляд на чужой Обители: там пишет только хозяин, принимаются лишь команды. */
+    private var visiting = false
+
+    /** Имя своей души; сообщается один раз, когда станет известно. */
+    private var ownName: String? = null
+    private var announceName = false
+
     private val reconnectRunnable = Runnable {
         if (!listener.isSessionActive() || connectAttemptActive || connectionState is ChatConnectionState.Ready) {
             return@Runnable
@@ -145,6 +152,11 @@ class ChatSession(
 
         if (trimmed.startsWith("/")) {
             return sendCommand(trimmed)
+        }
+        if (visiting) {
+            // Текст остаётся в поле: в чужой Обители пишет только хозяин.
+            emit(ChatUiEvent.AppendNotice("В чужой Обители пишет только хозяин — /home, чтобы вернуться"))
+            return SendResult.Accepted
         }
 
         val gen = generation
@@ -255,6 +267,11 @@ class ChatSession(
 
             turnedTo?.let { emit(ChatUiEvent.AppendNotice("── $it ──")) }
             turnedTo = null
+
+            if (announceName) {
+                announceName = false
+                ownName?.let { emit(ChatUiEvent.AppendNotice("Вы — $it")) }
+            }
         }
 
         override fun onError(message: String) {
@@ -268,8 +285,19 @@ class ChatSession(
             emit(ChatUiEvent.AppendNotice(message))
         }
 
-        override fun onTurned(where: String) {
+        override fun onAuthenticated(name: String) {
             if (!isCurrent(gen)) return
+            // Каждый вход начинается дома.
+            visiting = false
+            if (ownName != name) {
+                ownName = name
+                announceName = true
+            }
+        }
+
+        override fun onTurned(where: String, visiting: Boolean) {
+            if (!isCurrent(gen)) return
+            this@ChatSession.visiting = visiting
             emit(ChatUiEvent.ClearChat)
             historyBuffer.clear()
             deferredPeers.clear()
