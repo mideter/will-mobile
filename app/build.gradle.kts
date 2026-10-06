@@ -1,7 +1,16 @@
+import com.google.protobuf.gradle.id
+import com.google.protobuf.gradle.proto
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.protobuf")
 }
+
+val grpcVersion = "1.68.1"
+val grpcKotlinVersion = "1.4.1"
+val protobufVersion = "3.25.5"
+
 
 android {
     namespace = "com.will.app"
@@ -31,8 +40,50 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // The wire protocol lives with the server, in the sibling will repository.
+    sourceSets {
+        named("main") {
+            proto {
+                srcDir("../../will/src/infra/transport")
+            }
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:$protobufVersion"
+    }
+    plugins {
+        id("grpc") {
+            artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
+        }
+        id("grpckt") {
+            artifact = "io.grpc:protoc-gen-grpc-kotlin:$grpcKotlinVersion:jdk8@jar"
+        }
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                id("java") { option("lite") }
+                id("kotlin") { option("lite") }
+            }
+            task.plugins {
+                id("grpc") { option("lite") }
+                id("grpckt") { option("lite") }
+            }
+        }
+    }
 }
 
 dependencies {
-    // No AndroidX deps — small debug APK (~800 KB).
+    // No AndroidX deps. gRPC over OkHttp with lite protobuf, Kotlin stubs on coroutines.
+    implementation("io.grpc:grpc-okhttp:$grpcVersion")
+    implementation("io.grpc:grpc-protobuf-lite:$grpcVersion")
+    implementation("io.grpc:grpc-stub:$grpcVersion")
+    implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
+    implementation("com.google.protobuf:protobuf-kotlin-lite:$protobufVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    compileOnly("org.apache.tomcat:annotations-api:6.0.53")
 }
