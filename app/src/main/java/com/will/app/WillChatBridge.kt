@@ -54,6 +54,8 @@ class WillChatBridge {
          * [writable] — здесь можно писать: это своя комната (Келья или комната Уз).
          */
         fun onTurned(where: String, writable: Boolean) {}
+        /** Комнаты Обители, на которую смотрим ([abodeOf] пусто — своя), по порядку номеров. */
+        fun onRooms(abodeOf: String, names: List<String>) {}
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -93,6 +95,8 @@ class WillChatBridge {
 
         val started = scope.launch {
             var historyPending = false
+            // Чья Обитель перед глазами: к ней относятся номера комнат.
+            var abodeOf = ""
             try {
                 post(listener) { onAuthenticating() }
                 out.send(clientEvent { bindToken = bindToken { token = deviceToken } })
@@ -134,6 +138,7 @@ class WillChatBridge {
                             // Сервер следом шлёт слова нового места и HistoryEnd.
                             historyPending = true
                             val turned = event.turned
+                            abodeOf = turned.abodeOf
                             val abode = if (turned.abodeOf.isEmpty()) "Своя Обитель" else "Обитель ${turned.abodeOf}"
                             val where = if (turned.room.isEmpty()) abode else "$abode · ${turned.room}"
                             val writable = turned.abodeOf.isEmpty() && turned.room.isNotEmpty()
@@ -162,10 +167,16 @@ class WillChatBridge {
                             val text = if (rooms.isEmpty()) {
                                 "Ни одна комната вам здесь не открыта."
                             } else {
-                                "Комнаты: " + rooms.joinToString(", ") { "${it.name} (${partName(it.part)})" } +
-                                    " — /room <имя>"
+                                "Комнаты: " + rooms.withIndex().joinToString(", ") { (i, room) ->
+                                    "${i + 1}. ${room.name} (${partName(room.part)})"
+                                } + " — /room <номер>"
                             }
-                            post(listener) { onNotice(text) }
+                            val names = rooms.map { it.name }
+                            val whose = abodeOf
+                            post(listener) {
+                                onRooms(whose, names)
+                                onNotice(text)
+                            }
                         }
                         ServerEvent.EventCase.OUTSTANDING -> {
                             val waiting = event.outstanding.behestsList

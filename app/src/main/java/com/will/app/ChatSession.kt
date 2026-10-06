@@ -101,6 +101,10 @@ class ChatSession(
     /** Здесь можно писать: своя комната. В корне Обители и в чужих комнатах — лишь команды. */
     private var writable = false
 
+    /** Последний показанный список комнат и чья это Обитель: по ним `/room <номер>`. */
+    private var roomNames: List<String> = emptyList()
+    private var roomsAbodeOf = ""
+
     /** Имя своей души; сообщается один раз, когда станет известно. */
     private var ownName: String? = null
     private var announceName = false
@@ -209,14 +213,26 @@ class ChatSession(
             } else {
                 clientEvent { turn = turn { abodeOf = name; room = restAfter(2) } }
             }
-            "room" -> if (name.isEmpty()) null else clientEvent { turn = turn { room = restAfter(1) } }
+            "room" -> {
+                // Номер — из последнего показанного списка комнат, в той Обители, где он показан.
+                val numbered = name.toIntOrNull()?.let { roomNames.getOrNull(it - 1) }
+                when {
+                    numbered != null -> clientEvent { turn = turn { abodeOf = roomsAbodeOf; room = numbered } }
+                    name.isEmpty() -> null
+                    else -> clientEvent { turn = turn { room = restAfter(1) } }
+                }
+            }
             "arrange" -> {
                 val part = when (name) {
                     "inner", "внутренняя" -> RoomPart.INNER
                     "outer", "внешняя" -> RoomPart.OUTER
                     else -> null
                 }
-                val room = restAfter(2)
+                // Номер — только из списка своей Обители.
+                val numbered = parts.getOrNull(2)?.toIntOrNull()
+                    ?.takeIf { roomsAbodeOf.isEmpty() }
+                    ?.let { roomNames.getOrNull(it - 1) }
+                val room = numbered ?: restAfter(2)
                 if (part == null || room.isEmpty()) {
                     null
                 } else {
@@ -334,6 +350,12 @@ class ChatSession(
             }
         }
 
+        override fun onRooms(abodeOf: String, names: List<String>) {
+            if (!isCurrent(gen)) return
+            roomsAbodeOf = abodeOf
+            roomNames = names
+        }
+
         override fun onTurned(where: String, writable: Boolean) {
             if (!isCurrent(gen)) return
             this@ChatSession.writable = writable
@@ -395,7 +417,7 @@ class ChatSession(
         private const val RECONNECT_DELAY_MS = 3_000L
 
         private const val COMMAND_USAGE =
-            "Команды: /room <комната>, /arrange внутренняя|внешняя <комната>, /home, " +
+            "Команды: /room <номер|комната>, /arrange внутренняя|внешняя <номер|комната>, /home, " +
                 "/admit <имя>, /regard <имя> знакомый|ближний|друг, /dwellers, /visit <имя> [комната], " +
                 "/ask <имя>, /accept <имя>, /done <номер> [отчёт]"
 
