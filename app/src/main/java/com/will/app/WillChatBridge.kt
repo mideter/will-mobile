@@ -16,6 +16,7 @@ import will.v1.MessengerGrpcKt
 import will.v1.MessengerOuterClass.ClientEvent
 import will.v1.MessengerOuterClass.DwellerKind
 import will.v1.MessengerOuterClass.RoomPart
+import will.v1.MessengerOuterClass.Word
 import will.v1.MessengerOuterClass.ServerEvent
 import will.v1.bindToken
 import will.v1.chatMessage
@@ -116,10 +117,11 @@ class WillChatBridge {
                             post(listener) { onServerReceiptConfirmed() }
                         ServerEvent.EventCase.WORD -> {
                             val word = event.word
+                            val text = wordText(word)
                             if (historyPending) {
-                                post(listener) { onHistoryItem(word.name, word.body, word.isMine) }
+                                post(listener) { onHistoryItem(word.name, text, word.isMine) }
                             } else {
-                                post(listener) { onPeerMessage(word.name, word.body) }
+                                post(listener) { onPeerMessage(word.name, text) }
                             }
                         }
                         ServerEvent.EventCase.HISTORY_END -> {
@@ -171,13 +173,24 @@ class WillChatBridge {
                                 post(listener) { onNotice("Ничего не ждёт.") }
                             }
                             for (item in waiting) {
-                                post(listener) { onNotice("Ждёт в ${item.room}: ${item.behest.body}") }
+                                post(listener) {
+                                    onNotice("Ждёт в ${item.room}: #${item.behest.id} ${item.behest.body}")
+                                }
                             }
                         }
-                        ServerEvent.EventCase.SUPPLICATION_OFFER ->
-                            post(listener) { onNotice("Прошение от ${event.supplicationOffer.suppliantName}") }
-                        ServerEvent.EventCase.TIE_FORMED ->
-                            post(listener) { onNotice("Узы с ${event.tieFormed.counterpartName}") }
+                        ServerEvent.EventCase.SUPPLICATION_OFFER -> {
+                            val suppliant = event.supplicationOffer.suppliantName
+                            post(listener) { onNotice("Прошение от $suppliant — /accept $suppliant") }
+                        }
+                        ServerEvent.EventCase.TIE_FORMED -> {
+                            val tie = event.tieFormed
+                            val room = if (tie.asNovice) {
+                                "Послушание — ${tie.counterpartName}"
+                            } else {
+                                "Ведение — ${tie.counterpartName}"
+                            }
+                            post(listener) { onNotice("Узы с ${tie.counterpartName} — /room $room") }
+                        }
                         ServerEvent.EventCase.STIRRED ->
                             post(listener) {
                                 onNotice(
@@ -252,6 +265,13 @@ class WillChatBridge {
         /** Debug — локальный сервер (эмулятор видит хост как 10.0.2.2), release — удалённый. */
         val DEFAULT_HOST: String = BuildConfig.WILL_HOST
         const val DEFAULT_PORT = 7770
+
+        /** Веление показывается с номером для `/done`, Дело — с номером Веления, которое исполняет. */
+        fun wordText(word: Word): String = when (word.kind) {
+            Word.Kind.BEHEST -> "#${word.id} ${word.body}"
+            Word.Kind.DEED -> "✓ #${word.behestId} ${word.body}"
+            else -> word.body
+        }
 
         fun partName(part: RoomPart): String = when (part) {
             RoomPart.OUTER -> "внешняя"

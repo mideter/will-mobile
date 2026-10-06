@@ -7,11 +7,14 @@ import android.util.Log
 import will.v1.MessengerOuterClass.ClientEvent
 import will.v1.MessengerOuterClass.DwellerKind
 import will.v1.MessengerOuterClass.RoomPart
+import will.v1.acceptSupplication
 import will.v1.admit
 import will.v1.arrange
 import will.v1.clientEvent
+import will.v1.fulfil
 import will.v1.listDwellers
 import will.v1.regard
+import will.v1.supplicate
 import will.v1.turn
 
 
@@ -178,8 +181,8 @@ class ChatSession(
     }
 
     /**
-     * Команды как в консольном клиенте: `/room`, `/arrange`, `/admit`, `/regard`, `/dwellers`,
-     * `/visit`, `/home`. Имена комнат — остаток строки: в них бывают пробелы.
+     * Команды как в консольном клиенте: `/room`, `/arrange`, `/home`, `/admit`, `/regard`,
+     * `/dwellers`, `/visit`, `/ask`, `/accept`, `/done`. Имена комнат и отчёт — остаток строки.
      */
     private fun sendCommand(line: String): SendResult {
         val parts = line.substring(1).trim().split(Regex("\\s+"))
@@ -221,6 +224,20 @@ class ChatSession(
                 }
             }
             "home" -> clientEvent { turn = turn {} }
+            "ask" -> if (name.isEmpty()) null else clientEvent { supplicate = supplicate { addresseeName = name } }
+            "accept" -> if (name.isEmpty()) {
+                null
+            } else {
+                clientEvent { acceptSupplication = acceptSupplication { suppliantName = name } }
+            }
+            "done" -> {
+                val behest = name.toLongOrNull()
+                if (behest == null) {
+                    null
+                } else {
+                    clientEvent { fulfil = fulfil { behestId = behest; report = restAfter(2) } }
+                }
+            }
             else -> null
         }
 
@@ -379,7 +396,8 @@ class ChatSession(
 
         private const val COMMAND_USAGE =
             "Команды: /room <комната>, /arrange внутренняя|внешняя <комната>, /home, " +
-                "/admit <имя>, /regard <имя> знакомый|ближний|друг, /dwellers, /visit <имя> [комната]"
+                "/admit <имя>, /regard <имя> знакомый|ближний|друг, /dwellers, /visit <имя> [комната], " +
+                "/ask <имя>, /accept <имя>, /done <номер> [отчёт]"
 
         /**
          * Сколько ведущих deferred уже есть суффиксом snapshot истории
