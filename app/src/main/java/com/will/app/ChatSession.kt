@@ -4,6 +4,13 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import will.v1.MessengerOuterClass.ClientEvent
+import will.v1.MessengerOuterClass.DwellerKind
+import will.v1.admit
+import will.v1.clientEvent
+import will.v1.listDwellers
+import will.v1.regard
+import will.v1.turn
 
 
 /**
@@ -26,6 +33,10 @@ sealed class ChatUiEvent {
     data object ConfirmNextSelfAck : ChatUiEvent()
     data class ApplyHistory(val items: List<ChatLine>) : ChatUiEvent()
     data class ConnectionChanged(val state: ChatConnectionState) : ChatUiEvent()
+    /** Строка от сервера: отказ, подтверждение, обитатели, куда перенесён взгляд. */
+    data class AppendNotice(val text: String) : ChatUiEvent()
+    /** Команда ушла на сервер — поле ввода можно очистить. */
+    data class CommandSent(val text: String) : ChatUiEvent()
 }
 
 
@@ -79,6 +90,9 @@ class ChatSession(
 
     private var sendInFlight = false
 
+    /** Куда перенесён взгляд; сообщается после загрузки слов нового места. */
+    private var turnedTo: String? = null
+
     private val reconnectRunnable = Runnable {
         if (!listener.isSessionActive() || connectAttemptActive || connectionState is ChatConnectionState.Ready) {
             return@Runnable
@@ -129,6 +143,10 @@ class ChatSession(
         val maxLen = appContext.resources.getInteger(R.integer.max_message_length)
         if (trimmed.length > maxLen) return SendResult.TooLong(maxLen)
 
+        if (trimmed.startsWith("/")) {
+            return sendCommand(trimmed)
+        }
+
         val gen = generation
         sendInFlight = true
         bridge.sendLine(trimmed) { ok ->
@@ -141,6 +159,43 @@ class ChatSession(
                 emit(ChatUiEvent.AppendSelf(trimmed))
             }
             // При ошибке bridge уже шлёт onError / рвёт сокет → Busy + reconnect.
+        }
+        return SendResult.Accepted
+    }
+
+    /**
+     * Команды как в консольном клиенте: `/admit`, `/regard`, `/dwellers`, `/visit`, `/home`.
+     */
+    private fun sendCommand(line: String): SendResult {
+        val parts = line.substring(1).trim().split(Regex("\\s+"))
+        val name = parts.getOrNull(1).orEmpty()
+        val event: ClientEvent? = when (parts[0]) {
+            "admit" -> if (name.isEmpty()) null else clientEvent { admit = admit { this.name = name } }
+            "regard" -> {
+                val kind = when (parts.getOrNull(2)) {
+                    "знакомый", "acquaintance" -> DwellerKind.ACQUAINTANCE
+                    "ближний", "neighbour" -> DwellerKind.NEIGHBOUR
+                    "друг", "friend" -> DwellerKind.FRIEND
+                    else -> null
+                }
+                if (name.isEmpty() || kind == null) {
+                    null
+                } else {
+                    clientEvent { regard = regard { this.name = name; this.kind = kind } }
+                }
+            }
+            "dwellers" -> clientEvent { listDwellers = listDwellers {} }
+            "visit" -> if (name.isEmpty()) null else clientEvent { turn = turn { abodeOf = name } }
+            "home" -> clientEvent { turn = turn {} }
+            else -> null
+        }
+
+        if (event == null) {
+            emit(ChatUiEvent.AppendNotice(COMMAND_USAGE))
+            return SendResult.Accepted
+        }
+        if (bridge.send(event)) {
+            emit(ChatUiEvent.CommandSent(line))
         }
         return SendResult.Accepted
     }
@@ -197,12 +252,29 @@ class ChatSession(
 
             connectAttemptActive = false
             setConnectionState(ChatConnectionState.Ready)
+
+            turnedTo?.let { emit(ChatUiEvent.AppendNotice("── $it ──")) }
+            turnedTo = null
         }
 
         override fun onError(message: String) {
             if (!isCurrent(gen)) return
             Log.w(TAG, message)
             enterReconnectingState()
+        }
+
+        override fun onNotice(message: String) {
+            if (!isCurrent(gen)) return
+            emit(ChatUiEvent.AppendNotice(message))
+        }
+
+        override fun onTurned(where: String) {
+            if (!isCurrent(gen)) return
+            emit(ChatUiEvent.ClearChat)
+            historyBuffer.clear()
+            deferredPeers.clear()
+            awaitingHistory = true
+            turnedTo = where
         }
 
         override fun onAuthenticating() {
@@ -254,6 +326,9 @@ class ChatSession(
     companion object {
         private const val TAG = "ChatSession"
         private const val RECONNECT_DELAY_MS = 3_000L
+
+        private const val COMMAND_USAGE =
+            "Команды: /admit <имя>, /regard <имя> знакомый|ближний|друг, /dwellers, /visit <имя>, /home"
 
         /**
          * Сколько ведущих deferred уже есть суффиксом snapshot истории

@@ -32,6 +32,11 @@ class MainActivity : Activity() {
                     composer.clearIfMatches(event.text)
                 }
                 ChatUiEvent.ConfirmNextSelfAck -> chatAdapter.confirmNextSelfAck()
+                is ChatUiEvent.AppendNotice -> {
+                    chatAdapter.append(ChatLine.Peer(event.text, NOTICE_AUTHOR))
+                    scrollChatToEnd()
+                }
+                is ChatUiEvent.CommandSent -> composer.clearIfMatches(event.text)
                 is ChatUiEvent.ApplyHistory -> {
                     val added = chatAdapter.applyHistory(event.items)
                     if (added > 0) scrollChatToEnd()
@@ -121,5 +126,10 @@ class MainActivity : Activity() {
             ChatSession.SendResult.Empty,
             -> Unit
         }
+    }
+
+    private companion object {
+        /** Подпись строк, которые говорит сервер, а не человек. */
+        const val NOTICE_AUTHOR = "Will"
     }
 }

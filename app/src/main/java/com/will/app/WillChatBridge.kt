@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.launch
 import will.v1.MessengerGrpcKt
 import will.v1.MessengerOuterClass.ClientEvent
+import will.v1.MessengerOuterClass.DwellerKind
 import will.v1.MessengerOuterClass.ServerEvent
 import will.v1.bindToken
 import will.v1.chatMessage
@@ -42,8 +43,10 @@ class WillChatBridge {
         fun onError(message: String)
         fun onConnectionChanged(connected: Boolean)
         fun onAuthenticating() {}
-        /** Короткое уведомление сервера (отказ, подтверждение действия). */
+        /** Короткое уведомление сервера (отказ, подтверждение действия, обитатели). */
         fun onNotice(message: String) {}
+        /** Взгляд перенесён: дальше придут слова нового места до `HistoryEnd`. */
+        fun onTurned(where: String) {}
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -117,9 +120,42 @@ class WillChatBridge {
                         }
                         ServerEvent.EventCase.PROTOCOL_NOTICE ->
                             post(listener) { onNotice(event.protocolNotice.message) }
-                        else -> {
-                            // Узы и обитатели — следующими шагами.
+                        ServerEvent.EventCase.TURNED -> {
+                            // Сервер следом шлёт слова нового места и HistoryEnd.
+                            historyPending = true
+                            val turned = event.turned
+                            val where = when {
+                                turned.abodeOf.isNotEmpty() -> "Обитель ${turned.abodeOf}"
+                                turned.tieWith.isNotEmpty() -> "Узы с ${turned.tieWith}"
+                                else -> "Своя Обитель"
+                            }
+                            post(listener) { onTurned(where) }
                         }
+                        ServerEvent.EventCase.DWELLING -> {
+                            val dwelling = event.dwelling
+                            post(listener) {
+                                onNotice(
+                                    "Вы обитаете у ${dwelling.hostName} как ${kindName(dwelling.kind)} — " +
+                                        "/visit ${dwelling.hostName}",
+                                )
+                            }
+                        }
+                        ServerEvent.EventCase.DWELLERS -> {
+                            val told = event.dwellers.dwellersList
+                            val text = if (told.isEmpty()) {
+                                "В вашей Обители никто не обитает."
+                            } else {
+                                "Обитатели: " + told.joinToString(", ") { "${it.name} (${kindName(it.kind)})" }
+                            }
+                            post(listener) { onNotice(text) }
+                        }
+                        ServerEvent.EventCase.SUPPLICATION_OFFER ->
+                            post(listener) { onNotice("Прошение от ${event.supplicationOffer.suppliantName}") }
+                        ServerEvent.EventCase.TIE_FORMED ->
+                            post(listener) { onNotice("Узы с ${event.tieFormed.counterpartName}") }
+                        ServerEvent.EventCase.STIRRED ->
+                            post(listener) { onNotice("Новое слово в Узах с ${event.stirred.tieWith}") }
+                        else -> {}
                     }
                 }
                 throw IOException("Сервер закрыл соединение")
@@ -139,6 +175,12 @@ class WillChatBridge {
             outbound = out
             job = started
         }
+    }
+
+    /** Отправить событие клиента в поток; `false`, если соединения нет. */
+    fun send(event: ClientEvent): Boolean {
+        val out = synchronized(lock) { outbound }
+        return out != null && connected && out.trySend(event).isSuccess
     }
 
     /**
@@ -180,6 +222,12 @@ class WillChatBridge {
         /** Debug — локальный сервер (эмулятор видит хост как 10.0.2.2), release — удалённый. */
         val DEFAULT_HOST: String = BuildConfig.WILL_HOST
         const val DEFAULT_PORT = 7770
+
+        fun kindName(kind: DwellerKind): String = when (kind) {
+            DwellerKind.NEIGHBOUR -> "ближний"
+            DwellerKind.FRIEND -> "друг"
+            else -> "знакомый"
+        }
 
         /** Как `--history N` в will-client. */
         private const val HISTORY_LIMIT_ON_CONNECT = 200
