@@ -24,8 +24,17 @@ android {
         versionName = "1.0"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
+        debug {
+            // The emulator reaches the host machine's local server as 10.0.2.2.
+            buildConfigField("String", "WILL_HOST", "\"10.0.2.2\"")
+        }
         release {
+            buildConfigField("String", "WILL_HOST", "\"83.217.202.145\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
