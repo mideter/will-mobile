@@ -135,7 +135,8 @@ class WillSession(context: Context) {
 
     private fun onClosed(reason: String) {
         _state.update { it.copy(connection = Connection.Reconnecting) }
-        _notices.tryEmit("Связь потеряна: $reason")
+        android.util.Log.w(TAG, "connection lost: $reason")
+        _notices.tryEmit("Связь потеряна, переподключаюсь…")
         mainHandler.removeCallbacks(reconnect)
         mainHandler.postDelayed(reconnect, RECONNECT_DELAY_MS)
     }
@@ -207,6 +208,11 @@ class WillSession(context: Context) {
         listSupplications()
     }
 
+    /** Сказать что-то от себя — например, «Имя скопировано». */
+    fun tell(text: String) {
+        _notices.tryEmit(text)
+    }
+
     fun listDwellers() = send(clientEvent { listDwellers = listDwellers {} })
     fun listDwellings() = send(clientEvent { listDwellings = listDwellings {} })
     fun listSupplications() = send(clientEvent { listSupplications = listSupplications {} })
@@ -274,7 +280,7 @@ class WillSession(context: Context) {
                 _state.update { it.copy(view = shown ?: it.view, loading = false) }
             }
             ServerEvent.EventCase.RECEIPT_ACK -> Unit
-            ServerEvent.EventCase.PROTOCOL_NOTICE -> _notices.tryEmit(event.protocolNotice.message)
+            ServerEvent.EventCase.PROTOCOL_NOTICE -> _notices.tryEmit(Notices.ru(event.protocolNotice.message))
             ServerEvent.EventCase.DWELLING -> {
                 _notices.tryEmit("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
                 listDwellings()
@@ -313,6 +319,7 @@ class WillSession(context: Context) {
     private fun Word.toItem() = WordItem(id, name, body, isMine, kind, behestId)
 
     companion object {
+        private const val TAG = "WillSession"
         private const val RECONNECT_DELAY_MS = 3_000L
         private const val HISTORY_LIMIT = 200
 

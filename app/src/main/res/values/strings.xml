@@ -1,16 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Will</string>
-    <string name="message_hint">Сообщение…</string>
-    <string name="chat_reconnecting">Переподключение…</string>
-    <string name="send_arrow">→</string>
-    <string name="network_title">Сеть</string>
-    <string name="chat_connecting">Подключение к серверу…</string>
-    <string name="chat_authenticating">Авторизация…</string>
-    <string name="chat_loading_history">Загрузка истории…</string>
-    <string name="chat_connected">Соединение установлено.</string>
-    <string name="chat_disconnected">Отключено.</string>
-    <string name="chat_error_prefix">Ошибка: %1$s</string>
-    <string name="chat_message_too_long">Сообщение слишком длинное (не более %1$d символов).</string>
-    <string name="chat_server_receipt_cd">Сервер получил сообщение</string>
 </resources>
