@@ -71,8 +71,8 @@ sealed interface View {
 
     /**
      * Комната. [aspect] — что она отражает: слова (Келья, Узы), порог (Врата) или
-     * обитателей (Приёмная). [writable] — здесь пишут: своя Келья; Ведение — у Тренера.
-     * Во Вратах — [gatesOpen] и, хозяину, [waiting]; в Приёмной — [people].
+     * обитателей (Горница). [writable] — здесь пишут: своя Келья; Ведение — у Тренера.
+     * Во Вратах — [gatesOpen] и, хозяину, [waiting]; в Горнице — [people].
      */
     data class Room(
         override val host: String,
@@ -167,8 +167,8 @@ class WillSession(context: Context) {
     /** К Вратам хозяина, чтобы он впустил. */
     fun gates(host: String) = look(host.trim(), GATES)
 
-    /** В свою Приёмную — к своим обитателям. */
-    fun reception() = look("", RECEPTION)
+    /** В свою Горницу — к своим обитателям. */
+    fun upperRoom() = look("", UPPER_ROOM)
 
     /** Из комнаты — к её Обители; из чужой Обители — домой. */
     fun back(): Boolean {
@@ -301,14 +301,14 @@ class WillSession(context: Context) {
             }
             ServerEvent.EventCase.DWELLERS -> {
                 val people = event.dwellers.dwellersList.map { Person(it.name, it.kind.toKind()) }
-                // В Приёмной — её обитатели; своя Приёмная — это и мои обитатели.
-                val gatheringReception = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
-                if (gatheringReception != null) gathering = gatheringReception.copy(people = people)
+                // В Горнице — её обитатели; своя Горница — это и мои обитатели.
+                val gatheringUpperRoom = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
+                if (gatheringUpperRoom != null) gathering = gatheringUpperRoom.copy(people = people)
                 _state.update { s ->
                     val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
-                    val reception = gatheringReception ?: shown
+                    val upperRoom = gatheringUpperRoom ?: shown
                     s.copy(
-                        dwellers = if (reception == null || reception.host.isEmpty()) people else s.dwellers,
+                        dwellers = if (upperRoom == null || upperRoom.host.isEmpty()) people else s.dwellers,
                         view = if (shown != null) shown.copy(people = people) else s.view,
                     )
                 }
@@ -363,7 +363,7 @@ class WillSession(context: Context) {
 
         /** Имена стандартных комнат, как их называет сервер. */
         const val GATES = "Врата"
-        const val RECEPTION = "Приёмная"
+        const val UPPER_ROOM = "Горница"
 
         fun kindName(kind: Kind): String = when (kind) {
             Kind.Acquaintance -> "знакомый"

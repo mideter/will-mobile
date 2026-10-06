@@ -72,18 +72,18 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
 }
 
 /**
- * Приёмная: обитатели Обители. Хозяин, стоя здесь, меняет их род; тому, кто принял
+ * Горница: обитатели Обители. Хозяин, стоя здесь, меняет их род; тому, кто принял
  * и его, можно подать Прошение.
  */
 @Composable
-fun ReceptionScreen(state: WillState, view: View.Room, session: WillSession) {
+fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
     val own = view.host.isEmpty()
     LaunchedEffect(own) { if (own) session.listDwellings() }
     val mutual = state.dwellings.map { it.name }.toSet()
 
     Column(Modifier.fillMaxSize()) {
         Header(
-            title = "Приёмная",
+            title = "Горница",
             subtitle = if (own) "Мои обитатели" else "Обитатели ${view.host}",
             onBack = { session.back() },
         )

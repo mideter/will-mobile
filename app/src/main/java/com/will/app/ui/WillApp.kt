@@ -64,13 +64,13 @@ fun WillApp(session: WillSession) {
                         AbodeMenu(
                             waiting = state.supplications.size,
                             onOpen = { screen = it },
-                            onReception = { session.reception() },
+                            onUpperRoom = { session.upperRoom() },
                             onGates = { going = true },
                         )
                     })
                     is View.Room -> when (view.aspect) {
                         Aspect.Threshold -> GatesScreen(state, view, session)
-                        Aspect.Dwellers -> ReceptionScreen(state, view, session)
+                        Aspect.Dwellers -> UpperRoomScreen(state, view, session)
                         Aspect.Words -> RoomScreen(state, view, session)
                     }
                 }
@@ -112,13 +112,13 @@ private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
 
 
 @Composable
-private fun AbodeMenu(waiting: Int, onOpen: (Screen) -> Unit, onReception: () -> Unit, onGates: () -> Unit) {
+private fun AbodeMenu(waiting: Int, onOpen: (Screen) -> Unit, onUpperRoom: () -> Unit, onGates: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) {
         Text(if (waiting > 0) "⋯ $waiting" else "⋯", fontSize = 20.sp)
     }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-        DropdownMenuItem(text = { Text("Обитатели — Приёмная") }, onClick = { open = false; onReception() })
+        DropdownMenuItem(text = { Text("Обитатели — Горница") }, onClick = { open = false; onUpperRoom() })
         DropdownMenuItem(text = { Text("Пойти к Вратам…") }, onClick = { open = false; onGates() })
         DropdownMenuItem(text = { Text("Мои Обители") }, onClick = { open = false; onOpen(Screen.Dwellings) })
         DropdownMenuItem(

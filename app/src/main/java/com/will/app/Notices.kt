@@ -34,6 +34,9 @@ object Notices {
         "one wills only in the tie one contemplates" to "Велеть можно, находясь в комнате Уз",
         "one says only in one's cell" to "Записи пишут в Келье",
         "not the novice of this behest" to "Это Веление не вам",
+        "one regards dwellers only in one's upper room" to "Род обитателя меняют в Горнице",
+        "one admits only standing in one's gates" to "Впускают, стоя во Вратах",
+        "he does not stand at the gates" to "Его уже нет у Врат",
         "Saying must be non-empty" to "Пустое сообщение",
         "Saying exceeds MaxBodyLength" to "Сообщение слишком длинное",
     )
