@@ -38,7 +38,6 @@ fun WillApp(session: WillSession) {
     val snackbar = remember { SnackbarHostState() }
     var screen by rememberSaveable { mutableStateOf(Screen.Main) }
     var going by remember { mutableStateOf(false) }
-    var choosing by remember { mutableStateOf(false) }
 
     LaunchedEffect(session) {
         session.notices.collect { snackbar.showSnackbar(it) }
@@ -77,7 +76,6 @@ fun WillApp(session: WillSession) {
                             onUpperRoom = { session.upperRoom() },
                             onBirthRoom = { session.birthRoom() },
                             onGates = { going = true },
-                            onFather = { choosing = true },
                         )
                     })
                     is View.Room -> when (view.aspect) {
@@ -100,39 +98,6 @@ fun WillApp(session: WillSession) {
             onDismiss = { going = false },
         )
     }
-    if (choosing) {
-        NameDialog(
-            title = "Отец по духу",
-            hint = "Его имя",
-            confirm = "Избрать",
-            onDone = { name ->
-                choosing = false
-                session.chooseFather(name)
-            },
-            onDismiss = { choosing = false },
-        )
-    }
-}
-
-
-/** Спросить имя. */
-@Composable
-private fun NameDialog(title: String, hint: String, confirm: String, onDone: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                placeholder = { Text(hint) },
-            )
-        },
-        confirmButton = { TextButton(onClick = { onDone(name) }, enabled = name.isNotBlank()) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-    )
 }
 
 
@@ -164,7 +129,6 @@ private fun AbodeMenu(
     onUpperRoom: () -> Unit,
     onBirthRoom: () -> Unit,
     onGates: () -> Unit,
-    onFather: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) {
@@ -179,7 +143,6 @@ private fun AbodeMenu(
             text = { Text(if (waiting > 0) "Прошения ($waiting)" else "Прошения") },
             onClick = { open = false; onOpen(Screen.Supplications) },
         )
-        DropdownMenuItem(text = { Text("Отец по духу…") }, onClick = { open = false; onFather() })
-        DropdownMenuItem(text = { Text("Моя линия") }, onClick = { open = false; onOpen(Screen.Lineage) })
+        // Отец по духу и линия — пока не открыты.
     }
 }

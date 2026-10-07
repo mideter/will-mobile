@@ -45,6 +45,7 @@ object Notices {
         "one does not choose a descendant by spirit as one's father" to "Нельзя избрать отцом своего духовного потомка",
         "the father by flesh is ever at least a neighbour" to "Отец по плоти — всегда не ниже ближнего",
         "the father by spirit is ever a friend" to "Отец по духу — всегда друг",
+        "the father by spirit is not yet open" to "Отец по духу пока не открыт",
         "Saying must be non-empty" to "Пустое сообщение",
         "Saying exceeds MaxBodyLength" to "Сообщение слишком длинное",
     )
