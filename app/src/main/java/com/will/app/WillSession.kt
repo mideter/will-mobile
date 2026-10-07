@@ -17,11 +17,13 @@ import will.v1.MessengerOuterClass.ServerEvent
 import will.v1.MessengerOuterClass.Word
 import will.v1.acceptSupplication
 import will.v1.admit
+import will.v1.approach
 import will.v1.arrange
 import will.v1.bear
 import will.v1.chooseFather
 import will.v1.chatMessage
 import will.v1.clientEvent
+import will.v1.exercise
 import will.v1.fulfil
 import will.v1.historyRequest
 import will.v1.listDwellers
@@ -31,6 +33,7 @@ import will.v1.listSupplications
 import will.v1.regard
 import will.v1.rejectSupplication
 import will.v1.supplicate
+import will.v1.train
 import will.v1.turn
 
 
@@ -43,6 +46,12 @@ data class RoomItem(val name: String, val outer: Boolean)
 /** Неисполненное Веление в обзоре хозяина. */
 data class Waiting(val room: String, val behestId: Long, val body: String)
 
+/** Подход: вес в граммах (0 — свой вес) и повторы. */
+data class ApproachItem(val weightGrams: Int, val repetitions: Int)
+
+/** Упражнение: свободное название и подходы. */
+data class ExerciseItem(val name: String, val approaches: List<ApproachItem>)
+
 /** Слово в ленте комнаты. */
 data class WordItem(
     val id: Long,
@@ -52,6 +61,8 @@ data class WordItem(
     val kind: Word.Kind,
     /** Для Дела — номер Веления, которое оно исполняет. */
     val behestId: Long,
+    /** У тренировки — велённые упражнения; у Дела, исполнившего её, — сделанные. */
+    val exercises: List<ExerciseItem> = emptyList(),
 )
 
 /** Род обитателя. */
@@ -215,9 +226,28 @@ class WillSession(context: Context) {
         look(view.host, view.room)
     }
 
-    fun fulfil(behestId: Long, report: String) {
+    /** Исполнить Веление; тренировку — с тем, что сделано ([performed]; пусто — как велено). */
+    fun fulfil(behestId: Long, report: String, performed: List<ExerciseItem> = emptyList()) {
         val view = _state.value.view as? View.Room ?: return
-        send(clientEvent { fulfil = fulfil { this.behestId = behestId; this.report = report.trim() } })
+        send(clientEvent {
+            fulfil = fulfil {
+                this.behestId = behestId
+                this.report = report.trim()
+                this.performed.addAll(performed.map { it.toWire() })
+            }
+        })
+        look(view.host, view.room)
+    }
+
+    /** Велеть тренировку в Узах, где стоишь Тренером. */
+    fun train(title: String, exercises: List<ExerciseItem>) {
+        val view = _state.value.view as? View.Room ?: return
+        send(clientEvent {
+            train = train {
+                this.title = title.trim()
+                this.exercises.addAll(exercises.map { it.toWire() })
+            }
+        })
         look(view.host, view.room)
     }
 
@@ -412,7 +442,19 @@ class WillSession(context: Context) {
         if (view is View.Abode && view.host.isEmpty()) home()
     }
 
-    private fun Word.toItem() = WordItem(id, name, body, isMine, kind, behestId)
+    private fun Word.toItem() = WordItem(
+        id, name, body, isMine, kind, behestId,
+        exercisesList.map { e ->
+            ExerciseItem(e.name, e.approachesList.map { ApproachItem(it.weightGrams, it.repetitions) })
+        },
+    )
+
+    private fun ExerciseItem.toWire() = exercise {
+        name = this@toWire.name
+        approaches.addAll(this@toWire.approaches.map { a ->
+            approach { weightGrams = a.weightGrams; repetitions = a.repetitions }
+        })
+    }
 
     companion object {
         private const val TAG = "WillSession"
@@ -420,6 +462,7 @@ class WillSession(context: Context) {
         private const val HISTORY_LIMIT = 200
 
         /** Имена стандартных комнат, как их называет сервер. */
+        const val CELL = "Келья"
         const val GATES = "Врата"
         const val UPPER_ROOM = "Горница"
         const val BIRTH_ROOM = "Родильная"

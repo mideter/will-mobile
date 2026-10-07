@@ -18,6 +18,9 @@ object Notices {
         "in a tie the novice fulfils behests: /done <number> [report]" to "Послушник исполняет Веления кнопкой «Исполнить»",
         "enter the room of the tie first: /room <name>" to "Сначала войдите в комнату Уз",
         "unknown behest" to "Такого Веления нет",
+        "only the testator wills a training" to "Тренировку велит Тренер",
+        "invalid training" to "Тренировка составлена неверно",
+        "a plain behest is fulfilled without exercises" to "Это Веление исполняют без упражнений",
         "unknown dweller kind" to "Неизвестный статус обитателя",
         "unknown supplication" to "Такого прошения нет",
         "cannot supplicate oneself" to "Нельзя просить самого себя",
@@ -54,6 +57,7 @@ object Notices {
 
     private val patterns = listOf(
         Regex("behest (\\d+) fulfilled") to { _: MatchResult -> "Веление исполнено" },
+        Regex("training (\\d+) willed") to { _: MatchResult -> "Тренировка велена" },
         Regex("supplication of (.+) rejected") to { m: MatchResult -> "Прошение ${m.groupValues[1]} отклонено" },
         Regex("(.+) let (.+) in as an acquaintance") to { m: MatchResult ->
             "${m.groupValues[1]} впустил ${m.groupValues[2]} знакомым"

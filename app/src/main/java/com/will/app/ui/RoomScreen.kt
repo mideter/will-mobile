@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.will.app.ExerciseItem
 import com.will.app.View
 import com.will.app.WillSession
 import com.will.app.WillState
@@ -38,15 +39,49 @@ import will.v1.MessengerOuterClass.Word
 
 /**
  * Комната: лента слов отражаемого места. Поле ввода — только там, где можно писать
- * (своя Келья; Ведение — у Тренера). Послушник исполняет Веление кнопкой «Исполнить».
+ * (своя Келья; Ведение — у Тренера; там же — «Тренировка»). Послушник исполняет Веление
+ * кнопкой «Исполнить»; тренировку — отчётом о сделанном.
  */
 @Composable
 fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     val fulfilled = view.words.filter { it.kind == Word.Kind.DEED }.map { it.behestId }.toSet()
     // Своя комната, где писать нельзя, — Послушание: здесь исполняют.
     val novice = view.host.isEmpty() && !view.writable
+    // Писать можно и не в Келье — значит, это Ведение: здесь велят и тренировки.
+    val trainer = view.writable && view.room != WillSession.CELL
     var fulfilling by remember { mutableStateOf<WordItem?>(null) }
+    var composing by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val names = view.words.flatMap { w -> w.exercises.map { it.name } }.distinct()
+
+    if (composing) {
+        TrainingEditor(
+            report = false,
+            heading = view.room,
+            initial = emptyList(),
+            names = names,
+            onDone = { title, exercises ->
+                session.train(title, exercises)
+                composing = false
+            },
+            onCancel = { composing = false },
+        )
+        return
+    }
+    fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { training ->
+        TrainingEditor(
+            report = true,
+            heading = training.body,
+            initial = training.exercises,
+            names = names,
+            onDone = { report, done ->
+                session.fulfil(training.id, report, done)
+                fulfilling = null
+            },
+            onCancel = { fulfilling = null },
+        )
+        return
+    }
 
     LaunchedEffect(view.words.size) {
         if (view.words.isNotEmpty()) listState.scrollToItem(view.words.size - 1)
@@ -67,6 +102,11 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
                 items(view.words, key = { it.id }) { word ->
                     WordRow(
                         word = word,
+                        willed = if (word.kind == Word.Kind.DEED) {
+                            view.words.firstOrNull { it.id == word.behestId }?.exercises
+                        } else {
+                            null
+                        },
                         onFulfil = if (novice && word.kind == Word.Kind.BEHEST && word.id !in fulfilled) {
                             { fulfilling = word }
                         } else {
@@ -79,9 +119,14 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
             }
         }
 
+        if (trainer) {
+            TextButton(onClick = { composing = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                Text("+ Тренировка")
+            }
+        }
         if (view.writable) {
             Composer(
-                hint = "Написать…",
+                hint = if (trainer) "Велеть…" else "Написать…",
                 onSend = session::say,
             )
         }
@@ -114,15 +159,16 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
 }
 
 @Composable
-private fun WordRow(word: WordItem, onFulfil: (() -> Unit)?, done: Boolean) {
+private fun WordRow(word: WordItem, willed: List<ExerciseItem>?, onFulfil: (() -> Unit)?, done: Boolean) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
         if (!word.mine) {
             Text(word.author, fontSize = 12.sp, color = WillColors.Muted)
         }
         when (word.kind) {
             Word.Kind.BEHEST -> {
-                Text("Веление", fontSize = 12.sp, color = WillColors.Accent)
+                Text(if (word.exercises.isEmpty()) "Веление" else "Тренировка", fontSize = 12.sp, color = WillColors.Accent)
                 Text(word.body, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                if (word.exercises.isNotEmpty()) ExercisesView(word.exercises)
                 if (done) Text("исполнено", fontSize = 12.sp, color = WillColors.Muted)
                 if (onFulfil != null) {
                     TextButton(onClick = onFulfil, modifier = Modifier.padding(top = 2.dp)) { Text("Исполнить") }
@@ -131,6 +177,7 @@ private fun WordRow(word: WordItem, onFulfil: (() -> Unit)?, done: Boolean) {
             Word.Kind.DEED -> {
                 Text("✓ Исполнено", fontSize = 12.sp, color = WillColors.Accent)
                 Text(word.body, fontSize = 15.sp)
+                if (word.exercises.isNotEmpty()) ExercisesView(word.exercises, willed)
             }
             else -> Text(word.body, fontSize = 15.sp)
         }
