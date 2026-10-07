@@ -7,7 +7,7 @@ package com.will.app
 object Notices {
 
     private val exact = mapOf(
-        "supplication sent" to "Прошение подано",
+        "supplication sent" to "Просьба отправлена",
         "invalid soul name" to "Неверное имя",
         "unknown soul name" to "Такого имени нет",
         "no such room" to "Такой комнаты нет",
@@ -16,7 +16,7 @@ object Notices {
         "one writes in a room: /room Келья" to "Пишут в комнатах: войдите в Келью",
         "only the host writes in his abode" to "В Обители пишет только хозяин",
         "in a tie the novice fulfils behests: /done <number> [report]" to "Послушник выполняет задание, нажав на него",
-        "enter the room of the tie first: /room <name>" to "Сначала войдите в комнату Уз",
+        "enter the room of the tie first: /room <name>" to "Сначала войдите в комнату Тренера или ученика",
         "unknown behest" to "Такого задания нет",
         "only the testator wills a training" to "Тренировку задаёт Тренер",
         "invalid training" to "Тренировка составлена неверно",
@@ -24,17 +24,17 @@ object Notices {
         "unknown dweller kind" to "Неизвестный статус обитателя",
         "unknown supplication" to "Такого прошения нет",
         "cannot supplicate oneself" to "Нельзя просить самого себя",
-        "obedience already exists for this pair" to "Узы уже есть",
-        "pending supplication already exists for this pair" to "Прошение уже подано и ждёт ответа",
+        "obedience already exists for this pair" to "Вы уже связаны",
+        "pending supplication already exists for this pair" to "Просьба уже отправлена и ждёт ответа",
         "one supplicates only a dweller of one's abode" to "Просить можно только того, кто обитает у вас",
         "one hears only a dweller of one's abode" to "Он ещё не принял вас в свою Обитель",
-        "a tie binds only those who dwell in each other's abodes" to "Узы — только между теми, кто принял друг друга",
+        "a tie binds only those who dwell in each other's abodes" to "Тренером можно стать только тому, кто принял вас, а вы — его",
         "he already dwells in this abode" to "Он уже обитает у вас",
         "he does not dwell in this abode" to "Он не обитает у вас",
         "the host is not a dweller of his own abode" to "Себя принимать не нужно",
         "behest is already executed" to "Задание уже выполнено",
-        "one fulfils a behest only in the tie one contemplates" to "Выполнять можно, находясь в комнате Уз",
-        "one wills only in the tie one contemplates" to "Задавать можно, находясь в комнате Уз",
+        "one fulfils a behest only in the tie one contemplates" to "Выполнять можно, находясь в комнате Тренера",
+        "one wills only in the tie one contemplates" to "Задавать можно, находясь в комнате ученика",
         "one says only in one's cell" to "Записи пишут в Келье",
         "not the novice of this behest" to "Это задание не вам",
         "one arranges rooms only in one's upper room" to "Комнаты переносят в Горнице",
@@ -58,7 +58,7 @@ object Notices {
     private val patterns = listOf(
         Regex("behest (\\d+) fulfilled") to { _: MatchResult -> "Задание выполнено" },
         Regex("training (\\d+) willed") to { _: MatchResult -> "Тренировка задана" },
-        Regex("supplication of (.+) rejected") to { m: MatchResult -> "Прошение ${m.groupValues[1]} отклонено" },
+        Regex("supplication of (.+) rejected") to { m: MatchResult -> "Просьба ${m.groupValues[1]} отклонена" },
         Regex("(.+) let (.+) in as an acquaintance") to { m: MatchResult ->
             "${m.groupValues[1]} впустил ${m.groupValues[2]} знакомым"
         },

@@ -140,7 +140,7 @@ private fun AbodeMenu(
         DropdownMenuItem(text = { Text("Пойти к Вратам…") }, onClick = { open = false; onGates() })
         DropdownMenuItem(text = { Text("Мои Обители") }, onClick = { open = false; onOpen(Screen.Dwellings) })
         DropdownMenuItem(
-            text = { Text(if (waiting > 0) "Прошения ($waiting)" else "Прошения") },
+            text = { Text(if (waiting > 0) "Просьбы ($waiting)" else "Просьбы") },
             onClick = { open = false; onOpen(Screen.Supplications) },
         )
         // Отец по духу и линия — пока не открыты.

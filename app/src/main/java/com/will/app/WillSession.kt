@@ -421,15 +421,16 @@ class WillSession(context: Context) {
                 s.copy(supplications = event.supplications.suppliantNamesList)
             }
             ServerEvent.EventCase.SUPPLICATION_OFFER -> {
-                _notices.tryEmit("Прошение от ${event.supplicationOffer.suppliantName}")
+                _notices.tryEmit("${event.supplicationOffer.suppliantName} просит вас стать его Тренером")
                 listSupplications()
             }
             ServerEvent.EventCase.TIE_FORMED -> {
-                _notices.tryEmit("Узы с ${event.tieFormed.counterpartName}")
+                val other = event.tieFormed.counterpartName
+                _notices.tryEmit(if (event.tieFormed.asNovice) "$other — теперь ваш Тренер" else "Вы — теперь Тренер $other")
                 refreshIfHome()
             }
             ServerEvent.EventCase.STIRRED -> {
-                _notices.tryEmit("Новое слово от ${event.stirred.authorName} в комнате ${event.stirred.room}")
+                _notices.tryEmit("${event.stirred.authorName} написал в комнате ${event.stirred.room}")
                 refreshIfHome()
             }
             else -> Unit

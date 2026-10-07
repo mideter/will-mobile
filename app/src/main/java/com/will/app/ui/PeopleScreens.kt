@@ -52,8 +52,8 @@ fun SupplicationsScreen(state: WillState, session: WillSession, onBack: () -> Un
     LaunchedEffect(Unit) { session.listSupplications() }
 
     Column(Modifier.fillMaxSize()) {
-        Header(title = "Прошения", subtitle = "Просят стать их Тренером", onBack = onBack)
-        if (state.supplications.isEmpty()) Hint("Прошений нет")
+        Header(title = "Просьбы", subtitle = "Просят стать их Тренером", onBack = onBack)
+        if (state.supplications.isEmpty()) Hint("Просьб нет")
         LazyColumn(Modifier.fillMaxSize()) {
             items(state.supplications, key = { it }) { suppliant ->
                 Row(
