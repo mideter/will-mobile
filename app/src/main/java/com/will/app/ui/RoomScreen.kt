@@ -127,7 +127,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
         }
         if (view.writable) {
             Composer(
-                hint = if (trainer) "Велеть…" else "Написать…",
+                hint = if (trainer) "Задать…" else "Написать…",
                 onSend = session::say,
             )
         }
@@ -137,7 +137,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
         var report by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { fulfilling = null },
-            title = { Text("Исполнить") },
+            title = { Text("Выполнить") },
             text = {
                 Column {
                     Text(behest.body, modifier = Modifier.padding(bottom = 8.dp))
@@ -152,7 +152,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
                 TextButton(onClick = {
                     session.fulfil(behest.id, report)
                     fulfilling = null
-                }) { Text("Исполнить") }
+                }) { Text("Выполнить") }
             },
             dismissButton = { TextButton(onClick = { fulfilling = null }) { Text("Отмена") } },
         )
@@ -173,13 +173,13 @@ private fun WordRow(word: WordItem, willed: List<ExerciseItem>?, onFulfil: (() -
         }
         when (word.kind) {
             Word.Kind.BEHEST -> {
-                Text(if (word.exercises.isEmpty()) "Веление" else "Тренировка", fontSize = 12.sp, color = WillColors.Accent)
+                Text(if (word.exercises.isEmpty()) "Задание" else "Тренировка", fontSize = 12.sp, color = WillColors.Accent)
                 Text(word.body, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 if (word.exercises.isNotEmpty()) ExercisesView(word.exercises)
-                if (done) Text("исполнено", fontSize = 12.sp, color = WillColors.Muted)
+                if (done) Text("выполнено", fontSize = 12.sp, color = WillColors.Muted)
                 if (onFulfil != null) {
                     Text(
-                        "Нажмите, чтобы исполнить ›",
+                        "Нажмите, чтобы выполнить ›",
                         fontSize = 12.sp,
                         color = WillColors.Accent,
                         modifier = Modifier.padding(top = 6.dp),
@@ -187,7 +187,7 @@ private fun WordRow(word: WordItem, willed: List<ExerciseItem>?, onFulfil: (() -
                 }
             }
             Word.Kind.DEED -> {
-                Text("✓ Исполнено", fontSize = 12.sp, color = WillColors.Accent)
+                Text("✓ Выполнено", fontSize = 12.sp, color = WillColors.Accent)
                 Text(word.body, fontSize = 15.sp)
                 if (word.exercises.isNotEmpty()) ExercisesView(word.exercises, willed)
             }

@@ -54,7 +54,7 @@ fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = n
                 val differs = willed != null && asked != approach
                 Text(
                     "${a + 1}. ${weightText(approach.weightGrams)} × ${approach.repetitions}" +
-                        if (differs && asked != null) "   (велено ${weightText(asked.weightGrams)} × ${asked.repetitions})" else "",
+                        if (differs && asked != null) "   (задано ${weightText(asked.weightGrams)} × ${asked.repetitions})" else "",
                     fontSize = 14.sp,
                     color = if (differs) WillColors.Accent else WillColors.Ink,
                     modifier = Modifier.padding(start = 12.dp),
@@ -139,7 +139,7 @@ fun TrainingEditor(
             onBack = onCancel,
             actions = {
                 TextButton(onClick = { ready?.let { onDone(text, it) } }, enabled = ready != null) {
-                    Text(if (report) "Отчитаться" else "Велеть")
+                    Text(if (report) "Отчитаться" else "Задать")
                 }
             },
         )

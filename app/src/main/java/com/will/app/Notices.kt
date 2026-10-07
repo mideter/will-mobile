@@ -15,12 +15,12 @@ object Notices {
         "you do not enter that room" to "Вам не открыта эта комната",
         "one writes in a room: /room Келья" to "Пишут в комнатах: войдите в Келью",
         "only the host writes in his abode" to "В Обители пишет только хозяин",
-        "in a tie the novice fulfils behests: /done <number> [report]" to "Послушник исполняет Веления кнопкой «Исполнить»",
+        "in a tie the novice fulfils behests: /done <number> [report]" to "Послушник выполняет задание, нажав на него",
         "enter the room of the tie first: /room <name>" to "Сначала войдите в комнату Уз",
-        "unknown behest" to "Такого Веления нет",
-        "only the testator wills a training" to "Тренировку велит Тренер",
+        "unknown behest" to "Такого задания нет",
+        "only the testator wills a training" to "Тренировку задаёт Тренер",
         "invalid training" to "Тренировка составлена неверно",
-        "a plain behest is fulfilled without exercises" to "Это Веление исполняют без упражнений",
+        "a plain behest is fulfilled without exercises" to "Это задание выполняют без упражнений",
         "unknown dweller kind" to "Неизвестный статус обитателя",
         "unknown supplication" to "Такого прошения нет",
         "cannot supplicate oneself" to "Нельзя просить самого себя",
@@ -32,11 +32,11 @@ object Notices {
         "he already dwells in this abode" to "Он уже обитает у вас",
         "he does not dwell in this abode" to "Он не обитает у вас",
         "the host is not a dweller of his own abode" to "Себя принимать не нужно",
-        "behest is already executed" to "Веление уже исполнено",
-        "one fulfils a behest only in the tie one contemplates" to "Исполнять можно, находясь в комнате Уз",
-        "one wills only in the tie one contemplates" to "Велеть можно, находясь в комнате Уз",
+        "behest is already executed" to "Задание уже выполнено",
+        "one fulfils a behest only in the tie one contemplates" to "Выполнять можно, находясь в комнате Уз",
+        "one wills only in the tie one contemplates" to "Задавать можно, находясь в комнате Уз",
         "one says only in one's cell" to "Записи пишут в Келье",
-        "not the novice of this behest" to "Это Веление не вам",
+        "not the novice of this behest" to "Это задание не вам",
         "one arranges rooms only in one's upper room" to "Комнаты переносят в Горнице",
         "one regards dwellers only in one's upper room" to "Статус обитателя меняют в Горнице",
         "one admits only standing in gates" to "Впускают, стоя во Вратах",
@@ -56,8 +56,8 @@ object Notices {
     )
 
     private val patterns = listOf(
-        Regex("behest (\\d+) fulfilled") to { _: MatchResult -> "Веление исполнено" },
-        Regex("training (\\d+) willed") to { _: MatchResult -> "Тренировка велена" },
+        Regex("behest (\\d+) fulfilled") to { _: MatchResult -> "Задание выполнено" },
+        Regex("training (\\d+) willed") to { _: MatchResult -> "Тренировка задана" },
         Regex("supplication of (.+) rejected") to { m: MatchResult -> "Прошение ${m.groupValues[1]} отклонено" },
         Regex("(.+) let (.+) in as an acquaintance") to { m: MatchResult ->
             "${m.groupValues[1]} впустил ${m.groupValues[2]} знакомым"
