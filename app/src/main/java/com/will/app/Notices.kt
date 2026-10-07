@@ -18,7 +18,7 @@ object Notices {
         "in a tie the novice fulfils behests: /done <number> [report]" to "Послушник исполняет Веления кнопкой «Исполнить»",
         "enter the room of the tie first: /room <name>" to "Сначала войдите в комнату Уз",
         "unknown behest" to "Такого Веления нет",
-        "unknown dweller kind" to "Неизвестный род обитателя",
+        "unknown dweller kind" to "Неизвестный статус обитателя",
         "unknown supplication" to "Такого прошения нет",
         "cannot supplicate oneself" to "Нельзя просить самого себя",
         "obedience already exists for this pair" to "Узы уже есть",
@@ -34,8 +34,9 @@ object Notices {
         "one wills only in the tie one contemplates" to "Велеть можно, находясь в комнате Уз",
         "one says only in one's cell" to "Записи пишут в Келье",
         "not the novice of this behest" to "Это Веление не вам",
-        "one regards dwellers only in one's upper room" to "Род обитателя меняют в Горнице",
-        "one admits only standing in one's gates" to "Впускают, стоя во Вратах",
+        "one regards dwellers only in one's upper room" to "Статус обитателя меняют в Горнице",
+        "one admits only standing in gates" to "Впускают, стоя во Вратах",
+        "one keeps the gates only by one's kind" to "Ваш статус в этой Обители не позволяет впускать в эти Врата",
         "he does not stand at the gates" to "Его уже нет у Врат",
         "one awaits one's birth" to "Вы ещё не рождены: ждите",
         "the birth room holds one at a time" to "В Родильной уже кто-то есть: там бывает только один",
@@ -53,8 +54,11 @@ object Notices {
     private val patterns = listOf(
         Regex("behest (\\d+) fulfilled") to { _: MatchResult -> "Веление исполнено" },
         Regex("supplication of (.+) rejected") to { m: MatchResult -> "Прошение ${m.groupValues[1]} отклонено" },
+        Regex("(.+) let (.+) in as an acquaintance") to { m: MatchResult ->
+            "${m.groupValues[1]} впустил ${m.groupValues[2]} знакомым"
+        },
         Regex("(.+) admitted as an acquaintance") to { m: MatchResult -> "${m.groupValues[1]} принят знакомым" },
-        Regex("(.+) regarded anew") to { m: MatchResult -> "Род ${m.groupValues[1]} изменён" },
+        Regex("(.+) regarded anew") to { m: MatchResult -> "Статус ${m.groupValues[1]} изменён" },
         Regex("(.+) is now in the outer part") to { m: MatchResult -> "«${m.groupValues[1]}» — во внешней части" },
         Regex("(.+) born") to { m: MatchResult -> "Родился ${m.groupValues[1]}" },
         Regex("(.+) is now your father by spirit") to { m: MatchResult -> "${m.groupValues[1]} — ваш отец по духу" },

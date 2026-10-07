@@ -78,7 +78,8 @@ sealed interface View {
     /**
      * Комната. [aspect] — что она отражает: слова (Келья, Узы), порог (Врата) или
      * обитателей (Горница). [writable] — здесь пишут: своя Келья; Ведение — у Тренера.
-     * Во Вратах — [gatesOpen] и, хозяину, [waiting]; в Горнице — [people]; в Родильной —
+     * Во Вратах — [gatesOpen], [keeping] (я привратник: хозяин или обитатель, чьему роду
+     * открыта их часть) и, привратнику, [waiting]; в Горнице — [people]; в Родильной —
      * метки нерождённых [unborn].
      */
     data class Room(
@@ -88,6 +89,7 @@ sealed interface View {
         val writable: Boolean = false,
         val words: List<WordItem> = emptyList(),
         val gatesOpen: Boolean = false,
+        val keeping: Boolean = false,
         val waiting: List<String> = emptyList(),
         val people: List<Person> = emptyList(),
         val unborn: List<Long> = emptyList(),
@@ -345,14 +347,15 @@ class WillSession(context: Context) {
             }
             ServerEvent.EventCase.THRESHOLD -> {
                 val open = event.threshold.open
+                val keeping = event.threshold.keeping
                 val waiting = event.threshold.waitingList
                 val gatheringGates = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Threshold }
                 if (gatheringGates != null) {
-                    gathering = gatheringGates.copy(gatesOpen = open, waiting = waiting)
+                    gathering = gatheringGates.copy(gatesOpen = open, keeping = keeping, waiting = waiting)
                 } else {
                     _state.update { s ->
                         val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Threshold } ?: return@update s
-                        s.copy(view = shown.copy(gatesOpen = open, waiting = waiting))
+                        s.copy(view = shown.copy(gatesOpen = open, keeping = keeping, waiting = waiting))
                     }
                 }
             }

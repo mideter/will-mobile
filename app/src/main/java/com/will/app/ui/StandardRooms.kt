@@ -23,8 +23,9 @@ import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Врата. Хозяин, стоя в них, держит их открытыми: видит, кто ждёт, и впускает.
- * Пришедший видит, открыты ли Врата, и ждёт сколько хочет.
+ * Врата. Кто может впускать — хозяин или обитатель, чьему статусу открыта их часть, — стоя в них,
+ * держит их открытыми: видит, кто ждёт, и впускает знакомым хозяина. Пришедший видит,
+ * открыты ли Врата, и ждёт сколько хочет.
  */
 @Composable
 fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
@@ -37,8 +38,14 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
         )
         ConnectionBanner(state.connection)
 
-        if (own) {
-            Hint("Врата открыты, пока вы здесь. Уйдёте — закроются.")
+        if (view.keeping) {
+            Hint(
+                if (own) {
+                    "Врата открыты, пока здесь вы или кто-то, кто может впускать."
+                } else {
+                    "Вы можете впускать во Врата ${view.host}: впущенный станет его знакомым."
+                },
+            )
             SectionTitle("У Врат")
             if (view.waiting.isEmpty()) Hint("Никто не ждёт")
             LazyColumn(Modifier.fillMaxSize()) {
@@ -55,7 +62,7 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
             }
         } else {
             Text(
-                if (view.gatesOpen) "Врата открыты: хозяин здесь." else "Врата закрыты: хозяина нет.",
+                if (view.gatesOpen) "Врата открыты." else "Врата закрыты: нет никого, кто может впускать.",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Medium,
@@ -64,7 +71,7 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
                 if (view.gatesOpen) {
                     "Ждите, пока вас впустят."
                 } else {
-                    "Можно ждать здесь: когда хозяин войдёт во Врата, он увидит вас."
+                    "Можно ждать здесь: когда войдёт тот, кто может впускать, он увидит вас."
                 },
             )
         }
