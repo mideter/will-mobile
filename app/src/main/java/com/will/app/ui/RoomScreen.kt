@@ -1,6 +1,7 @@
 package com.will.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,8 +40,8 @@ import will.v1.MessengerOuterClass.Word
 
 /**
  * Комната: лента слов отражаемого места. Поле ввода — только там, где можно писать
- * (своя Келья; Ведение — у Тренера; там же — «Тренировка»). Послушник исполняет Веление
- * кнопкой «Исполнить»; тренировку — отчётом о сделанном.
+ * (своя Келья; Ведение — у Тренера; там же — «Тренировка»). Послушник исполняет Веление,
+ * нажав на него самого; тренировку — отчётом о сделанном.
  */
 @Composable
 fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
@@ -160,7 +161,13 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
 
 @Composable
 private fun WordRow(word: WordItem, willed: List<ExerciseItem>?, onFulfil: (() -> Unit)?, done: Boolean) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+    // Веление, ждущее Послушника, исполняют нажатием на него самого.
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .let { if (onFulfil != null) it.clickable(onClick = onFulfil) else it }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
         if (!word.mine) {
             Text(word.author, fontSize = 12.sp, color = WillColors.Muted)
         }
@@ -171,7 +178,12 @@ private fun WordRow(word: WordItem, willed: List<ExerciseItem>?, onFulfil: (() -
                 if (word.exercises.isNotEmpty()) ExercisesView(word.exercises)
                 if (done) Text("исполнено", fontSize = 12.sp, color = WillColors.Muted)
                 if (onFulfil != null) {
-                    TextButton(onClick = onFulfil, modifier = Modifier.padding(top = 2.dp)) { Text("Исполнить") }
+                    Text(
+                        "Нажмите, чтобы исполнить ›",
+                        fontSize = 12.sp,
+                        color = WillColors.Accent,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
                 }
             }
             Word.Kind.DEED -> {
