@@ -89,6 +89,49 @@ fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = n
     }
 }
 
+/**
+ * Заданное и сделанное в одной строке на подход: «100 кг × 5 ✓», «100 кг × 5 → × 3»,
+ * «свой вес × 8 — не сделан», «+ 100 кг × 3» сверх заданного. Упражнения сопоставляются
+ * по названию, подходы — по порядку: отчёт несёт только сделанные, без номеров.
+ */
+@Composable
+fun ComparedExercisesView(willed: List<ExerciseItem>, done: List<ExerciseItem>) {
+    val unmatched = done.toMutableList()
+    Column(Modifier.padding(top = 4.dp)) {
+        willed.forEach { exercise ->
+            val did = unmatched.firstOrNull { it.name == exercise.name }?.also { unmatched.remove(it) }
+            Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            val count = maxOf(exercise.approaches.size, did?.approaches?.size ?: 0)
+            for (a in 0 until count) {
+                ComparedApproach(a + 1, exercise.approaches.getOrNull(a), did?.approaches?.getOrNull(a))
+            }
+        }
+        // Упражнения, которых не задавали.
+        unmatched.forEach { exercise ->
+            Text(exercise.name + " — сверх заданного", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
+            exercise.approaches.forEachIndexed { a, approach -> ComparedApproach(a + 1, null, approach) }
+        }
+    }
+}
+
+@Composable
+private fun ComparedApproach(number: Int, asked: ApproachItem?, did: ApproachItem?) {
+    val (line, colour) = when {
+        asked == null && did != null ->
+            "+ ${weightText(did.weightGrams)} × ${did.repetitions}" to WillColors.Accent
+        did == null && asked != null ->
+            "${weightText(asked.weightGrams)} × ${asked.repetitions} — не сделан" to WillColors.Muted
+        asked == did ->
+            "${weightText(asked!!.weightGrams)} × ${asked.repetitions}  ✓" to WillColors.Ink
+        asked!!.weightGrams == did!!.weightGrams ->
+            "${weightText(asked.weightGrams)} × ${asked.repetitions} → × ${did.repetitions}" to WillColors.Accent
+        else ->
+            "${weightText(asked.weightGrams)} × ${asked.repetitions} → ${weightText(did.weightGrams)} × ${did.repetitions}" to WillColors.Accent
+    }
+    Text("$number. $line", fontSize = 14.sp, color = colour, modifier = Modifier.padding(start = 12.dp))
+}
+
+
 /** Шаг веса — 2,5 кг; шаг повторов — 1. */
 private const val WEIGHT_STEP = 2_500
 private const val MAX_GRAMS = 1_000_000

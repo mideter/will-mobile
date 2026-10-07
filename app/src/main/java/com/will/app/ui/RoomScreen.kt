@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.will.app.ExerciseItem
 import com.will.app.View
 import com.will.app.WillSession
 import com.will.app.WillState
@@ -43,9 +42,15 @@ import will.v1.MessengerOuterClass.Word
  * (своя Келья; Ведение — у Тренера; там же — «Тренировка»). Послушник исполняет Веление,
  * нажав на него самого; тренировку — отчётом о сделанном.
  */
+/** Слово, которым сервер называет Дело без отчёта. */
+private const val SILENT_DEED = "совершено"
+
 @Composable
 fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
-    val fulfilled = view.words.filter { it.kind == Word.Kind.DEED }.map { it.behestId }.toSet()
+    // Отчёт — ответ на задание: он показывается внутри него, а не отдельной записью.
+    val deeds = view.words.filter { it.kind == Word.Kind.DEED }.associateBy { it.behestId }
+    val fulfilled = deeds.keys
+    val shown = feedOf(view.words)
     // Своя комната, где писать нельзя, — Послушание: здесь исполняют.
     val novice = view.host.isEmpty() && !view.writable
     // Писать можно и не в Келье — значит, это Ведение: здесь велят и тренировки.
@@ -85,7 +90,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     }
 
     LaunchedEffect(view.words.size) {
-        if (view.words.isNotEmpty()) listState.scrollToItem(view.words.size - 1)
+        if (shown.isNotEmpty()) listState.scrollToItem(shown.size - 1)
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -100,14 +105,10 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
             Column(Modifier.weight(1f)) { Hint("Здесь пока ничего нет") }
         } else {
             LazyColumn(Modifier.weight(1f), state = listState) {
-                items(view.words, key = { it.id }) { word ->
+                items(shown, key = { it.id }) { word ->
                     WordRow(
                         word = word,
-                        willed = if (word.kind == Word.Kind.DEED) {
-                            view.words.firstOrNull { it.id == word.behestId }?.exercises
-                        } else {
-                            null
-                        },
+                        deed = deeds[word.id],
                         onFulfil = if (novice && word.kind == Word.Kind.BEHEST && word.id !in fulfilled) {
                             { fulfilling = word }
                         } else {
@@ -159,8 +160,24 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     }
 }
 
+/**
+ * Лента: слова по времени, но отчёт не отдельной записью — он внутри своего задания, а
+ * задание с отчётом стоит там, где пришёл отчёт: новое — внизу. Отчёт, чьё задание
+ * не видно, остаётся записью.
+ */
+private fun feedOf(words: List<WordItem>): List<WordItem> {
+    val ids = words.map { it.id }.toSet()
+    val answeredAt = words.withIndex()
+        .filter { it.value.kind == Word.Kind.DEED && it.value.behestId in ids }
+        .associate { it.value.behestId to it.index }
+    return words.withIndex()
+        .filterNot { it.value.kind == Word.Kind.DEED && it.value.behestId in ids }
+        .sortedBy { answeredAt[it.value.id] ?: it.index }
+        .map { it.value }
+}
+
 @Composable
-private fun WordRow(word: WordItem, willed: List<ExerciseItem>?, onFulfil: (() -> Unit)?, done: Boolean) {
+private fun WordRow(word: WordItem, deed: WordItem?, onFulfil: (() -> Unit)?, done: Boolean) {
     // Веление, ждущее Послушника, исполняют нажатием на него самого.
     Column(
         Modifier
@@ -173,10 +190,21 @@ private fun WordRow(word: WordItem, willed: List<ExerciseItem>?, onFulfil: (() -
         }
         when (word.kind) {
             Word.Kind.BEHEST -> {
-                Text(if (word.exercises.isEmpty()) "Задание" else "Тренировка", fontSize = 12.sp, color = WillColors.Accent)
+                Text(
+                    (if (word.exercises.isEmpty()) "Задание" else "Тренировка") + if (done) " · ✓ Выполнено" else "",
+                    fontSize = 12.sp,
+                    color = WillColors.Accent,
+                )
                 Text(word.body, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                if (word.exercises.isNotEmpty()) ExercisesView(word.exercises)
-                if (done) Text("выполнено", fontSize = 12.sp, color = WillColors.Muted)
+                // Отчёт Послушника — его слово, если он что-то сказал.
+                if (deed != null && deed.body != SILENT_DEED) {
+                    Text("«${deed.body}»", fontSize = 14.sp, color = WillColors.Ink, modifier = Modifier.padding(top = 2.dp))
+                }
+                when {
+                    word.exercises.isEmpty() -> Unit
+                    deed != null -> ComparedExercisesView(word.exercises, deed.exercises)
+                    else -> ExercisesView(word.exercises)
+                }
                 if (onFulfil != null) {
                     Text(
                         "Нажмите, чтобы выполнить ›",
@@ -187,9 +215,10 @@ private fun WordRow(word: WordItem, willed: List<ExerciseItem>?, onFulfil: (() -
                 }
             }
             Word.Kind.DEED -> {
+                // Отчёт, чьё задание здесь не видно.
                 Text("✓ Выполнено", fontSize = 12.sp, color = WillColors.Accent)
                 Text(word.body, fontSize = 15.sp)
-                if (word.exercises.isNotEmpty()) ExercisesView(word.exercises, willed)
+                if (word.exercises.isNotEmpty()) ExercisesView(word.exercises)
             }
             else -> Text(word.body, fontSize = 15.sp)
         }
