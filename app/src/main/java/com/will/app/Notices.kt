@@ -34,6 +34,7 @@ object Notices {
         "one wills only in the tie one contemplates" to "Велеть можно, находясь в комнате Уз",
         "one says only in one's cell" to "Записи пишут в Келье",
         "not the novice of this behest" to "Это Веление не вам",
+        "one arranges rooms only in one's upper room" to "Комнаты переносят в Горнице",
         "one regards dwellers only in one's upper room" to "Статус обитателя меняют в Горнице",
         "one admits only standing in gates" to "Впускают, стоя во Вратах",
         "one keeps the gates only by one's kind" to "Ваш статус в этой Обители не позволяет впускать в эти Врата",

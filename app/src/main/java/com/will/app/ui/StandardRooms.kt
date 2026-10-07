@@ -124,6 +124,29 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
                 }
                 HorizontalDivider(color = WillColors.Divider)
             }
+            if (own && view.rooms.isNotEmpty()) {
+                item { SectionTitle("Комнаты") }
+                item { Hint("Внутренние видят только друзья; внешние — ещё и ближние.") }
+                items(view.rooms, key = { "room:" + it.name }) { room ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(room.name, fontSize = 16.sp)
+                            Text(
+                                if (room.outer) "внешняя часть" else "внутренняя часть",
+                                fontSize = 13.sp,
+                                color = WillColors.Muted,
+                            )
+                        }
+                        TextButton(onClick = { session.arrange(room.name, outer = !room.outer) }) {
+                            Text(if (room.outer) "Во внутреннюю" else "Во внешнюю")
+                        }
+                    }
+                    HorizontalDivider(color = WillColors.Divider)
+                }
+            }
         }
     }
 }

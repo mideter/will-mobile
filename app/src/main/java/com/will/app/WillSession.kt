@@ -93,6 +93,8 @@ sealed interface View {
         val waiting: List<String> = emptyList(),
         val people: List<Person> = emptyList(),
         val unborn: List<Long> = emptyList(),
+        /** В своей Горнице — все комнаты Обители с их частями: здесь их переносят. */
+        val rooms: List<RoomItem> = emptyList(),
     ) : View
 }
 
@@ -219,10 +221,9 @@ class WillSession(context: Context) {
         look(view.host, view.room)
     }
 
-    fun arrange(room: String, outer: Boolean) {
+    /** Перенести комнату своей Обители в другую часть — стоя в своей Горнице. */
+    fun arrange(room: String, outer: Boolean) =
         send(clientEvent { arrange = arrange { this.room = room; part = if (outer) RoomPart.OUTER else RoomPart.INNER } })
-        home()
-    }
 
     fun admit(name: String) = send(clientEvent { admit = admit { this.name = name.trim() } })
 
@@ -298,8 +299,17 @@ class WillSession(context: Context) {
                 _state.update { it.copy(loading = true) }
             }
             ServerEvent.EventCase.ROOMS -> {
-                val abode = gathering as? View.Abode ?: return
-                gathering = abode.copy(rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER) })
+                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER) }
+                when (val gathered = gathering) {
+                    is View.Abode -> gathering = gathered.copy(rooms = rooms)
+                    // В своей Горнице — комнаты, которые здесь переносят.
+                    is View.Room -> gathering = gathered.copy(rooms = rooms)
+                    null -> _state.update { s ->
+                        // Перенесли комнату, стоя в Горнице: список приходит заново.
+                        val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers } ?: return@update s
+                        s.copy(view = shown.copy(rooms = rooms))
+                    }
+                }
             }
             ServerEvent.EventCase.OUTSTANDING -> {
                 val abode = gathering as? View.Abode ?: return
