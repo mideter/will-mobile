@@ -37,6 +37,14 @@ object Notices {
         "one regards dwellers only in one's upper room" to "Род обитателя меняют в Горнице",
         "one admits only standing in one's gates" to "Впускают, стоя во Вратах",
         "he does not stand at the gates" to "Его уже нет у Врат",
+        "one awaits one's birth" to "Вы ещё не рождены: ждите",
+        "the birth room holds one at a time" to "В Родильной уже кто-то есть: там бывает только один",
+        "no such unborn" to "Такого нерождённого нет",
+        "one bears only standing in a birth room" to "Рождают, стоя в Родильной",
+        "one is not one's own father" to "Нельзя быть отцом самому себе",
+        "one does not choose a descendant by spirit as one's father" to "Нельзя избрать отцом своего духовного потомка",
+        "the father by flesh is ever at least a neighbour" to "Отец по плоти — всегда не ниже ближнего",
+        "the father by spirit is ever a friend" to "Отец по духу — всегда друг",
         "Saying must be non-empty" to "Пустое сообщение",
         "Saying exceeds MaxBodyLength" to "Сообщение слишком длинное",
     )
@@ -47,6 +55,9 @@ object Notices {
         Regex("(.+) admitted as an acquaintance") to { m: MatchResult -> "${m.groupValues[1]} принят знакомым" },
         Regex("(.+) regarded anew") to { m: MatchResult -> "Род ${m.groupValues[1]} изменён" },
         Regex("(.+) is now in the outer part") to { m: MatchResult -> "«${m.groupValues[1]}» — во внешней части" },
+        Regex("(.+) born") to { m: MatchResult -> "Родился ${m.groupValues[1]}" },
+        Regex("(.+) is now your father by spirit") to { m: MatchResult -> "${m.groupValues[1]} — ваш отец по духу" },
+        Regex("(.+) chose you as his father by spirit") to { m: MatchResult -> "${m.groupValues[1]} избрал вас отцом по духу" },
         Regex("(.+) is now in the inner part") to { m: MatchResult -> "«${m.groupValues[1]}» — во внутренней части" },
     )
 

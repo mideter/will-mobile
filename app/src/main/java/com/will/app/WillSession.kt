@@ -18,12 +18,15 @@ import will.v1.MessengerOuterClass.Word
 import will.v1.acceptSupplication
 import will.v1.admit
 import will.v1.arrange
+import will.v1.bear
+import will.v1.chooseFather
 import will.v1.chatMessage
 import will.v1.clientEvent
 import will.v1.fulfil
 import will.v1.historyRequest
 import will.v1.listDwellers
 import will.v1.listDwellings
+import will.v1.listLineage
 import will.v1.listSupplications
 import will.v1.regard
 import will.v1.rejectSupplication
@@ -57,7 +60,10 @@ enum class Kind { Acquaintance, Neighbour, Friend }
 data class Person(val name: String, val kind: Kind)
 
 /** Что отражает комната. */
-enum class Aspect { Words, Threshold, Dwellers }
+enum class Aspect { Words, Threshold, Dwellers, Birth }
+
+/** Чадо по духу и его отец — звено духовной линии. */
+data class Descent(val name: String, val father: String)
 
 /** Что перед глазами: Обитель (своя, когда [host] пуст) или комната в ней. */
 sealed interface View {
@@ -72,7 +78,8 @@ sealed interface View {
     /**
      * Комната. [aspect] — что она отражает: слова (Келья, Узы), порог (Врата) или
      * обитателей (Горница). [writable] — здесь пишут: своя Келья; Ведение — у Тренера.
-     * Во Вратах — [gatesOpen] и, хозяину, [waiting]; в Горнице — [people].
+     * Во Вратах — [gatesOpen] и, хозяину, [waiting]; в Горнице — [people]; в Родильной —
+     * метки нерождённых [unborn].
      */
     data class Room(
         override val host: String,
@@ -83,6 +90,7 @@ sealed interface View {
         val gatesOpen: Boolean = false,
         val waiting: List<String> = emptyList(),
         val people: List<Person> = emptyList(),
+        val unborn: List<Long> = emptyList(),
     ) : View
 }
 
@@ -95,6 +103,10 @@ data class WillState(
     val dwellers: List<Person> = emptyList(),
     val dwellings: List<Person> = emptyList(),
     val supplications: List<String> = emptyList(),
+    /** Тело ещё не рождено: метка, по которой его видят в Родильных. */
+    val unbornMark: Long? = null,
+    /** Моя духовная линия, поколение за поколением. */
+    val lineage: List<Descent> = emptyList(),
 )
 
 
@@ -169,6 +181,17 @@ class WillSession(context: Context) {
 
     /** В свою Горницу — к своим обитателям. */
     fun upperRoom() = look("", UPPER_ROOM)
+
+    /** В свою Родильную — к нерождённым. */
+    fun birthRoom() = look("", BIRTH_ROOM)
+
+    /** Родить нерождённого, стоя в Родильной: отцом станет её хозяин. */
+    fun bear(mark: Long) = send(clientEvent { bear = bear { this.mark = mark } })
+
+    /** Избрать отца по духу; он отказаться не может. */
+    fun chooseFather(name: String) = send(clientEvent { chooseFather = chooseFather { this.name = name.trim() } })
+
+    fun listLineage() = send(clientEvent { listLineage = listLineage {} })
 
     /** Из комнаты — к её Обители; из чужой Обители — домой. */
     fun back(): Boolean {
@@ -245,7 +268,14 @@ class WillSession(context: Context) {
     private fun onEvent(event: ServerEvent) {
         when (event.eventCase) {
             ServerEvent.EventCase.AUTH_OK -> {
-                _state.update { it.copy(connection = Connection.Ready, ownName = event.authOk.name, loading = true) }
+                if (event.authOk.unborn) {
+                    // Тело ещё не рождено: только ждать.
+                    _state.update { it.copy(connection = Connection.Ready, ownName = "", unbornMark = event.authOk.mark) }
+                    return
+                }
+                _state.update {
+                    it.copy(connection = Connection.Ready, ownName = event.authOk.name, unbornMark = null, loading = true)
+                }
                 // После входа взгляд — на своей Обители; вернуться туда, где был.
                 gathering = View.Abode("")
                 send(clientEvent { historyRequest = historyRequest { limit = HISTORY_LIMIT } })
@@ -326,6 +356,21 @@ class WillSession(context: Context) {
                     }
                 }
             }
+            ServerEvent.EventCase.UNBORN -> {
+                val marks = event.unborn.marksList
+                val gatheringBirthRoom = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Birth }
+                if (gatheringBirthRoom != null) {
+                    gathering = gatheringBirthRoom.copy(unborn = marks)
+                } else {
+                    _state.update { s ->
+                        val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Birth } ?: return@update s
+                        s.copy(view = shown.copy(unborn = marks))
+                    }
+                }
+            }
+            ServerEvent.EventCase.LINEAGE -> _state.update { s ->
+                s.copy(lineage = event.lineage.descentsList.map { Descent(it.name, it.fatherName) })
+            }
             ServerEvent.EventCase.DWELLINGS -> _state.update { s ->
                 s.copy(dwellings = event.dwellings.dwellingsList.map { Person(it.hostName, it.kind.toKind()) })
             }
@@ -364,6 +409,7 @@ class WillSession(context: Context) {
         /** Имена стандартных комнат, как их называет сервер. */
         const val GATES = "Врата"
         const val UPPER_ROOM = "Горница"
+        const val BIRTH_ROOM = "Родильная"
 
         fun kindName(kind: Kind): String = when (kind) {
             Kind.Acquaintance -> "знакомый"
@@ -374,6 +420,7 @@ class WillSession(context: Context) {
         private fun RoomAspect.toAspect(): Aspect = when (this) {
             RoomAspect.THRESHOLD -> Aspect.Threshold
             RoomAspect.DWELLERS -> Aspect.Dwellers
+            RoomAspect.BIRTH -> Aspect.Birth
             else -> Aspect.Words
         }
 

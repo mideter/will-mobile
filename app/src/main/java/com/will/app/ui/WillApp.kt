@@ -29,7 +29,7 @@ import com.will.app.View
 import com.will.app.WillSession
 
 /** Экраны из меню Обители; [Main] — вид из сессии (Обитель или комната). */
-private enum class Screen { Main, Dwellings, Supplications }
+private enum class Screen { Main, Dwellings, Supplications, Lineage }
 
 /** Корень приложения: вид из состояния сессии, уведомления — снекбаром, «назад» — к Обители. */
 @Composable
@@ -38,9 +38,18 @@ fun WillApp(session: WillSession) {
     val snackbar = remember { SnackbarHostState() }
     var screen by rememberSaveable { mutableStateOf(Screen.Main) }
     var going by remember { mutableStateOf(false) }
+    var choosing by remember { mutableStateOf(false) }
 
     LaunchedEffect(session) {
         session.notices.collect { snackbar.showSnackbar(it) }
+    }
+
+    // Нерождённый только ждёт.
+    state.unbornMark?.let { mark ->
+        Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) { UnbornScreen(state, mark) }
+        }
+        return
     }
 
     val view = state.view
@@ -58,6 +67,7 @@ fun WillApp(session: WillSession) {
                     screen = Screen.Main
                 })
                 Screen.Supplications -> SupplicationsScreen(state, session, onBack = back)
+                Screen.Lineage -> LineageScreen(state, session, onBack = back)
                 Screen.Main -> when (view) {
                     null -> Centered("Подключение к серверу…")
                     is View.Abode -> AbodeScreen(state, view, session, menu = {
@@ -65,12 +75,15 @@ fun WillApp(session: WillSession) {
                             waiting = state.supplications.size,
                             onOpen = { screen = it },
                             onUpperRoom = { session.upperRoom() },
+                            onBirthRoom = { session.birthRoom() },
                             onGates = { going = true },
+                            onFather = { choosing = true },
                         )
                     })
                     is View.Room -> when (view.aspect) {
                         Aspect.Threshold -> GatesScreen(state, view, session)
                         Aspect.Dwellers -> UpperRoomScreen(state, view, session)
+                        Aspect.Birth -> BirthRoomScreen(state, view, session)
                         Aspect.Words -> RoomScreen(state, view, session)
                     }
                 }
@@ -87,6 +100,39 @@ fun WillApp(session: WillSession) {
             onDismiss = { going = false },
         )
     }
+    if (choosing) {
+        NameDialog(
+            title = "Отец по духу",
+            hint = "Его имя",
+            confirm = "Избрать",
+            onDone = { name ->
+                choosing = false
+                session.chooseFather(name)
+            },
+            onDismiss = { choosing = false },
+        )
+    }
+}
+
+
+/** Спросить имя. */
+@Composable
+private fun NameDialog(title: String, hint: String, confirm: String, onDone: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                placeholder = { Text(hint) },
+            )
+        },
+        confirmButton = { TextButton(onClick = { onDone(name) }, enabled = name.isNotBlank()) { Text(confirm) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
 }
 
 
@@ -112,18 +158,28 @@ private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
 
 
 @Composable
-private fun AbodeMenu(waiting: Int, onOpen: (Screen) -> Unit, onUpperRoom: () -> Unit, onGates: () -> Unit) {
+private fun AbodeMenu(
+    waiting: Int,
+    onOpen: (Screen) -> Unit,
+    onUpperRoom: () -> Unit,
+    onBirthRoom: () -> Unit,
+    onGates: () -> Unit,
+    onFather: () -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) {
         Text(if (waiting > 0) "⋯ $waiting" else "⋯", fontSize = 20.sp)
     }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
         DropdownMenuItem(text = { Text("Обитатели — Горница") }, onClick = { open = false; onUpperRoom() })
+        DropdownMenuItem(text = { Text("Родильная") }, onClick = { open = false; onBirthRoom() })
         DropdownMenuItem(text = { Text("Пойти к Вратам…") }, onClick = { open = false; onGates() })
         DropdownMenuItem(text = { Text("Мои Обители") }, onClick = { open = false; onOpen(Screen.Dwellings) })
         DropdownMenuItem(
             text = { Text(if (waiting > 0) "Прошения ($waiting)" else "Прошения") },
             onClick = { open = false; onOpen(Screen.Supplications) },
         )
+        DropdownMenuItem(text = { Text("Отец по духу…") }, onClick = { open = false; onFather() })
+        DropdownMenuItem(text = { Text("Моя линия") }, onClick = { open = false; onOpen(Screen.Lineage) })
     }
 }
