@@ -92,14 +92,16 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
         onDispose { screen.keepScreenOn = false }
     }
 
-    // Отдых после последнего сделанного подхода — сколько задано после него.
+    // Отдых — перед подходом: от конца последнего сделанного до того, к какому приступаешь;
+    // заданный — у выбранного следующего. До первого подхода отдыхать не от чего.
     val last = training.efforts.maxByOrNull { it.finishedAtNs }
-    val restWilled = last?.let { TrainingCourse.restAfter(training, it) } ?: 0
+    val resting = doing == null && last != null && selected != null
+    val restWilled = selected?.let { (e, a) -> TrainingCourse.restWilled(training, e, a) } ?: 0
     val rested = last?.let { (nowNs - it.finishedAtNs) / NANOS } ?: 0
-    val restLeft = if (doing == null && last != null) restWilled - rested else 0
+    val clock = TrainingCourse.restClock(restWilled, rested)
     val context = LocalContext.current
-    LaunchedEffect(last?.finishedAtNs, restLeft <= 0) {
-        if (last != null && doing == null && restWilled > 0 && restLeft <= 0 && rested < restWilled + 3) {
+    LaunchedEffect(last?.finishedAtNs, restWilled, clock.over) {
+        if (resting && restWilled > 0 && clock.over && rested < restWilled + 3) {
             context.getSystemService(Vibrator::class.java)
                 ?.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
         }
@@ -164,13 +166,22 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                     Text(spanText((nowNs - doing.begunAtNs) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium)
                     Text(captionOf(training, doing.exercise, doing.approach), fontSize = 14.sp, color = WillColors.Muted)
                 }
-                restLeft > 0 -> {
-                    Text("Отдых", fontSize = 13.sp, color = WillColors.Muted)
-                    Text(spanText(restLeft), fontSize = 48.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
+                resting -> {
+                    // Сначала обратный отсчёт до заданного, потом секундомер дальше от отметки.
+                    Text(
+                        if (clock.over && restWilled > 0) "Отдых · задано ${restText(restWilled)}" else "Отдых",
+                        fontSize = 13.sp,
+                        color = WillColors.Muted,
+                    )
+                    Text(
+                        spanText(clock.seconds),
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (clock.over) WillColors.Ink else WillColors.Accent,
+                    )
                     selected?.let { (e, a) -> Text("Далее: " + captionOf(training, e, a), fontSize = 14.sp, color = WillColors.Muted) }
                 }
                 else -> {
-                    if (last != null && restWilled > 0) Text("Отдых окончен", fontSize = 13.sp, color = WillColors.Accent)
                     selected?.let { (e, a) -> Text("Далее: " + captionOf(training, e, a), fontSize = 15.sp) }
                         ?: Text("Все заданные подходы сделаны", fontSize = 15.sp, color = WillColors.Muted)
                 }

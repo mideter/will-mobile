@@ -79,14 +79,29 @@ class TrainingCourseTest {
     }
 
     @Test
-    fun `the rest after an approach is the willed one, beyond the willed as the last willed`() {
-        val t = training(done(0, 0, at = 0), done(0, 2, at = 100))
-        assertEquals(90, TrainingCourse.restAfter(t, t.efforts[0]))
-        assertEquals(120, TrainingCourse.restAfter(t, t.efforts[1]))
+    fun `the rest before an approach is the willed one, beyond the willed as the last willed`() {
+        val t = training()
+        assertEquals(90, TrainingCourse.restWilled(t, 0, 0))
+        assertEquals(120, TrainingCourse.restWilled(t, 0, 1))
+        assertEquals(120, TrainingCourse.restWilled(t, 0, 2))
     }
 
     @Test
-    fun `the rest before an approach is the time since the one before it finished`() {
+    fun `the rest clock counts down, then goes on from the mark passed`() {
+        assertEquals(TrainingCourse.RestClock(90, over = false), TrainingCourse.restClock(90, 0))
+        assertEquals(TrainingCourse.RestClock(1, over = false), TrainingCourse.restClock(90, 89))
+        assertEquals(TrainingCourse.RestClock(90, over = true), TrainingCourse.restClock(90, 90))
+        assertEquals(TrainingCourse.RestClock(102, over = true), TrainingCourse.restClock(90, 102))
+    }
+
+    @Test
+    fun `without a willed rest the clock is a stopwatch from zero`() {
+        assertEquals(TrainingCourse.RestClock(0, over = true), TrainingCourse.restClock(0, 0))
+        assertEquals(TrainingCourse.RestClock(15, over = true), TrainingCourse.restClock(0, 15))
+    }
+
+    @Test
+    fun `the rest taken before an approach is the time since the one before it finished, none before the first`() {
         val first = done(0, 0, at = 0)
         val second = done(0, 1, at = 75)
         val t = training(first, second)

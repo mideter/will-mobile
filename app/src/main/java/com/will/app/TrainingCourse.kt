@@ -51,15 +51,28 @@ object TrainingCourse {
     }
 
     /**
-     * Отдых после сделанного подхода, в секундах: заданный после него; у подхода сверх
-     * заданного — как у последнего заданного в этом упражнении.
+     * Заданный отдых перед подходом, в секундах: насколько отдохнувшим к нему приступать.
+     * Перед подходом сверх заданного — как перед последним заданным в этом упражнении.
      */
-    fun restAfter(training: WordItem, effort: EffortItem): Int {
-        val approaches = training.exercises.getOrNull(effort.exercise)?.approaches ?: return 0
-        return (approaches.getOrNull(effort.approach) ?: approaches.lastOrNull())?.restSeconds ?: 0
+    fun restWilled(training: WordItem, exercise: Int, approach: Int): Int {
+        val approaches = training.exercises.getOrNull(exercise)?.approaches ?: return 0
+        return (approaches.getOrNull(approach) ?: approaches.lastOrNull())?.restSeconds ?: 0
     }
 
-    /** Отдых перед подходом, в секундах: от конца предыдущего по времени до его начала. */
+    /** Таймер отдыха: [seconds] — сколько осталось или, когда [over], сколько отдыхает всего. */
+    data class RestClock(val seconds: Long, val over: Boolean)
+
+    /**
+     * Пока заданный отдых не вышел — обратный отсчёт; потом секундомер идёт дальше от
+     * пройденной отметки. Без заданного отдыха — секундомер с нуля.
+     */
+    fun restClock(willed: Int, rested: Long): RestClock =
+        if (rested < willed) RestClock(willed - rested, over = false) else RestClock(rested, over = true)
+
+    /**
+     * Отдых перед сделанным подходом, в секундах: от конца предыдущего по времени до его
+     * начала. Null — первое усилие тренировки: приступил отдохнувшим.
+     */
     fun restBefore(efforts: List<EffortItem>, effort: EffortItem): Long? {
         val before = efforts.filter { it.finishedAtNs <= effort.begunAtNs && it != effort }.maxByOrNull { it.finishedAtNs }
             ?: return null
