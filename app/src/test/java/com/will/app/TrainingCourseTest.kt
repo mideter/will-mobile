@@ -110,6 +110,13 @@ class TrainingCourseTest {
     }
 
     @Test
+    fun `the rest before an approach underway is the time since the last effort finished`() {
+        val t = training(done(0, 0, at = 0), done(1, 0, at = 50))
+        assertEquals(40L, TrainingCourse.restUntil(t.efforts, 120 * NS))
+        assertNull(TrainingCourse.restUntil(emptyList(), 120 * NS))
+    }
+
+    @Test
     fun `the confirmation proposes the willed, beyond the willed the last approach done`() {
         val t = training(done(1, 0, at = 0, reps = 4), done(1, 1, at = 100, reps = 3))
         assertEquals(squat.approaches[0], TrainingCourse.proposal(t, 1, 0))

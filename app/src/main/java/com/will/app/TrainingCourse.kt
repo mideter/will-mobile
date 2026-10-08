@@ -70,14 +70,17 @@ object TrainingCourse {
         if (rested < willed) RestClock(willed - rested, over = false) else RestClock(rested, over = true)
 
     /**
-     * Отдых перед сделанным подходом, в секундах: от конца предыдущего по времени до его
-     * начала. Null — первое усилие тренировки: приступил отдохнувшим.
+     * Отдых, взятый перед подходом, начатым в [begunAtNs], в секундах: от конца предыдущего
+     * по времени усилия. Null — до него усилий не было: приступил отдохнувшим.
      */
-    fun restBefore(efforts: List<EffortItem>, effort: EffortItem): Long? {
-        val before = efforts.filter { it.finishedAtNs <= effort.begunAtNs && it != effort }.maxByOrNull { it.finishedAtNs }
+    fun restUntil(efforts: List<EffortItem>, begunAtNs: Long): Long? {
+        val before = efforts.filter { it.begunAtNs < begunAtNs && it.finishedAtNs <= begunAtNs }.maxByOrNull { it.finishedAtNs }
             ?: return null
-        return (effort.begunAtNs - before.finishedAtNs) / 1_000_000_000L
+        return (begunAtNs - before.finishedAtNs) / 1_000_000_000L
     }
+
+    /** Отдых перед сделанным подходом; null — первое усилие тренировки. */
+    fun restBefore(efforts: List<EffortItem>, effort: EffortItem): Long? = restUntil(efforts, effort.begunAtNs)
 
     /** Что предложить в подтверждении: заданное; сверх заданного — как последний сделанный в упражнении. */
     fun proposal(training: WordItem, exercise: Int, approach: Int): ApproachItem? =

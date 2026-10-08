@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -124,11 +125,17 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                     val next = TrainingCourse.nextIn(training, e)
                     for (a in 0 until TrainingCourse.count(training, e)) {
                         val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
+                        val begun = effort?.begunAtNs ?: doing?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
+                        val willedRest = TrainingCourse.restWilled(training, e, a)
+                        when {
+                            begun != null -> RestRow(restTaken(TrainingCourse.restUntil(training.efforts, begun), willedRest), WillColors.Muted)
+                            resting && selected == e to a -> RestRow(restTaken(rested, willedRest), WillColors.Accent)
+                            willedRest > 0 -> RestRow("отдых ${restText(willedRest)}", WillColors.Muted)
+                        }
                         RunRow(
                             number = a + 1,
                             willed = exercise.approaches.getOrNull(a),
                             effort = effort,
-                            restBefore = effort?.let { TrainingCourse.restBefore(training.efforts, it) },
                             underwayFor = doing?.takeIf { it.exercise == e && it.approach == a }?.let { (nowNs - it.begunAtNs) / NANOS },
                             selected = doing == null && selected == e to a,
                             onSelect = if (doing == null && a == next) ({ chosen = e; extraFor = null }) else null,
@@ -138,11 +145,11 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                     val extra = e to TrainingCourse.count(training, e)
                     if (doing == null && next == null) {
                         if (selected == extra) {
+                            if (resting) RestRow(restTaken(rested, TrainingCourse.restWilled(training, e, extra.second)), WillColors.Accent)
                             RunRow(
                                 number = extra.second + 1,
                                 willed = null,
                                 effort = null,
-                                restBefore = null,
                                 underwayFor = null,
                                 selected = true,
                                 onSelect = null,
@@ -260,13 +267,26 @@ private fun captionOf(training: WordItem, exercise: Int, approach: Int): String 
         (asked?.let { " · ${weightText(it.weightGrams)} × ${it.repetitions}" } ?: " · сверх заданного")
 }
 
+/**
+ * Отдых, взятый перед подходом: «отдых 2:10 (задано 1:30)»; до первого усилия тренировки
+ * отдыхать было не от чего — «отдохнувшим».
+ */
+internal fun restTaken(seconds: Long?, willed: Int): String =
+    if (seconds == null) "отдохнувшим"
+    else "отдых ${spanText(seconds)}" + if (willed > 0) " (задано ${restText(willed)})" else ""
+
+/** Отдых — своей строкой над подходом: он перед подходом, а не после. */
+@Composable
+private fun RestRow(text: String, colour: Color) {
+    Text(text, fontSize = 12.sp, color = colour, modifier = Modifier.padding(start = 48.dp, top = 4.dp))
+}
+
 /** Подход в выполнении: сделан, идёт или ещё впереди (и, может быть, выбран). */
 @Composable
 private fun RunRow(
     number: Int,
     willed: ApproachItem?,
     effort: EffortItem?,
-    restBefore: Long?,
     underwayFor: Long?,
     selected: Boolean,
     onSelect: (() -> Unit)?,
@@ -296,13 +316,11 @@ private fun RunRow(
             effort != null -> {
                 val changed = willed != null && (willed.weightGrams != effort.weightGrams || willed.repetitions != effort.repetitions)
                 val took = (effort.finishedAtNs - effort.begunAtNs) / NANOS
-                ("${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}" +
-                    (restBefore?.let { " · отдых ${spanText(it)}" } ?: "")) to
+                "${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}" to
                     (if (changed || willed == null) WillColors.Accent else WillColors.Ink)
             }
             underwayFor != null -> "выполняется ${spanText(underwayFor)}" to WillColors.Accent
-            willed != null -> ("${weightText(willed.weightGrams)} × ${willed.repetitions}" +
-                (if (willed.restSeconds != 0) " · отдых ${restText(willed.restSeconds)}" else "")) to
+            willed != null -> "${weightText(willed.weightGrams)} × ${willed.repetitions}" to
                 (if (selected) WillColors.Ink else WillColors.Muted)
             else -> "сверх заданного" to WillColors.Accent
         }
@@ -323,6 +341,12 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
             for (a in 0 until TrainingCourse.count(training, e)) {
                 val asked = exercise.approaches.getOrNull(a)
                 val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
+                val begun = effort?.begunAtNs ?: underway?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
+                val willedRest = TrainingCourse.restWilled(training, e, a)
+                when {
+                    begun != null -> FeedRestLine(restTaken(TrainingCourse.restUntil(training.efforts, begun), willedRest))
+                    asked != null && willedRest > 0 && !finished -> FeedRestLine("отдых ${restText(willedRest)}")
+                }
                 val (line, colour) = when {
                     effort != null -> {
                         val did = "${effort.repetitions}"
@@ -335,8 +359,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                             else -> "${weightText(asked.weightGrams)} × ${asked.repetitions} → ${weightText(effort.weightGrams)} × $did"
                         }
                         val took = (effort.finishedAtNs - effort.begunAtNs) / NANOS
-                        val rest = TrainingCourse.restBefore(training.efforts, effort)?.let { " · отдых ${spanText(it)}" } ?: ""
-                        ("$head · ${spanText(took)}$rest") to
+                        "$head · ${spanText(took)}" to
                             (if (head.endsWith("✓")) WillColors.Ink else WillColors.Accent)
                     }
                     underway != null && underway.exercise == e && underway.approach == a ->
@@ -349,4 +372,9 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
             }
         }
     }
+}
+
+@Composable
+private fun FeedRestLine(text: String) {
+    Text(text, fontSize = 12.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 28.dp))
 }
