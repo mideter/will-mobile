@@ -77,9 +77,12 @@ fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = n
             exercise.approaches.forEachIndexed { a, approach ->
                 val asked = willed?.getOrNull(e)?.approaches?.getOrNull(a)
                 val differs = willed != null && asked != approach
+                // Отдых — своей строкой над подходом, к которому он ведёт.
+                if (approach.restSeconds != 0) {
+                    Text("отдых ${restText(approach.restSeconds)}", fontSize = 12.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 28.dp))
+                }
                 Text(
                     "${a + 1}. ${weightText(approach.weightGrams)} × ${approach.repetitions}" +
-                        (if (approach.restSeconds != 0) " · отдых ${restText(approach.restSeconds)}" else "") +
                         if (differs && asked != null) "   (задано ${weightText(asked.weightGrams)} × ${asked.repetitions})" else "",
                     fontSize = 14.sp,
                     color = if (differs) WillColors.Accent else WillColors.Ink,
@@ -159,7 +162,7 @@ private fun secondsOf(text: String): Int? {
     return seconds.takeIf { it in 0..MAX_REST }
 }
 
-/** Черновик подхода: вес, повторы и отдых после него. */
+/** Черновик подхода: вес, повторы и отдых перед ним. */
 internal class ApproachDraft(grams: Int, repetitions: Int, rest: Int = DEFAULT_REST) {
     var grams by mutableStateOf(grams)
     var repetitions by mutableStateOf(repetitions)
@@ -199,7 +202,7 @@ private fun exercisesOf(drafts: List<ExerciseDraft>): List<ExerciseItem> =
 
 /**
  * Редактор тренировки: Тренер составляет её — заголовок, упражнения карточками, подходы:
- * вес, повторы и отдых после — шагами. [names] — прежние названия упражнений для подсказки.
+ * отдых перед подходом, вес и повторы — шагами. [names] — прежние названия упражнений для подсказки.
  */
 @Composable
 fun TrainingEditor(
@@ -327,10 +330,15 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>,
     }
 }
 
-/** Подход в редакторе Тренера: номер, вес и повторы шагами. */
+/** Подход в редакторе Тренера: отдых перед ним, затем номер, вес и повторы — шагами. */
 @Composable
 private fun ApproachRow(number: Int, approach: ApproachDraft, onRemove: (() -> Unit)?) {
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        // Отдых — перед подходом: насколько отдохнувшим к нему приступать.
+        Row(Modifier.padding(start = 24.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("отдых", fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.width(52.dp))
+            RestStepper(approach, Modifier.width(170.dp))
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("$number", fontSize = 14.sp, color = WillColors.Muted, modifier = Modifier.width(24.dp))
             WeightStepper(approach, Modifier.weight(1.3f))
@@ -341,11 +349,6 @@ private fun ApproachRow(number: Int, approach: ApproachDraft, onRemove: (() -> U
             } else {
                 Spacer(Modifier.width(30.dp))
             }
-        }
-        // Отдых после подхода — второй строкой.
-        Row(Modifier.padding(start = 24.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("отдых", fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.width(52.dp))
-            RestStepper(approach, Modifier.width(170.dp))
         }
     }
 }

@@ -48,7 +48,7 @@ data class RoomItem(val name: String, val outer: Boolean)
 /** Неисполненное Веление в обзоре хозяина. */
 data class Waiting(val room: String, val behestId: Long, val body: String)
 
-/** Подход: вес в граммах (0 — свой вес), повторы и отдых после него, в секундах. */
+/** Подход: вес в граммах (0 — свой вес), повторы и отдых перед ним, в секундах. */
 data class ApproachItem(val weightGrams: Int, val repetitions: Int, val restSeconds: Int = 0)
 
 /** Упражнение: свободное название и подходы. */
