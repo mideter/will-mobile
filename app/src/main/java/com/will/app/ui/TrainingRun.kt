@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.ApproachItem
+import com.will.app.TrainingCourse
 import com.will.app.EffortItem
 import com.will.app.UnderwayItem
 import com.will.app.WillSession
@@ -49,31 +50,6 @@ import kotlinx.coroutines.delay
 fun spanText(seconds: Long): String = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 
 private const val NANOS = 1_000_000_000L
-
-/** Сколько подходов у упражнения: заданные и сделанные сверх них. */
-private fun approachCount(training: WordItem, exercise: Int): Int =
-    maxOf(
-        training.exercises[exercise].approaches.size,
-        (training.efforts.filter { it.exercise == exercise }.maxOfOrNull { it.approach } ?: -1) + 1,
-    )
-
-/** Следующий подход упражнения по порядку: первый заданный, ещё не сделанный; null — заданные сделаны. */
-private fun nextIn(training: WordItem, exercise: Int): Int? =
-    training.exercises[exercise].approaches.indices.firstOrNull { a ->
-        training.efforts.none { it.exercise == exercise && it.approach == a }
-    }
-
-/** Упражнение, к которому переходят сами: первое, где остались заданные подходы. */
-private fun nextOf(training: WordItem): Pair<Int, Int>? {
-    training.exercises.indices.forEach { e -> nextIn(training, e)?.let { return e to it } }
-    return null
-}
-
-/** Отдых перед этим усилием: от конца предыдущего по времени до его начала. */
-internal fun restBefore(efforts: List<EffortItem>, effort: EffortItem): Long? {
-    val before = efforts.filter { it.finishedAtNs <= effort.begunAtNs }.maxByOrNull { it.finishedAtNs } ?: return null
-    return (effort.begunAtNs - before.finishedAtNs) / NANOS
-}
 
 /**
  * Выполнение тренировки. Подходы упражнения идут по порядку, упражнения — в каком угодно:
@@ -86,8 +62,18 @@ internal fun restBefore(efforts: List<EffortItem>, effort: EffortItem): Long? {
 fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSession, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
     val doing = underway?.takeIf { it.behestId == training.id }
-    var chosen by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    val selected = chosen?.takeIf { (e, a) -> training.efforts.none { it.exercise == e && it.approach == a } } ?: nextOf(training)
+    // Выбирают упражнение: выбор держится его, пока подходы не кончатся (см. TrainingCourse).
+    var chosen by remember { mutableStateOf<Int?>(null) }
+    var extraFor by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(doing) {
+        // Начатый подход — где бы его ни начали — ведёт фокус; «сверх заданного» не залипает.
+        if (doing != null) {
+            chosen = doing.exercise
+            extraFor = null
+        }
+    }
+    val focus = TrainingCourse.focus(training, doing, chosen)
+    val selected = if (doing == null) TrainingCourse.next(training, focus, extraFor) else null
     var confirming by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
 
@@ -108,7 +94,7 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
 
     // Отдых после последнего сделанного подхода — сколько задано после него.
     val last = training.efforts.maxByOrNull { it.finishedAtNs }
-    val restWilled = last?.let { training.exercises.getOrNull(it.exercise)?.approaches?.getOrNull(it.approach)?.restSeconds } ?: 0
+    val restWilled = last?.let { TrainingCourse.restAfter(training, it) } ?: 0
     val rested = last?.let { (nowNs - it.finishedAtNs) / NANOS } ?: 0
     val restLeft = if (doing == null && last != null) restWilled - rested else 0
     val context = LocalContext.current
@@ -133,21 +119,21 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                 ) {
                     Text(exercise.name, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                     // Нажимается только следующий подход упражнения: подходы идут по порядку.
-                    val next = nextIn(training, e)
-                    for (a in 0 until approachCount(training, e)) {
+                    val next = TrainingCourse.nextIn(training, e)
+                    for (a in 0 until TrainingCourse.count(training, e)) {
                         val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                         RunRow(
                             number = a + 1,
                             willed = exercise.approaches.getOrNull(a),
                             effort = effort,
-                            restBefore = effort?.let { restBefore(training.efforts, it) },
+                            restBefore = effort?.let { TrainingCourse.restBefore(training.efforts, it) },
                             underwayFor = doing?.takeIf { it.exercise == e && it.approach == a }?.let { (nowNs - it.begunAtNs) / NANOS },
                             selected = doing == null && selected == e to a,
-                            onSelect = if (doing == null && a == next) ({ chosen = e to a }) else null,
+                            onSelect = if (doing == null && a == next) ({ chosen = e; extraFor = null }) else null,
                         )
                     }
                     // Сверх заданного — когда заданные подходы упражнения сделаны.
-                    val extra = e to approachCount(training, e)
+                    val extra = e to TrainingCourse.count(training, e)
                     if (doing == null && next == null) {
                         if (selected == extra) {
                             RunRow(
@@ -160,7 +146,7 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                                 onSelect = null,
                             )
                         } else {
-                            TextButton(onClick = { chosen = extra }) { Text("+ подход сверх заданного") }
+                            TextButton(onClick = { chosen = e; extraFor = e }) { Text("+ подход сверх заданного") }
                         }
                     }
                 }
@@ -204,8 +190,7 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
 
     if (confirming && doing != null) {
         // Сделанное — как задано, если не поправить; сверх заданного — как последний подход.
-        val asked = training.exercises[doing.exercise].approaches.getOrNull(doing.approach)
-        val like = asked ?: training.efforts.lastOrNull { it.exercise == doing.exercise }?.let { ApproachItem(it.weightGrams, it.repetitions) }
+        val like = TrainingCourse.proposal(training, doing.exercise, doing.approach)
         val draft = remember(doing) { ApproachDraft(like?.weightGrams ?: 0, like?.repetitions ?: 10) }
         AlertDialog(
             onDismissRequest = { confirming = false },
@@ -324,7 +309,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
     Column(Modifier.padding(top = 4.dp)) {
         training.exercises.forEachIndexed { e, exercise ->
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            for (a in 0 until approachCount(training, e)) {
+            for (a in 0 until TrainingCourse.count(training, e)) {
                 val asked = exercise.approaches.getOrNull(a)
                 val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                 val (line, colour) = when {
@@ -339,7 +324,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                             else -> "${weightText(asked.weightGrams)} × ${asked.repetitions} → ${weightText(effort.weightGrams)} × $did"
                         }
                         val took = (effort.finishedAtNs - effort.begunAtNs) / NANOS
-                        val rest = restBefore(training.efforts, effort)?.let { " · отдых ${spanText(it)}" } ?: ""
+                        val rest = TrainingCourse.restBefore(training.efforts, effort)?.let { " · отдых ${spanText(it)}" } ?: ""
                         ("$head · ${spanText(took)}$rest") to
                             (if (head.endsWith("✓")) WillColors.Ink else WillColors.Accent)
                     }
