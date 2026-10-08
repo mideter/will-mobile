@@ -57,13 +57,15 @@ private fun approachCount(training: WordItem, exercise: Int): Int =
         (training.efforts.filter { it.exercise == exercise }.maxOfOrNull { it.approach } ?: -1) + 1,
     )
 
-/** Первый заданный подход, ещё не сделанный, — его выбирают сами. */
-private fun nextOf(training: WordItem): Pair<Int, Int>? {
-    training.exercises.forEachIndexed { e, exercise ->
-        for (a in exercise.approaches.indices) {
-            if (training.efforts.none { it.exercise == e && it.approach == a }) return e to a
-        }
+/** Следующий подход упражнения по порядку: первый заданный, ещё не сделанный; null — заданные сделаны. */
+private fun nextIn(training: WordItem, exercise: Int): Int? =
+    training.exercises[exercise].approaches.indices.firstOrNull { a ->
+        training.efforts.none { it.exercise == exercise && it.approach == a }
     }
+
+/** Упражнение, к которому переходят сами: первое, где остались заданные подходы. */
+private fun nextOf(training: WordItem): Pair<Int, Int>? {
+    training.exercises.indices.forEach { e -> nextIn(training, e)?.let { return e to it } }
     return null
 }
 
@@ -74,7 +76,8 @@ internal fun restBefore(efforts: List<EffortItem>, effort: EffortItem): Long? {
 }
 
 /**
- * Выполнение тренировки. Выбираешь подход (следующий выбран сам) и «Приступить» — идёт
+ * Выполнение тренировки. Подходы упражнения идут по порядку, упражнения — в каком угодно:
+ * выбираешь упражнение (первое с несделанными подходами выбрано само) и «Приступить» — идёт
  * таймер подхода; «Завершить подход» — подтверждаешь сделанное, и идёт отдых: обратный
  * отсчёт до заданного, с вибрацией в конце. Каждый подход сразу уходит Тренеру. Экран не
  * гаснет, пока открыт; таймеры считаются от меток времени.
@@ -129,6 +132,8 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 ) {
                     Text(exercise.name, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    // Нажимается только следующий подход упражнения: подходы идут по порядку.
+                    val next = nextIn(training, e)
                     for (a in 0 until approachCount(training, e)) {
                         val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                         RunRow(
@@ -138,11 +143,25 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                             restBefore = effort?.let { restBefore(training.efforts, it) },
                             underwayFor = doing?.takeIf { it.exercise == e && it.approach == a }?.let { (nowNs - it.begunAtNs) / NANOS },
                             selected = doing == null && selected == e to a,
-                            onSelect = if (doing == null && effort == null) ({ chosen = e to a }) else null,
+                            onSelect = if (doing == null && a == next) ({ chosen = e to a }) else null,
                         )
                     }
-                    if (doing == null) {
-                        TextButton(onClick = { chosen = e to approachCount(training, e) }) { Text("+ подход сверх заданного") }
+                    // Сверх заданного — когда заданные подходы упражнения сделаны.
+                    val extra = e to approachCount(training, e)
+                    if (doing == null && next == null) {
+                        if (selected == extra) {
+                            RunRow(
+                                number = extra.second + 1,
+                                willed = null,
+                                effort = null,
+                                restBefore = null,
+                                underwayFor = null,
+                                selected = true,
+                                onSelect = null,
+                            )
+                        } else {
+                            TextButton(onClick = { chosen = extra }) { Text("+ подход сверх заданного") }
+                        }
                     }
                 }
             }
