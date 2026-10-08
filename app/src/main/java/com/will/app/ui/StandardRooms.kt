@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Kind
+import com.will.app.Standing
 import com.will.app.View
 import com.will.app.WillSession
 import com.will.app.WillState
@@ -115,7 +116,21 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
                                 }
                             }
                         }
-                        if (dweller.name in mutual) {
+                        // Как он стоит ко мне в тренерстве; просить — только где есть смысл.
+                        val standings = dweller.standings
+                        if (Standing.Trainer in standings) Text("Ваш Тренер", fontSize = 13.sp, color = WillColors.Accent)
+                        if (Standing.Novice in standings) Text("Ваш ученик", fontSize = 13.sp, color = WillColors.Accent)
+                        if (Standing.Asked in standings) {
+                            Text("Просьба отправлена, ждёт ответа", fontSize = 13.sp, color = WillColors.Muted)
+                        }
+                        if (Standing.Asks in standings) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Просит вас стать его Тренером", fontSize = 13.sp, color = WillColors.Accent, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { session.accept(dweller.name) }) { Text("Принять") }
+                                TextButton(onClick = { session.reject(dweller.name) }) { Text("Отклонить", color = WillColors.Muted) }
+                            }
+                        }
+                        if (dweller.name in mutual && Standing.Trainer !in standings && Standing.Asked !in standings) {
                             TextButton(onClick = { session.ask(dweller.name) }) { Text("Просить стать Тренером") }
                         }
                     } else {

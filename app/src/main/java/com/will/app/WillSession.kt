@@ -88,7 +88,10 @@ data class WordItem(
 /** Род обитателя. */
 enum class Kind { Acquaintance, Neighbour, Friend }
 
-data class Person(val name: String, val kind: Kind)
+/** Как обитатель стоит к хозяину в тренерстве; Узы бывают в обе стороны, поэтому отношений может быть несколько. */
+enum class Standing { Asked, Asks, Trainer, Novice }
+
+data class Person(val name: String, val kind: Kind, val standings: Set<Standing> = emptySet())
 
 /** Что отражает комната. */
 enum class Aspect { Words, Threshold, Dwellers, Birth }
@@ -423,7 +426,15 @@ class WillSession(context: Context) {
                 listDwellings()
             }
             ServerEvent.EventCase.DWELLERS -> {
-                val people = event.dwellers.dwellersList.map { Person(it.name, it.kind.toKind()) }
+                val people = event.dwellers.dwellersList.map {
+                    val standings = buildSet {
+                        if (it.trainer) add(Standing.Trainer)
+                        if (it.novice) add(Standing.Novice)
+                        if (it.asks) add(Standing.Asks)
+                        if (it.asked) add(Standing.Asked)
+                    }
+                    Person(it.name, it.kind.toKind(), standings)
+                }
                 // В Горнице — её обитатели; своя Горница — это и мои обитатели.
                 val gatheringUpperRoom = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
                 if (gatheringUpperRoom != null) gathering = gatheringUpperRoom.copy(people = people)
