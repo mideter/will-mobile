@@ -46,8 +46,8 @@ data class RoomItem(val name: String, val outer: Boolean)
 /** Неисполненное Веление в обзоре хозяина. */
 data class Waiting(val room: String, val behestId: Long, val body: String)
 
-/** Подход: вес в граммах (0 — свой вес) и повторы. */
-data class ApproachItem(val weightGrams: Int, val repetitions: Int)
+/** Подход: вес в граммах (0 — свой вес), повторы и отдых после него, в секундах. */
+data class ApproachItem(val weightGrams: Int, val repetitions: Int, val restSeconds: Int = 0)
 
 /** Упражнение: свободное название и подходы. */
 data class ExerciseItem(val name: String, val approaches: List<ApproachItem>)
@@ -450,14 +450,14 @@ class WillSession(context: Context) {
     private fun Word.toItem() = WordItem(
         id, name, body, isMine, kind, behestId,
         exercisesList.map { e ->
-            ExerciseItem(e.name, e.approachesList.map { ApproachItem(it.weightGrams, it.repetitions) })
+            ExerciseItem(e.name, e.approachesList.map { ApproachItem(it.weightGrams, it.repetitions, it.restSeconds) })
         },
     )
 
     private fun ExerciseItem.toWire() = exercise {
         name = this@toWire.name
         approaches.addAll(this@toWire.approaches.map { a ->
-            approach { weightGrams = a.weightGrams; repetitions = a.repetitions }
+            approach { weightGrams = a.weightGrams; repetitions = a.repetitions; restSeconds = a.restSeconds }
         })
     }
 

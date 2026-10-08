@@ -79,6 +79,7 @@ fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = n
                 val differs = willed != null && asked != approach
                 Text(
                     "${a + 1}. ${weightText(approach.weightGrams)} × ${approach.repetitions}" +
+                        (if (approach.restSeconds != 0) " · отдых ${restText(approach.restSeconds)}" else "") +
                         if (differs && asked != null) "   (задано ${weightText(asked.weightGrams)} × ${asked.repetitions})" else "",
                     fontSize = 14.sp,
                     color = if (differs) WillColors.Accent else WillColors.Ink,
@@ -136,18 +137,47 @@ private fun ComparedApproach(number: Int, asked: ApproachItem?, did: ApproachIte
 private const val WEIGHT_STEP = 2_500
 private const val MAX_GRAMS = 1_000_000
 private const val MAX_REPETITIONS = 10_000
+/** Отдых по умолчанию — полторы минуты; шаг — 15 секунд; не больше часа. */
+private const val DEFAULT_REST = 90
+private const val REST_STEP = 15
+private const val MAX_REST = 3_600
+
+/** Отдых как его читают: «1:30»; без отдыха — «без отдыха». */
+fun restText(seconds: Int): String =
+    if (seconds == 0) "без отдыха" else "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+
+/** Секунды из набранного: «90», «1:30». Null, если это не отдых. */
+private fun secondsOf(text: String): Int? {
+    val t = text.trim()
+    if (t.isEmpty()) return 0
+    val parts = t.split(':')
+    val seconds = when (parts.size) {
+        1 -> parts[0].toIntOrNull()
+        2 -> parts[0].toIntOrNull()?.let { m -> parts[1].toIntOrNull()?.takeIf { it in 0..59 }?.let { m * 60 + it } }
+        else -> null
+    } ?: return null
+    return seconds.takeIf { it in 0..MAX_REST }
+}
 
 /**
  * Черновик подхода. [willed] — заданное (в отчёте); [marked] — отмечен сделанным;
  * [editing] — числа открыты для правки шагами.
  */
-private class ApproachDraft(grams: Int, repetitions: Int, val willed: ApproachItem?, marked: Boolean, editing: Boolean) {
+private class ApproachDraft(
+    grams: Int,
+    repetitions: Int,
+    val willed: ApproachItem?,
+    marked: Boolean,
+    editing: Boolean,
+    rest: Int = willed?.restSeconds ?: DEFAULT_REST,
+) {
     var grams by mutableStateOf(grams)
     var repetitions by mutableStateOf(repetitions)
+    var rest by mutableStateOf(rest)
     var marked by mutableStateOf(marked)
     var editing by mutableStateOf(editing)
 
-    val item get() = ApproachItem(grams, repetitions)
+    val item get() = ApproachItem(grams, repetitions, rest)
     val changed get() = willed != null && willed != item
 }
 
@@ -352,7 +382,9 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, report: Boolean, nam
         // Новый подход — как последний: обычно меняют одно число.
         TextButton(onClick = {
             val last = draft.approaches.lastOrNull()
-            draft.approaches.add(ApproachDraft(last?.grams ?: 0, last?.repetitions ?: 10, null, marked = true, editing = true))
+            draft.approaches.add(
+                ApproachDraft(last?.grams ?: 0, last?.repetitions ?: 10, null, marked = true, editing = true, rest = last?.rest ?: DEFAULT_REST),
+            )
         }) { Text(if (report) "+ подход сверх заданного" else "+ подход") }
     }
 }
@@ -360,17 +392,37 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, report: Boolean, nam
 /** Подход в редакторе Тренера: номер, вес и повторы шагами. */
 @Composable
 private fun ApproachRow(number: Int, approach: ApproachDraft, onRemove: (() -> Unit)?) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("$number", fontSize = 14.sp, color = WillColors.Muted, modifier = Modifier.width(24.dp))
-        WeightStepper(approach, Modifier.weight(1.3f))
-        Text("×", fontSize = 16.sp, color = WillColors.Muted, modifier = Modifier.padding(horizontal = 4.dp))
-        RepetitionsStepper(approach, Modifier.weight(1f))
-        if (onRemove != null) {
-            Text("✕", color = WillColors.Muted, modifier = Modifier.clickable(onClick = onRemove).padding(8.dp))
-        } else {
-            Spacer(Modifier.width(30.dp))
+    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("$number", fontSize = 14.sp, color = WillColors.Muted, modifier = Modifier.width(24.dp))
+            WeightStepper(approach, Modifier.weight(1.3f))
+            Text("×", fontSize = 16.sp, color = WillColors.Muted, modifier = Modifier.padding(horizontal = 4.dp))
+            RepetitionsStepper(approach, Modifier.weight(1f))
+            if (onRemove != null) {
+                Text("✕", color = WillColors.Muted, modifier = Modifier.clickable(onClick = onRemove).padding(8.dp))
+            } else {
+                Spacer(Modifier.width(30.dp))
+            }
+        }
+        // Отдых после подхода — второй строкой.
+        Row(Modifier.padding(start = 24.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("отдых", fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.width(52.dp))
+            RestStepper(approach, Modifier.width(170.dp))
         }
     }
+}
+
+@Composable
+private fun RestStepper(approach: ApproachDraft, modifier: Modifier) {
+    Stepper(
+        text = restText(approach.rest),
+        onMinus = { approach.rest = (approach.rest - REST_STEP).coerceAtLeast(0) },
+        onPlus = { approach.rest = (approach.rest + REST_STEP).coerceAtMost(MAX_REST) },
+        exact = ExactInput("Отдых", "секунды или мм:сс; пусто — без отдыха", if (approach.rest == 0) "" else restText(approach.rest), KeyboardType.Text) {
+            secondsOf(it)?.let { s -> approach.rest = s; true } ?: false
+        },
+        modifier = modifier,
+    )
 }
 
 /**
