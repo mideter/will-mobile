@@ -159,26 +159,13 @@ private fun secondsOf(text: String): Int? {
     return seconds.takeIf { it in 0..MAX_REST }
 }
 
-/**
- * Черновик подхода. [willed] — заданное (в отчёте); [marked] — отмечен сделанным;
- * [editing] — числа открыты для правки шагами.
- */
-private class ApproachDraft(
-    grams: Int,
-    repetitions: Int,
-    val willed: ApproachItem?,
-    marked: Boolean,
-    editing: Boolean,
-    rest: Int = willed?.restSeconds ?: DEFAULT_REST,
-) {
+/** Черновик подхода: вес, повторы и отдых после него. */
+internal class ApproachDraft(grams: Int, repetitions: Int, rest: Int = DEFAULT_REST) {
     var grams by mutableStateOf(grams)
     var repetitions by mutableStateOf(repetitions)
     var rest by mutableStateOf(rest)
-    var marked by mutableStateOf(marked)
-    var editing by mutableStateOf(editing)
 
     val item get() = ApproachItem(grams, repetitions, rest)
-    val changed get() = willed != null && willed != item
 }
 
 /** Черновик упражнения. */
@@ -199,115 +186,76 @@ private fun gramsOf(text: String): Int? {
 /** Вес, как его набирают: «62,5»; свой вес — пусто. */
 private fun kilogramsText(grams: Int) = if (grams == 0) "" else weightText(grams).removeSuffix(" кг")
 
-/** Что не так в черновиках; null, если всё можно отправить. */
-private fun troubleOf(drafts: List<ExerciseDraft>, report: Boolean): String? {
-    if (report) {
-        if (drafts.none { d -> d.approaches.any { it.marked } }) return "Отметьте сделанные подходы"
-        return null
-    }
+/** Что не так в черновиках; null, если всё можно задать. */
+private fun troubleOf(drafts: List<ExerciseDraft>): String? {
     if (drafts.isEmpty()) return "Добавьте упражнение"
     if (drafts.any { it.name.isBlank() }) return "У каждого упражнения должно быть название"
     if (drafts.any { it.approaches.isEmpty() }) return "У каждого упражнения — хотя бы один подход"
     return null
 }
 
-/** Упражнения из черновиков: в отчёте — только отмеченные подходы. */
-private fun exercisesOf(drafts: List<ExerciseDraft>, report: Boolean): List<ExerciseItem> =
-    drafts.mapNotNull { draft ->
-        val approaches = draft.approaches.filter { !report || it.marked }.map { it.item }
-        if (approaches.isEmpty()) null else ExerciseItem(draft.name.trim(), approaches)
-    }
+private fun exercisesOf(drafts: List<ExerciseDraft>): List<ExerciseItem> =
+    drafts.map { draft -> ExerciseItem(draft.name.trim(), draft.approaches.map { it.item }) }
 
 /**
- * Редактор тренировки. Тренер составляет её ([report] = false): заголовок, упражнения
- * карточками, подходы — вес и повторы шагами. Послушник отчитывается ([report] = true):
- * отмечает подходы, сделанные как задано, правит сделанное иначе и пишет отчёт.
- * [names] — прежние названия упражнений для подсказки.
+ * Редактор тренировки: Тренер составляет её — заголовок, упражнения карточками, подходы:
+ * вес, повторы и отдых после — шагами. [names] — прежние названия упражнений для подсказки.
  */
 @Composable
 fun TrainingEditor(
-    report: Boolean,
     heading: String,
-    initial: List<ExerciseItem>,
     names: List<String>,
-    onDone: (text: String, exercises: List<ExerciseItem>) -> Unit,
+    onDone: (title: String, exercises: List<ExerciseItem>) -> Unit,
     onCancel: () -> Unit,
 ) {
     BackHandler(onBack = onCancel)
-    var text by remember { mutableStateOf("") }
-    val drafts = remember {
-        mutableStateListOf<ExerciseDraft>().apply {
-            if (initial.isEmpty()) {
-                add(ExerciseDraft("", listOf(ApproachDraft(0, 10, null, marked = true, editing = true))))
-            } else {
-                addAll(initial.map { e ->
-                    ExerciseDraft(e.name, e.approaches.map { ApproachDraft(it.weightGrams, it.repetitions, it, marked = false, editing = false) })
-                })
-            }
-        }
-    }
-    val trouble = troubleOf(drafts, report)
+    var title by remember { mutableStateOf("") }
+    val drafts = remember { mutableStateListOf(ExerciseDraft("", listOf(ApproachDraft(0, 10)))) }
+    val trouble = troubleOf(drafts)
 
     Column(Modifier.fillMaxSize()) {
-        Header(title = if (report) "Отчёт" else "Новая тренировка", subtitle = heading, onBack = onCancel)
+        Header(title = "Новая тренировка", subtitle = heading, onBack = onCancel)
         LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 12.dp)) {
             item {
-                if (report) {
-                    Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = {
-                            drafts.forEach { d -> d.approaches.forEach { if (!it.marked) { it.marked = true } } }
-                        }) { Text("✓ Всё как задано") }
-                    }
-                } else {
-                    PlainField(
-                        value = text,
-                        onValueChange = { text = it },
-                        placeholder = "Тренировка",
-                        fontSize = 22.sp,
-                        modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 8.dp),
-                    )
-                }
+                PlainField(
+                    value = title,
+                    onValueChange = { title = it },
+                    placeholder = "Тренировка",
+                    fontSize = 22.sp,
+                    modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 8.dp),
+                )
             }
             itemsIndexed(drafts) { index, draft ->
                 ExerciseCard(
                     number = index + 1,
                     draft = draft,
-                    report = report,
                     names = names,
-                    onRemove = if (!report && drafts.size > 1) ({ drafts.removeAt(index) }) else null,
+                    onRemove = if (drafts.size > 1) ({ drafts.removeAt(index) }) else null,
                 )
             }
-            if (!report) {
-                item {
-                    DashedCard(onClick = {
-                        drafts.add(ExerciseDraft("", listOf(ApproachDraft(0, 10, null, marked = true, editing = true))))
-                    }) { Text("+ упражнение", color = WillColors.Accent, fontSize = 16.sp) }
-                }
-            }
-            if (report) {
-                item {
-                    OutlinedTextField(
-                        value = text,
-                        onValueChange = { text = it },
-                        modifier = Modifier.fillMaxWidth().padding(16.dp, 12.dp),
-                        placeholder = { Text("Отчёт (необязательно)") },
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    )
+            item {
+                DashedCard(onClick = { drafts.add(ExerciseDraft("", listOf(ApproachDraft(0, 10)))) }) {
+                    Text("+ упражнение", color = WillColors.Accent, fontSize = 16.sp)
                 }
             }
         }
-        // Кнопка всегда видна внизу; пока что-то не так — неактивна, и сказано почему.
-        Column(Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 8.dp, 16.dp, 12.dp)) {
-            if (trouble != null) {
-                Text(trouble, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(bottom = 6.dp))
-            }
-            Button(
-                onClick = { onDone(text, exercisesOf(drafts, report)) },
-                enabled = trouble == null,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-            ) { Text(if (report) "Отчитаться" else "Задать", fontSize = 17.sp) }
+        BottomButton(text = "Задать", trouble = trouble) { onDone(title, exercisesOf(drafts)) }
+    }
+}
+
+/** Кнопка внизу экрана: всегда видна; пока что-то не так — неактивна, и сказано почему. */
+@Composable
+internal fun BottomButton(text: String, trouble: String?, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 8.dp, 16.dp, 12.dp)) {
+        if (trouble != null) {
+            Text(trouble, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(bottom = 6.dp))
         }
+        Button(
+            onClick = onClick,
+            enabled = trouble == null,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(12.dp),
+        ) { Text(text, fontSize = 17.sp) }
     }
 }
 
@@ -339,7 +287,7 @@ private fun PlainField(
 
 /** Карточка упражнения: номер, название, подходы. */
 @Composable
-private fun ExerciseCard(number: Int, draft: ExerciseDraft, report: Boolean, names: List<String>, onRemove: (() -> Unit)?) {
+private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>, onRemove: (() -> Unit)?) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -350,22 +298,18 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, report: Boolean, nam
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("$number", fontSize = 15.sp, color = WillColors.Muted, modifier = Modifier.width(24.dp))
-            if (report) {
-                Text(draft.name, fontSize = 18.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            } else {
-                PlainField(
-                    value = draft.name,
-                    onValueChange = { draft.name = it },
-                    placeholder = "Упражнение",
-                    fontSize = 18.sp,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            PlainField(
+                value = draft.name,
+                onValueChange = { draft.name = it },
+                placeholder = "Упражнение",
+                fontSize = 18.sp,
+                modifier = Modifier.weight(1f),
+            )
             if (onRemove != null) TextButton(onClick = onRemove) { Text("✕", color = WillColors.Muted) }
         }
         // Подсказка: прежние названия, в которых есть набранное.
         val typed = draft.name.trim()
-        if (!report && typed.isNotEmpty()) {
+        if (typed.isNotEmpty()) {
             val like = names.filter { it != typed && it.contains(typed, ignoreCase = true) }.take(3)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 like.forEach { SuggestionChip(onClick = { draft.name = it }, label = { Text(it, fontSize = 13.sp) }) }
@@ -373,19 +317,13 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, report: Boolean, nam
         }
         Spacer(Modifier.height(4.dp))
         draft.approaches.forEachIndexed { index, approach ->
-            if (report) {
-                ReportRow(index + 1, approach, onRemove = if (approach.willed == null) ({ draft.approaches.removeAt(index) }) else null)
-            } else {
-                ApproachRow(index + 1, approach, onRemove = if (draft.approaches.size > 1) ({ draft.approaches.removeAt(index) }) else null)
-            }
+            ApproachRow(index + 1, approach, onRemove = if (draft.approaches.size > 1) ({ draft.approaches.removeAt(index) }) else null)
         }
         // Новый подход — как последний: обычно меняют одно число.
         TextButton(onClick = {
             val last = draft.approaches.lastOrNull()
-            draft.approaches.add(
-                ApproachDraft(last?.grams ?: 0, last?.repetitions ?: 10, null, marked = true, editing = true, rest = last?.rest ?: DEFAULT_REST),
-            )
-        }) { Text(if (report) "+ подход сверх заданного" else "+ подход") }
+            draft.approaches.add(ApproachDraft(last?.grams ?: 0, last?.repetitions ?: 10, last?.rest ?: DEFAULT_REST))
+        }) { Text("+ подход") }
     }
 }
 
@@ -425,78 +363,8 @@ private fun RestStepper(approach: ApproachDraft, modifier: Modifier) {
     )
 }
 
-/**
- * Подход в отчёте: отметка ○/✓; заданное — строкой, по нажатию — шаги для сделанного иначе.
- * Изменённое выделено, рядом — что было задано.
- */
 @Composable
-private fun ReportRow(number: Int, approach: ApproachDraft, onRemove: (() -> Unit)?) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$number", fontSize = 14.sp, color = WillColors.Muted, modifier = Modifier.width(24.dp))
-            Mark(approach.marked) {
-                if (approach.marked) {
-                    approach.marked = false
-                } else {
-                    // ✓ — «как задано».
-                    approach.willed?.let { approach.grams = it.weightGrams; approach.repetitions = it.repetitions }
-                    approach.marked = true
-                    approach.editing = false
-                }
-            }
-            Spacer(Modifier.width(10.dp))
-            if (approach.editing) {
-                WeightStepper(approach, Modifier.weight(1.3f))
-                Text("×", fontSize = 16.sp, color = WillColors.Muted, modifier = Modifier.padding(horizontal = 4.dp))
-                RepetitionsStepper(approach, Modifier.weight(1f))
-            } else {
-                Text(
-                    "${weightText(approach.grams)} × ${approach.repetitions}",
-                    fontSize = 16.sp,
-                    color = when {
-                        approach.changed -> WillColors.Accent
-                        approach.marked -> WillColors.Ink
-                        else -> WillColors.Muted
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { approach.editing = true; approach.marked = true }
-                        .padding(vertical = 10.dp),
-                )
-            }
-            if (onRemove != null) {
-                Text("✕", color = WillColors.Muted, modifier = Modifier.clickable(onClick = onRemove).padding(8.dp))
-            }
-        }
-        val willed = approach.willed
-        if (approach.changed && willed != null) {
-            Text(
-                "задано ${weightText(willed.weightGrams)} × ${willed.repetitions}",
-                fontSize = 12.sp,
-                color = WillColors.Muted,
-                modifier = Modifier.padding(start = 58.dp),
-            )
-        }
-    }
-}
-
-/** Отметка подхода: пустой кружок или ✓. */
-@Composable
-private fun Mark(marked: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .background(if (marked) WillColors.Accent else WillColors.Divider)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (marked) Text("✓", color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp)
-    }
-}
-
-@Composable
-private fun WeightStepper(approach: ApproachDraft, modifier: Modifier) {
+internal fun WeightStepper(approach: ApproachDraft, modifier: Modifier) {
     Stepper(
         text = weightText(approach.grams),
         onMinus = { approach.grams = (approach.grams - WEIGHT_STEP).coerceAtLeast(0) },
@@ -509,7 +377,7 @@ private fun WeightStepper(approach: ApproachDraft, modifier: Modifier) {
 }
 
 @Composable
-private fun RepetitionsStepper(approach: ApproachDraft, modifier: Modifier) {
+internal fun RepetitionsStepper(approach: ApproachDraft, modifier: Modifier) {
     Stepper(
         text = "${approach.repetitions}",
         onMinus = { approach.repetitions = (approach.repetitions - 1).coerceAtLeast(1) },

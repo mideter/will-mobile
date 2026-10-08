@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.will.app.UnderwayItem
 import com.will.app.View
 import com.will.app.WillSession
 import com.will.app.WillState
@@ -62,9 +63,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
 
     if (composing) {
         TrainingEditor(
-            report = false,
             heading = view.room,
-            initial = emptyList(),
             names = names,
             onDone = { title, exercises ->
                 session.train(title, exercises)
@@ -74,19 +73,15 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
         )
         return
     }
-    fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { training ->
-        TrainingEditor(
-            report = true,
-            heading = training.body,
-            initial = training.exercises,
-            names = names,
-            onDone = { report, done ->
-                session.fulfil(training.id, report, done)
-                fulfilling = null
-            },
-            onCancel = { fulfilling = null },
-        )
-        return
+    // Тренировку выполняют по подходам; берётся живая — с усилиями, пришедшими только что.
+    fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { chosen ->
+        val training = view.words.firstOrNull { it.id == chosen.id }
+        if (training == null || training.id in fulfilled) {
+            fulfilling = null
+        } else {
+            TrainingRun(training, view.underway, session, onClose = { fulfilling = null })
+            return
+        }
     }
 
     LaunchedEffect(view.words.size) {
@@ -109,6 +104,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
                     WordRow(
                         word = word,
                         deed = deeds[word.id],
+                        underway = view.underway?.takeIf { it.behestId == word.id },
                         onFulfil = if (novice && word.kind == Word.Kind.BEHEST && word.id !in fulfilled) {
                             { fulfilling = word }
                         } else {
@@ -177,7 +173,7 @@ private fun feedOf(words: List<WordItem>): List<WordItem> {
 }
 
 @Composable
-private fun WordRow(word: WordItem, deed: WordItem?, onFulfil: (() -> Unit)?, done: Boolean) {
+private fun WordRow(word: WordItem, deed: WordItem?, underway: UnderwayItem?, onFulfil: (() -> Unit)?, done: Boolean) {
     // Веление, ждущее Послушника, исполняют нажатием на него самого.
     Column(
         Modifier
@@ -202,6 +198,8 @@ private fun WordRow(word: WordItem, deed: WordItem?, onFulfil: (() -> Unit)?, do
                 }
                 when {
                     word.exercises.isEmpty() -> Unit
+                    // Выполнение по подходам: заданное и сделанное, вживую.
+                    word.efforts.isNotEmpty() || underway != null -> EffortsView(word, underway, finished = deed != null)
                     deed != null -> ComparedExercisesView(word.exercises, deed.exercises)
                     else -> ExercisesView(word.exercises)
                 }

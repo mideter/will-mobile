@@ -19,11 +19,13 @@ import will.v1.acceptSupplication
 import will.v1.admit
 import will.v1.approach
 import will.v1.arrange
+import will.v1.beginApproach
 import will.v1.bear
 import will.v1.chooseFather
 import will.v1.chatMessage
 import will.v1.clientEvent
 import will.v1.exercise
+import will.v1.finishApproach
 import will.v1.fulfil
 import will.v1.historyRequest
 import will.v1.listDwellers
@@ -52,6 +54,22 @@ data class ApproachItem(val weightGrams: Int, val repetitions: Int, val restSeco
 /** Упражнение: свободное название и подходы. */
 data class ExerciseItem(val name: String, val approaches: List<ApproachItem>)
 
+/**
+ * Сделанный подход тренировки: какой (номера с нуля), с каким весом и сколько повторов,
+ * начат и закончен когда (наносекунды от эпохи, по часам сервера).
+ */
+data class EffortItem(
+    val exercise: Int,
+    val approach: Int,
+    val weightGrams: Int,
+    val repetitions: Int,
+    val begunAtNs: Long,
+    val finishedAtNs: Long,
+)
+
+/** Подход, который Послушник выполняет сейчас. */
+data class UnderwayItem(val behestId: Long, val exercise: Int, val approach: Int, val begunAtNs: Long)
+
 /** Слово в ленте комнаты. */
 data class WordItem(
     val id: Long,
@@ -63,6 +81,8 @@ data class WordItem(
     val behestId: Long,
     /** У тренировки — велённые упражнения; у Дела, исполнившего её, — сделанные. */
     val exercises: List<ExerciseItem> = emptyList(),
+    /** У тренировки — подходы, сделанные по ходу. */
+    val efforts: List<EffortItem> = emptyList(),
 )
 
 /** Род обитателя. */
@@ -107,6 +127,8 @@ sealed interface View {
         val waiting: List<String> = emptyList(),
         val people: List<Person> = emptyList(),
         val unborn: List<Long> = emptyList(),
+        /** В комнате Уз — подход, который Послушник выполняет сейчас. */
+        val underway: UnderwayItem? = null,
         /** В своей Горнице — все комнаты Обители с их частями: здесь их переносят. */
         val rooms: List<RoomItem> = emptyList(),
     ) : View
@@ -229,18 +251,22 @@ class WillSession(context: Context) {
         look(view.host, view.room)
     }
 
-    /** Исполнить Веление; тренировку — с тем, что сделано ([performed]; пусто — как велено). */
-    fun fulfil(behestId: Long, report: String, performed: List<ExerciseItem> = emptyList()) {
+    /** Выполнить задание; тренировку — завершить: сделанное сервер складывает из подходов. */
+    fun fulfil(behestId: Long, report: String) {
         val view = _state.value.view as? View.Room ?: return
-        send(clientEvent {
-            fulfil = fulfil {
-                this.behestId = behestId
-                this.report = report.trim()
-                this.performed.addAll(performed.map { it.toWire() })
-            }
-        })
+        send(clientEvent { fulfil = fulfil { this.behestId = behestId; this.report = report.trim() } })
         look(view.host, view.room)
     }
+
+    /** Приступить к подходу тренировки (номера с нуля). */
+    fun beginApproach(behestId: Long, exercise: Int, approach: Int) =
+        send(clientEvent { beginApproach = beginApproach { this.behestId = behestId; this.exercise = exercise; this.approach = approach } })
+
+    /** Завершить идущий подход: что сделано. */
+    fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) =
+        send(clientEvent {
+            finishApproach = finishApproach { this.behestId = behestId; this.weightGrams = weightGrams; this.repetitions = repetitions }
+        })
 
     /** Велеть тренировку в Узах, где стоишь Тренером. */
     fun train(title: String, exercises: List<ExerciseItem>) {
@@ -364,6 +390,27 @@ class WillSession(context: Context) {
                     }
                 }
             }
+            ServerEvent.EventCase.UNDERWAY -> {
+                val u = event.underway
+                val doing = if (u.doing) UnderwayItem(u.behestId, u.exercise, u.approach, u.begunAtNs) else null
+                (gathering as? View.Room)?.let { gathering = it.copy(underway = doing) }
+                _state.update { s ->
+                    val shown = s.view as? View.Room ?: return@update s
+                    s.copy(view = shown.copy(underway = doing))
+                }
+            }
+            ServerEvent.EventCase.EXERTED -> {
+                val e = event.exerted.effort
+                val effort = EffortItem(e.exercise, e.approach, e.weightGrams, e.repetitions, e.begunAtNs, e.finishedAtNs)
+                val add = { words: List<WordItem> ->
+                    words.map { if (it.id == event.exerted.behestId) it.copy(efforts = it.efforts + effort) else it }
+                }
+                (gathering as? View.Room)?.let { gathering = it.copy(words = add(it.words)) }
+                _state.update { s ->
+                    val shown = s.view as? View.Room ?: return@update s
+                    s.copy(view = shown.copy(words = add(shown.words)))
+                }
+            }
             ServerEvent.EventCase.HISTORY_END -> {
                 val shown = gathering
                 gathering = null
@@ -452,6 +499,7 @@ class WillSession(context: Context) {
         exercisesList.map { e ->
             ExerciseItem(e.name, e.approachesList.map { ApproachItem(it.weightGrams, it.repetitions, it.restSeconds) })
         },
+        effortsList.map { EffortItem(it.exercise, it.approach, it.weightGrams, it.repetitions, it.begunAtNs, it.finishedAtNs) },
     )
 
     private fun ExerciseItem.toWire() = exercise {
