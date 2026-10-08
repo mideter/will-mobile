@@ -83,7 +83,10 @@ sealed interface View {
     data class Abode(
         override val host: String,
         val rooms: List<RoomItem> = emptyList(),
-        val waiting: List<Waiting> = emptyList(),
+        /** Что ожидает моего внимания: задания, где я Послушник. */
+        val owed: List<Waiting> = emptyList(),
+        /** Что я задал другим: задания, где я Тренер. */
+        val awaited: List<Waiting> = emptyList(),
     ) : View
 
     /**
@@ -344,7 +347,8 @@ class WillSession(context: Context) {
             ServerEvent.EventCase.OUTSTANDING -> {
                 val abode = gathering as? View.Abode ?: return
                 gathering = abode.copy(
-                    waiting = event.outstanding.behestsList.map { Waiting(it.room, it.behest.id, it.behest.body) },
+                    owed = event.outstanding.owedList.map { Waiting(it.room, it.behest.id, it.behest.body) },
+                    awaited = event.outstanding.awaitedList.map { Waiting(it.room, it.behest.id, it.behest.body) },
                 )
             }
             ServerEvent.EventCase.WORD -> {

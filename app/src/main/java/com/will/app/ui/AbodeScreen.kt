@@ -53,13 +53,14 @@ fun AbodeScreen(
         ConnectionBanner(state.connection)
 
         LazyColumn(Modifier.fillMaxSize()) {
-            if (own) {
-                item { SectionTitle("Ждёт") }
-                if (view.waiting.isEmpty()) {
-                    item { Hint("Ничего не ждёт") }
-                } else {
-                    items(view.waiting) { waiting -> WaitingCard(waiting) { session.enter(waiting.room) } }
-                }
+            // Пустой раздел не показывается.
+            if (own && view.owed.isNotEmpty()) {
+                item { SectionTitle("Ожидает внимания") }
+                items(view.owed) { waiting -> WaitingCard(waiting) { session.enter(waiting.room) } }
+            }
+            if (own && view.awaited.isNotEmpty()) {
+                item { SectionTitle("Задано другим") }
+                items(view.awaited) { waiting -> WaitingCard(waiting) { session.enter(waiting.room) } }
             }
 
             if (view.rooms.isEmpty()) {
