@@ -30,6 +30,22 @@ android {
         compose = true
     }
 
+    // The release key lives outside the repository: WILL_STORE_FILE, WILL_STORE_PASSWORD,
+    // WILL_KEY_ALIAS, WILL_KEY_PASSWORD in ~/.gradle/gradle.properties. Without them the
+    // release is built unsigned. Keep the key: an update signed by another one cannot
+    // replace the app, and removing the app loses its device token.
+    val storeFile = project.findProperty("WILL_STORE_FILE")?.toString()
+    signingConfigs {
+        if (storeFile != null) {
+            create("release") {
+                this.storeFile = file(storeFile)
+                storePassword = project.findProperty("WILL_STORE_PASSWORD")?.toString()
+                keyAlias = project.findProperty("WILL_KEY_ALIAS")?.toString()
+                keyPassword = project.findProperty("WILL_KEY_PASSWORD")?.toString()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // The emulator reaches the host machine's local server as 10.0.2.2.
@@ -40,6 +56,7 @@ android {
         release {
             buildConfigField("String", "WILL_HOST", "\"83.217.202.145\"")
             buildConfigField("int", "WILL_PORT", "7770")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
