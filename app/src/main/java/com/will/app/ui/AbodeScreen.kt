@@ -1,8 +1,7 @@
 package com.will.app.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,8 +25,8 @@ import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Обитель. Своя: обзор — что ждёт, — и комнаты; долгое нажатие на комнате переносит её
- * в другую часть. Чужая: комнаты, открытые моему роду.
+ * Обитель. Своя: обзор — что ждёт, — и комнаты (переносят их в Горнице). Чужая: комнаты,
+ * открытые моему роду.
  */
 @Composable
 fun AbodeScreen(
@@ -87,7 +86,7 @@ private fun WaitingCard(waiting: Waiting, onClick: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
             .background(WillColors.Row, RoundedCornerShape(10.dp))
-            .combinedClickableCompat(onClick)
+            .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Text(waiting.body, fontSize = 15.sp)
@@ -95,13 +94,12 @@ private fun WaitingCard(waiting: Waiting, onClick: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RoomRow(room: RoomItem, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick)
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -109,6 +107,3 @@ private fun RoomRow(room: RoomItem, onClick: () -> Unit) {
         Text("›", fontSize = 18.sp, color = WillColors.Muted)
     }
 }
-
-@OptIn(ExperimentalFoundationApi::class)
-private fun Modifier.combinedClickableCompat(onClick: () -> Unit): Modifier = combinedClickable(onClick = onClick)
