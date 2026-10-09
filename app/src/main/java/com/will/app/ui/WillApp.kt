@@ -80,7 +80,6 @@ fun WillApp(session: WillSession) {
                             AbodeMenu(
                                 waiting = state.supplications.size,
                                 onOpen = { screen = it },
-                                onUpperRoom = { session.upperRoom() },
                                 onGates = { going = true },
                             )
                         })
@@ -113,7 +112,7 @@ private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
     var host by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Пойти к Вратам") },
+        title = { Text("К чужим Вратам") },
         text = {
             OutlinedTextField(
                 value = host,
@@ -132,7 +131,6 @@ private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
 private fun AbodeMenu(
     waiting: Int,
     onOpen: (Screen) -> Unit,
-    onUpperRoom: () -> Unit,
     onGates: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -140,8 +138,8 @@ private fun AbodeMenu(
         Text(if (waiting > 0) "⋯ $waiting" else "⋯", fontSize = 20.sp)
     }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-        DropdownMenuItem(text = { Text("Обитатели — Горница") }, onClick = { open = false; onUpperRoom() })
-        DropdownMenuItem(text = { Text("Пойти к Вратам…") }, onClick = { open = false; onGates() })
+        // Свои комнаты — в списке Обители; здесь только то, чего там нет.
+        DropdownMenuItem(text = { Text("К чужим Вратам…") }, onClick = { open = false; onGates() })
         DropdownMenuItem(text = { Text("Мои Обители") }, onClick = { open = false; onOpen(Screen.Dwellings) })
         DropdownMenuItem(
             text = { Text(if (waiting > 0) "Просьбы ($waiting)" else "Просьбы") },

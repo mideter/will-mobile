@@ -282,9 +282,6 @@ class WillSession(context: Context) {
     /** К Вратам хозяина, чтобы он впустил. */
     fun gates(host: String) = look(host.trim(), GATES)
 
-    /** В свою Горницу — к своим обитателям. */
-    fun upperRoom() = look("", UPPER_ROOM)
-
     /** Родить нерождённого, стоя во Вратах, где можешь впускать: отцом станет их хозяин. */
     fun bear(mark: Long) = send(clientEvent { bear = bear { this.mark = mark } })
 
@@ -675,7 +672,6 @@ class WillSession(context: Context) {
         /** Имена стандартных комнат, как их называет сервер. */
         const val CELL = "Слово"
         const val GATES = "Врата"
-        const val UPPER_ROOM = "Горница"
 
         fun kindName(kind: Kind): String = when (kind) {
             Kind.Acquaintance -> "знакомый"
