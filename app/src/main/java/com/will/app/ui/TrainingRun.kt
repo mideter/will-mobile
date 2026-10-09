@@ -58,11 +58,19 @@ private const val NANOS = 1_000_000_000L
  * выбираешь упражнение (первое с несделанными подходами выбрано само) и «Приступить» — идёт
  * таймер подхода; «Завершить подход» — подтверждаешь сделанное, и идёт отдых: обратный
  * отсчёт до заданного, с вибрацией в конце. Каждый подход сразу уходит Тренеру. Экран не
- * гаснет, пока открыт; таймеры считаются от меток времени. [finishing] — тренировка отправлена
- * на завершение и ждёт ответа сервера; закрывает экран сам ответ.
+ * гаснет, пока открыт; таймеры считаются от меток времени. [beginning] — к подходу приступили,
+ * сервер ещё не сказал, что он идёт. [finishing] — тренировка отправлена на завершение и ждёт
+ * ответа сервера; закрывает экран сам ответ.
  */
 @Composable
-fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSession, finishing: Boolean, onClose: () -> Unit) {
+fun TrainingRun(
+    training: WordItem,
+    underway: UnderwayItem?,
+    session: WillSession,
+    beginning: Boolean,
+    finishing: Boolean,
+    onClose: () -> Unit,
+) {
     BackHandler(onBack = onClose)
     val doing = underway?.takeIf { it.behestId == training.id }
     // Выбирают упражнение: выбор держится его, пока подходы не кончатся (см. TrainingCourse).
@@ -201,8 +209,9 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                 BottomButton(text = "Завершить подход", trouble = null) { confirming = true }
             } else {
                 BottomButton(
-                    text = "Приступить",
+                    text = if (beginning) "Начинается…" else "Приступить",
                     trouble = if (selected == null) "Заданные подходы сделаны: завершите тренировку или добавьте подход" else null,
+                    busy = beginning,
                 ) { selected?.let { (e, a) -> session.beginApproach(training.id, e, a) } }
                 TextButton(onClick = { closing = true }) { Text("Завершить тренировку") }
             }

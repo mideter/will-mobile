@@ -160,6 +160,8 @@ data class WillState(
     val willing: Reply = Reply.None,
     /** Что с заданием, отправленным на выполнение. */
     val fulfilling: Reply = Reply.None,
+    /** Подход, к которому приступили: `Pending`, пока сервер не сказал, что он идёт, или почему нет. */
+    val beginning: Reply = Reply.None,
 )
 
 
@@ -185,17 +187,22 @@ class WillSession(context: Context) {
     /** Вид, который сейчас собирается из событий сервера. */
     private var gathering: View? = null
 
-    /** Куда смотреть после переподключения. */
-    private var target: Pair<String, String> = "" to ""
+    /** Куда смотреть после переподключения: хозяин Обители и комната. */
+    var target: Pair<String, String> = "" to ""
+        private set
 
     private val reconnect = Runnable { connect() }
 
     private var started = false
 
-    /** Начать сессию один раз на всё приложение (экран при повороте пересоздаётся, сессия — нет). */
-    fun start() {
+    /**
+     * Начать сессию один раз на всё приложение (экран при повороте пересоздаётся, сессия — нет).
+     * [resumed] — куда смотреть после входа: где был экран, когда система выгрузила процесс.
+     */
+    fun start(resumed: Pair<String, String> = "" to "") {
         if (started) return
         started = true
+        target = resumed
         connect()
     }
 
@@ -212,7 +219,9 @@ class WillSession(context: Context) {
 
     private fun onClosed(reason: String) {
         // Ответов на отправленное уже не будет: окна остаются открытыми.
-        _state.update { it.copy(connection = Connection.Reconnecting, willing = Reply.None, fulfilling = Reply.None) }
+        _state.update {
+            it.copy(connection = Connection.Reconnecting, willing = Reply.None, fulfilling = Reply.None, beginning = Reply.None)
+        }
         android.util.Log.w(TAG, "connection lost: $reason")
         _notices.tryEmit("Связь потеряна, переподключаюсь…")
         mainHandler.removeCallbacks(reconnect)
@@ -280,9 +289,17 @@ class WillSession(context: Context) {
     /** Окно выполнения закрыто после того, как задание выполнено. */
     fun fulfillingSeen() = _state.update { it.copy(fulfilling = Reply.None) }
 
-    /** Приступить к подходу тренировки (номера с нуля). */
-    fun beginApproach(behestId: Long, exercise: Int, approach: Int) =
-        send(clientEvent { beginApproach = beginApproach { this.behestId = behestId; this.exercise = exercise; this.approach = approach } })
+    /**
+     * Приступить к подходу тренировки (номера с нуля). Сервер отвечает идущим подходом
+     * (`Underway`) или уведомлением, почему нет; до того [WillState.beginning] — `Pending`.
+     */
+    fun beginApproach(behestId: Long, exercise: Int, approach: Int) {
+        if (_state.value.beginning == Reply.Pending) return
+        val sent = send(clientEvent {
+            beginApproach = beginApproach { this.behestId = behestId; this.exercise = exercise; this.approach = approach }
+        })
+        if (sent) _state.update { it.copy(beginning = Reply.Pending) }
+    }
 
     /** Завершить идущий подход: что сделано. */
     fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) =
@@ -416,8 +433,10 @@ class WillSession(context: Context) {
                 val doing = if (u.doing) UnderwayItem(u.behestId, u.exercise, u.approach, u.begunAtNs) else null
                 (gathering as? View.Room)?.let { gathering = it.copy(underway = doing) }
                 _state.update { s ->
-                    val shown = s.view as? View.Room ?: return@update s
-                    s.copy(view = shown.copy(underway = doing))
+                    // Подход пошёл — к нему больше не приступают.
+                    val begun = if (doing != null) s.copy(beginning = Reply.None) else s
+                    val shown = begun.view as? View.Room ?: return@update begun
+                    begun.copy(view = shown.copy(underway = doing))
                 }
             }
             ServerEvent.EventCase.EXERTED -> {
@@ -451,6 +470,7 @@ class WillSession(context: Context) {
                     when {
                         it.willing == Reply.Pending -> it.copy(willing = replyOf(TRAINING_WILLED, message))
                         it.fulfilling == Reply.Pending -> it.copy(fulfilling = replyOf(BEHEST_FULFILLED, message))
+                        it.beginning == Reply.Pending -> it.copy(beginning = Reply.None)
                         else -> it
                     }
                 }

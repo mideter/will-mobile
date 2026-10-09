@@ -275,16 +275,19 @@ fun TrainingEditor(
     }
 }
 
-/** Кнопка внизу экрана: всегда видна; пока что-то не так — неактивна, и сказано почему. */
+/**
+ * Кнопка внизу экрана: всегда видна; пока что-то не так — неактивна, и сказано почему.
+ * [busy] — нажатое ещё в пути: неактивна, а что происходит, говорит сам [text].
+ */
 @Composable
-internal fun BottomButton(text: String, trouble: String?, onClick: () -> Unit) {
+internal fun BottomButton(text: String, trouble: String?, busy: Boolean = false, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 8.dp, 16.dp, 12.dp)) {
         if (trouble != null) {
             Text(trouble, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(bottom = 6.dp))
         }
         Button(
             onClick = onClick,
-            enabled = trouble == null,
+            enabled = trouble == null && !busy,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(12.dp),
         ) { Text(text, fontSize = 17.sp) }

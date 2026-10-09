@@ -94,7 +94,12 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     if (fulfillingId != null && fulfilling == null) fulfillingId = null
     // Тренировку выполняют по подходам; берётся живая — с усилиями, пришедшими только что.
     fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { training ->
-        TrainingRun(training, view.underway, session, finishing = sendingFulfil, onClose = { fulfillingId = null })
+        TrainingRun(
+            training, view.underway, session,
+            beginning = state.beginning == Reply.Pending,
+            finishing = sendingFulfil,
+            onClose = { fulfillingId = null },
+        )
         return
     }
 
