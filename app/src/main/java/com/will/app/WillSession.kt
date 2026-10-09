@@ -1,6 +1,8 @@
 package com.will.app
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.channels.BufferOverflow
@@ -207,6 +209,9 @@ class WillSession(context: Context) {
 
     private val reconnect = Runnable { connect() }
 
+    /** Паузы между попытками переподключиться: растут, пока связи нет. */
+    private val backoff = Backoff()
+
     private var started = false
 
     /**
@@ -218,6 +223,24 @@ class WillSession(context: Context) {
         started = true
         target = resumed
         connect()
+        watchNetwork()
+    }
+
+    /**
+     * Сеть появилась — например, телефон вышел из подвала, — переподключиться сразу, не
+     * дожидаясь конца паузы: она могла вырасти до полуминуты.
+     */
+    private fun watchNetwork() {
+        val connectivity = appContext.getSystemService(ConnectivityManager::class.java) ?: return
+        connectivity.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                mainHandler.post {
+                    if (_state.value.connection != Connection.Reconnecting) return@post
+                    backoff.reset()
+                    connect()
+                }
+            }
+        })
     }
 
     private fun connect() {
@@ -232,16 +255,19 @@ class WillSession(context: Context) {
     }
 
     private fun onClosed(reason: String) {
+        val wasReady = _state.value.connection == Connection.Ready
         // Ответов на отправленное уже не будет: окна остаются открытыми.
         _state.update {
             it.copy(connection = Connection.Reconnecting, willing = Reply.None, fulfilling = Reply.None, beginning = Reply.None)
         }
         beginSentAt = null
         finishSentAt = null
-        android.util.Log.w(TAG, "connection lost: $reason")
-        _notices.tryEmit("Связь потеряна, переподключаюсь…")
+        val delay = backoff.next()
+        android.util.Log.w(TAG, "connection lost: $reason; again in $delay ms")
+        // Сказать раз — когда пропала рабочая связь; о попытках дальше говорит полоса «Переподключение…».
+        if (wasReady) _notices.tryEmit("Связь потеряна, переподключаюсь…")
         mainHandler.removeCallbacks(reconnect)
-        mainHandler.postDelayed(reconnect, RECONNECT_DELAY_MS)
+        mainHandler.postDelayed(reconnect, delay)
     }
 
     // ── Действия ──────────────────────────────────────────────────────────────
@@ -419,6 +445,7 @@ class WillSession(context: Context) {
     private fun onEvent(event: ServerEvent) {
         when (event.eventCase) {
             ServerEvent.EventCase.AUTH_OK -> {
+                backoff.reset()
                 if (event.authOk.unborn) {
                     // Тело ещё не рождено: только ждать.
                     _state.update { it.copy(connection = Connection.Ready, ownName = "", unbornMark = event.authOk.mark) }
@@ -643,7 +670,6 @@ class WillSession(context: Context) {
 
     companion object {
         private const val TAG = "WillSession"
-        private const val RECONNECT_DELAY_MS = 3_000L
         private const val HISTORY_LIMIT = 200
         private val TRAINING_WILLED = Regex("training \\d+ willed")
         private val BEHEST_FULFILLED = Regex("behest (\\d+) fulfilled")

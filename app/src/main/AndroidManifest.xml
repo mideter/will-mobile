@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Сеть вернулась — переподключиться сразу, не дожидаясь паузы. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Конец отдыха между подходами. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Идущую тренировку ведёт сервис переднего плана: таймер в уведомлении, вибрация в
