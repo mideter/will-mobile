@@ -260,9 +260,8 @@ class WillSession(context: Context) {
     fun say(text: String) {
         val view = _state.value.view as? View.Room ?: return
         if (!view.writable || text.isBlank()) return
+        // Своё слово приходит в подтверждении (`ReceiptAck`); прежний сервер его не несёт — тогда комната перечитывается.
         send(clientEvent { chat = chatMessage { body = text.trim() } })
-        // Перечитать комнату: сервер не возвращает автору его же слово.
-        look(view.host, view.room)
     }
 
     /**
@@ -411,19 +410,7 @@ class WillSession(context: Context) {
                     awaited = event.outstanding.awaitedList.map { Waiting(it.room, it.behest.id, it.behest.body) },
                 )
             }
-            ServerEvent.EventCase.WORD -> {
-                val word = event.word.toItem()
-                val room = gathering as? View.Room
-                if (room != null) {
-                    gathering = room.copy(words = room.words + word)
-                } else {
-                    // Живое слово в комнате, на которую смотрим.
-                    _state.update { s ->
-                        val shown = s.view as? View.Room ?: return@update s
-                        s.copy(view = shown.copy(words = shown.words + word))
-                    }
-                }
-            }
+            ServerEvent.EventCase.WORD -> place(event.word.toItem())
             ServerEvent.EventCase.UNDERWAY -> {
                 val u = event.underway
                 val doing = if (u.doing) UnderwayItem(u.behestId, u.exercise, u.approach, u.begunAtNs) else null
@@ -450,7 +437,13 @@ class WillSession(context: Context) {
                 gathering = null
                 _state.update { it.copy(view = shown ?: it.view, loading = false) }
             }
-            ServerEvent.EventCase.RECEIPT_ACK -> Unit
+            ServerEvent.EventCase.RECEIPT_ACK -> {
+                if (event.receiptAck.hasWord()) {
+                    place(event.receiptAck.word.toItem())
+                } else {
+                    (_state.value.view as? View.Room)?.let { look(it.host, it.room) }
+                }
+            }
             ServerEvent.EventCase.PROTOCOL_NOTICE -> {
                 val message = event.protocolNotice.message
                 // Пока просьба ждёт ответа, первое уведомление — её ответ.
@@ -538,6 +531,19 @@ class WillSession(context: Context) {
                 refreshIfHome()
             }
             else -> Unit
+        }
+    }
+
+    /** Слово в комнату: в собираемую, иначе — живое, в ту, на которую смотрим. */
+    private fun place(word: WordItem) {
+        val room = gathering as? View.Room
+        if (room != null) {
+            gathering = room.copy(words = room.words + word)
+        } else {
+            _state.update { s ->
+                val shown = s.view as? View.Room ?: return@update s
+                s.copy(view = shown.copy(words = shown.words + word))
+            }
         }
     }
 
