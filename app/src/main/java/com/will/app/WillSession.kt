@@ -121,8 +121,8 @@ sealed interface View {
     ) : View
 
     /**
-     * Комната. [aspect] — что она отражает: слова (Келья, Узы), порог (Врата) или
-     * обитателей (Горница). [writable] — здесь пишут: своя Келья; Ведение — у Тренера.
+     * Комната. [aspect] — что она отражает: слова (Слово, Узы), порог (Врата) или
+     * обитателей (Горница). [writable] — здесь пишут: своё Слово; Ведение — у Тренера.
      * Во Вратах — [gatesOpen], [keeping] (я привратник: хозяин или обитатель, чьему роду
      * открыта их часть) и, привратнику, [waiting] и метки нерождённых [unborn]; в Горнице —
      * [people].
@@ -673,7 +673,7 @@ class WillSession(context: Context) {
         private fun replyOf(granted: Regex, notice: String) = if (granted.matches(notice)) Reply.Granted else Reply.None
 
         /** Имена стандартных комнат, как их называет сервер. */
-        const val CELL = "Келья"
+        const val CELL = "Слово"
         const val GATES = "Врата"
         const val UPPER_ROOM = "Горница"
 
