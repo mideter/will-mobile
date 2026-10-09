@@ -143,6 +143,9 @@ sealed interface View {
     ) : View
 }
 
+/** Тренировка, которую выполняют: где она — Обитель [host] и комната [room] — и её номер. */
+data class Workout(val host: String, val room: String, val behestId: Long)
+
 data class WillState(
     val connection: Connection = Connection.Connecting,
     val ownName: String = "",
@@ -162,6 +165,10 @@ data class WillState(
     val fulfilling: Reply = Reply.None,
     /** Подход, к которому приступили: `Pending`, пока сервер не сказал, что он идёт, или почему нет. */
     val beginning: Reply = Reply.None,
+    /** Выбор Послушника в тренировке: его видят и экран выполнения, и уведомление. */
+    val choice: Choice = Choice(),
+    /** Тренировка, которую выполняют, — с первого подхода до завершения; её ведёт [TrainingService]. */
+    val workout: Workout? = null,
 )
 
 
@@ -289,17 +296,34 @@ class WillSession(context: Context) {
     /** Окно выполнения закрыто после того, как задание выполнено. */
     fun fulfillingSeen() = _state.update { it.copy(fulfilling = Reply.None) }
 
+    /** Выбрать в тренировке упражнение и, может быть, подход сверх заданного в нём. */
+    fun choose(behestId: Long, exercise: Int, extra: Int? = null) =
+        _state.update { it.copy(choice = Choice(behestId, exercise, extra)) }
+
     /**
      * Приступить к подходу тренировки (номера с нуля). Сервер отвечает идущим подходом
      * (`Underway`) или уведомлением, почему нет; до того [WillState.beginning] — `Pending`.
+     * Сервер принимает подход только в комнате Уз: из уведомления, когда смотришь в другое
+     * место, сначала поворачиваешься к ней. С первым подходом тренировку ведёт [TrainingService].
      */
     fun beginApproach(behestId: Long, exercise: Int, approach: Int) {
-        if (_state.value.beginning == Reply.Pending) return
+        val s = _state.value
+        if (s.beginning == Reply.Pending) return
+        val shown = (s.view as? View.Room)?.takeIf { room -> room.words.any { it.id == behestId } }
+        val workout = shown?.let { Workout(it.host, it.room, behestId) }
+            ?: s.workout?.takeIf { it.behestId == behestId }
+            ?: return
+        if (shown == null) look(workout.host, workout.room)
         val sent = send(clientEvent {
             beginApproach = beginApproach { this.behestId = behestId; this.exercise = exercise; this.approach = approach }
         })
-        if (sent) _state.update { it.copy(beginning = Reply.Pending) }
+        if (!sent) return
+        _state.update { it.copy(beginning = Reply.Pending, workout = workout) }
+        TrainingService.start(appContext)
     }
+
+    /** Тренировку больше не ведут: она завершена или давно заброшена. */
+    fun stopWorkout() = _state.update { it.copy(workout = null) }
 
     /** Завершить идущий подход: что сделано. */
     fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) =
@@ -433,8 +457,13 @@ class WillSession(context: Context) {
                 val doing = if (u.doing) UnderwayItem(u.behestId, u.exercise, u.approach, u.begunAtNs) else null
                 (gathering as? View.Room)?.let { gathering = it.copy(underway = doing) }
                 _state.update { s ->
-                    // Подход пошёл — к нему больше не приступают.
-                    val begun = if (doing != null) s.copy(beginning = Reply.None) else s
+                    // Подход пошёл — к нему больше не приступают; выбор держится его упражнения,
+                    // где бы его ни начали, а «сверх заданного» не залипает.
+                    val begun = if (doing != null) {
+                        s.copy(beginning = Reply.None, choice = Choice(doing.behestId, doing.exercise))
+                    } else {
+                        s
+                    }
                     val shown = begun.view as? View.Room ?: return@update begun
                     begun.copy(view = shown.copy(underway = doing))
                 }
@@ -465,6 +494,9 @@ class WillSession(context: Context) {
             }
             ServerEvent.EventCase.PROTOCOL_NOTICE -> {
                 val message = event.protocolNotice.message
+                // Завершённую тренировку больше не ведут, кто бы её ни завершил.
+                val fulfilled = BEHEST_FULFILLED.matchEntire(message)?.groupValues?.get(1)?.toLongOrNull()
+                if (fulfilled != null && fulfilled == _state.value.workout?.behestId) stopWorkout()
                 // Пока просьба ждёт ответа, первое уведомление — её ответ.
                 _state.update {
                     when {
@@ -593,7 +625,7 @@ class WillSession(context: Context) {
         private const val RECONNECT_DELAY_MS = 3_000L
         private const val HISTORY_LIMIT = 200
         private val TRAINING_WILLED = Regex("training \\d+ willed")
-        private val BEHEST_FULFILLED = Regex("behest \\d+ fulfilled")
+        private val BEHEST_FULFILLED = Regex("behest (\\d+) fulfilled")
 
         private fun replyOf(granted: Regex, notice: String) = if (granted.matches(notice)) Reply.Granted else Reply.None
 

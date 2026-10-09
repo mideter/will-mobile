@@ -1,8 +1,11 @@
 package com.will.app.ui
 
-import android.os.VibrationEffect
-import android.os.Vibrator
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -40,7 +43,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.will.app.ApproachItem
+import com.will.app.Choice
 import com.will.app.TrainingCourse
 import com.will.app.EffortItem
 import com.will.app.UnderwayItem
@@ -57,8 +62,9 @@ private const val NANOS = 1_000_000_000L
  * Выполнение тренировки. Подходы упражнения идут по порядку, упражнения — в каком угодно:
  * выбираешь упражнение (первое с несделанными подходами выбрано само) и «Приступить» — идёт
  * таймер подхода; «Завершить подход» — подтверждаешь сделанное, и идёт отдых: обратный
- * отсчёт до заданного, с вибрацией в конце. Каждый подход сразу уходит Тренеру. Экран не
- * гаснет, пока открыт; таймеры считаются от меток времени. [beginning] — к подходу приступили,
+ * отсчёт до заданного. Каждый подход сразу уходит Тренеру. Экран не гаснет, пока открыт;
+ * таймеры считаются от меток времени. Погашенный экран ведёт [com.will.app.TrainingService]:
+ * уведомление с таймером и вибрация в конце отдыха. Выбор [choice] — в сессии, его видит и оно. [beginning] — к подходу приступили,
  * сервер ещё не сказал, что он идёт. [finishing] — тренировка отправлена на завершение и ждёт
  * ответа сервера; закрывает экран сам ответ.
  */
@@ -66,6 +72,7 @@ private const val NANOS = 1_000_000_000L
 fun TrainingRun(
     training: WordItem,
     underway: UnderwayItem?,
+    choice: Choice,
     session: WillSession,
     beginning: Boolean,
     finishing: Boolean,
@@ -74,18 +81,8 @@ fun TrainingRun(
     BackHandler(onBack = onClose)
     val doing = underway?.takeIf { it.behestId == training.id }
     // Выбирают упражнение: выбор держится его, пока подходы не кончатся (см. TrainingCourse).
-    // Выбор и открытые окна переживают поворот экрана.
-    var chosen by rememberSaveable { mutableStateOf<Int?>(null) }
-    var extraFor by rememberSaveable { mutableStateOf<Int?>(null) }
-    LaunchedEffect(doing) {
-        // Начатый подход — где бы его ни начали — ведёт фокус; «сверх заданного» не залипает.
-        if (doing != null) {
-            chosen = doing.exercise
-            extraFor = null
-        }
-    }
-    val focus = TrainingCourse.focus(training, doing, chosen)
-    val selected = if (doing == null) TrainingCourse.next(training, focus, extraFor) else null
+    val selected = TrainingCourse.selected(training, doing, choice)
+    // Открытые окна переживают поворот экрана.
     var confirming by rememberSaveable { mutableStateOf(false) }
     var closing by rememberSaveable { mutableStateOf(false) }
 
@@ -111,11 +108,14 @@ fun TrainingRun(
     val restWilled = selected?.let { (e, a) -> TrainingCourse.restWilled(training, e, a) } ?: 0
     val rested = last?.let { (nowNs - it.finishedAtNs) / NANOS } ?: 0
     val clock = TrainingCourse.restClock(restWilled, rested)
+    // Без уведомлений погашенный экран не покажет таймер и не даст «Приступить»; вибрация будет и так.
     val context = LocalContext.current
-    LaunchedEffect(last?.finishedAtNs, restWilled, clock.over) {
-        if (resting && restWilled > 0 && clock.over && rested < restWilled + 3) {
-            context.getSystemService(Vibrator::class.java)
-                ?.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -149,7 +149,7 @@ fun TrainingRun(
                             effort = effort,
                             underwayFor = doing?.takeIf { it.exercise == e && it.approach == a }?.let { (nowNs - it.begunAtNs) / NANOS },
                             selected = doing == null && selected == e to a,
-                            onSelect = if (doing == null && a == next) ({ chosen = e; extraFor = null }) else null,
+                            onSelect = if (doing == null && a == next) ({ session.choose(training.id, e) }) else null,
                         )
                     }
                     // Сверх заданного — когда заданные подходы упражнения сделаны.
@@ -166,7 +166,7 @@ fun TrainingRun(
                                 onSelect = null,
                             )
                         } else {
-                            TextButton(onClick = { chosen = e; extraFor = e }) { Text("+ подход сверх заданного") }
+                            TextButton(onClick = { session.choose(training.id, e, extra = e) }) { Text("+ подход сверх заданного") }
                         }
                     }
                 }
@@ -272,7 +272,7 @@ fun TrainingRun(
 }
 
 /** «Присед · подход 2 · 100 кг × 5». */
-private fun captionOf(training: WordItem, exercise: Int, approach: Int): String {
+internal fun captionOf(training: WordItem, exercise: Int, approach: Int): String {
     val name = training.exercises[exercise].name
     val asked = training.exercises[exercise].approaches.getOrNull(approach)
     return "$name · подход ${approach + 1}" +

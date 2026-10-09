@@ -143,6 +143,40 @@ class TrainingCourseTest {
         assertEquals(2, TrainingCourse.count(t, 1, underway))
     }
 
+    @Test
+    fun `the selected approach follows the choice of this training only`() {
+        val t = training(done(1, 0, at = 0))
+        // Выбран жим — к нему и приступят, хотя последний подход был в приседе.
+        assertEquals(0 to 0, TrainingCourse.selected(t, null, Choice(behestId = 1, exercise = 0)))
+        // Выбор другой тренировки не в счёт: продолжают, где остановились.
+        assertEquals(1 to 1, TrainingCourse.selected(t, null, Choice(behestId = 9, exercise = 0)))
+        // «Сверх заданного» в подтягиваниях, когда заданные там сделаны.
+        val u = training(done(2, 0, at = 0))
+        assertEquals(2 to 1, TrainingCourse.selected(u, null, Choice(behestId = 1, exercise = 2, extra = 2)))
+    }
+
+    @Test
+    fun `while an approach is underway none is selected and no one rests`() {
+        val t = training(done(0, 0, at = 0))
+        val underway = UnderwayItem(behestId = 1, exercise = 0, approach = 1, begunAtNs = 100 * NS)
+        assertNull(TrainingCourse.selected(t, underway, Choice()))
+        assertNull(TrainingCourse.rest(t, TrainingCourse.selected(t, underway, Choice())))
+    }
+
+    @Test
+    fun `the rest runs from the last effort and ends when the willed rest of the next approach is over`() {
+        // Первый подход жима кончился на 30-й секунде; перед вторым задано 120 с.
+        val t = training(done(0, 0, at = 0))
+        val rest = TrainingCourse.rest(t, 0 to 1)!!
+        assertEquals(30 * NS, rest.sinceNs)
+        assertEquals(120, rest.willed)
+        assertEquals(150 * NS, rest.endNs)
+        // До первого усилия отдыхать не от чего.
+        assertNull(TrainingCourse.rest(training(), 0 to 0))
+        // Приступать не к чему — и отдыха нет.
+        assertNull(TrainingCourse.rest(t, null))
+    }
+
     private companion object {
         const val NS = 1_000_000_000L
     }

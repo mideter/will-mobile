@@ -8,6 +8,12 @@ package com.will.app
  * упражнения, на котором Послушник сейчас (его «фокус»), пока подходы его не кончатся;
  * затем переходит к следующему упражнению по кругу.
  */
+/**
+ * Выбор Послушника в тренировке [behestId]: упражнение, которого держаться, и, может быть,
+ * подход «сверх заданного» в упражнении [extra]. Пустой — продолжать, где остановился.
+ */
+data class Choice(val behestId: Long = 0, val exercise: Int? = null, val extra: Int? = null)
+
 object TrainingCourse {
 
     /** Сколько подходов у упражнения: заданные, сделанные сверх них и идущий [underway]. */
@@ -49,6 +55,32 @@ object TrainingCourse {
             nextIn(training, e)?.let { return e to it }
         }
         return null
+    }
+
+    /**
+     * Подход, к которому приступят по выбору [choice]: null — идёт подход или всё заданное
+     * сделано. Выбор другой тренировки не в счёт.
+     */
+    fun selected(training: WordItem, underway: UnderwayItem?, choice: Choice): Pair<Int, Int>? {
+        if (underway?.behestId == training.id) return null
+        val mine = choice.takeIf { it.behestId == training.id } ?: Choice()
+        return next(training, focus(training, null, mine.exercise), mine.extra)
+    }
+
+    /** Отдых перед подходом: идёт с [sinceNs] — конца последнего усилия; задано [willed] секунд. */
+    data class Rest(val sinceNs: Long, val willed: Int) {
+        /** Когда заданный отдых выйдет. */
+        val endNs: Long get() = sinceNs + willed * 1_000_000_000L
+    }
+
+    /**
+     * Отдых перед [selected] подходом; null — не отдыхают: идёт подход, усилий ещё не было
+     * или приступать не к чему.
+     */
+    fun rest(training: WordItem, selected: Pair<Int, Int>?): Rest? {
+        val (e, a) = selected ?: return null
+        val last = training.efforts.maxByOrNull { it.finishedAtNs } ?: return null
+        return Rest(last.finishedAtNs, restWilled(training, e, a))
     }
 
     /**
