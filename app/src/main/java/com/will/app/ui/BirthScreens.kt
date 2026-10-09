@@ -28,13 +28,12 @@ import com.will.app.WillState
 
 /** Тело ещё не рождено: только ждать. Метку видят в Родильных. */
 @Composable
-fun UnbornScreen(state: WillState, mark: Long) {
+fun UnbornScreen(mark: Long) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ConnectionBanner(state.connection)
         Text("Вы ещё не рождены", fontSize = 20.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(24.dp))
         Text("#$mark", fontSize = 48.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
@@ -61,7 +60,6 @@ fun BirthRoomScreen(state: WillState, view: View.Room, session: WillSession) {
             subtitle = if (own) "Моя Обитель" else "Обитель ${view.host}",
             onBack = { session.back() },
         )
-        ConnectionBanner(state.connection)
         Hint(
             if (own) {
                 "Рождённый здесь станет вашим чадом по плоти."

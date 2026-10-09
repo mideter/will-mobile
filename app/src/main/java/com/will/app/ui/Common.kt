@@ -1,5 +1,6 @@
 package com.will.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -52,7 +53,7 @@ fun Header(
     }
 }
 
-/** Полоса о связи, пока она не готова. */
+/** Полоса о связи над любым экраном, пока связь не готова; одна на всё приложение — в [WillApp]. */
 @Composable
 fun ConnectionBanner(connection: Connection) {
     val text = when (connection) {
@@ -62,7 +63,7 @@ fun ConnectionBanner(connection: Connection) {
     }
     Text(
         text,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().background(WillColors.Row).padding(horizontal = 16.dp, vertical = 6.dp),
         fontSize = 13.sp,
         color = WillColors.Muted,
     )

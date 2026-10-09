@@ -255,7 +255,6 @@ class WillSession(context: Context) {
     }
 
     private fun onClosed(reason: String) {
-        val wasReady = _state.value.connection == Connection.Ready
         // Ответов на отправленное уже не будет: окна остаются открытыми.
         _state.update {
             it.copy(connection = Connection.Reconnecting, willing = Reply.None, fulfilling = Reply.None, beginning = Reply.None)
@@ -264,8 +263,7 @@ class WillSession(context: Context) {
         finishSentAt = null
         val delay = backoff.next()
         android.util.Log.w(TAG, "connection lost: $reason; again in $delay ms")
-        // Сказать раз — когда пропала рабочая связь; о попытках дальше говорит полоса «Переподключение…».
-        if (wasReady) _notices.tryEmit("Связь потеряна, переподключаюсь…")
+        // Сказать об этом — дело полосы «Переподключение…» над экраном: она видна, пока связи нет.
         mainHandler.removeCallbacks(reconnect)
         mainHandler.postDelayed(reconnect, delay)
     }

@@ -2,6 +2,7 @@ package com.will.app.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -46,7 +47,10 @@ fun WillApp(session: WillSession) {
     // Нерождённый только ждёт.
     state.unbornMark?.let { mark ->
         Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding)) { UnbornScreen(state, mark) }
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                ConnectionBanner(state.connection)
+                Box(Modifier.weight(1f)) { UnbornScreen(mark) }
+            }
         }
         return
     }
@@ -59,30 +63,34 @@ fun WillApp(session: WillSession) {
 
     val back = { screen = Screen.Main }
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding).imePadding()) {
-            when (screen) {
-                Screen.Dwellings -> DwellingsScreen(state, session, onBack = back, onVisit = { host ->
-                    session.visit(host)
-                    screen = Screen.Main
-                })
-                Screen.Supplications -> SupplicationsScreen(state, session, onBack = back)
-                Screen.Lineage -> LineageScreen(state, session, onBack = back)
-                Screen.Main -> when (view) {
-                    null -> ConnectingScreen()
-                    is View.Abode -> AbodeScreen(state, view, session, menu = {
-                        AbodeMenu(
-                            waiting = state.supplications.size,
-                            onOpen = { screen = it },
-                            onUpperRoom = { session.upperRoom() },
-                            onBirthRoom = { session.birthRoom() },
-                            onGates = { going = true },
-                        )
+        Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
+            // Связь — одной полосой над любым экраном; пока идёт первое подключение, о нём говорит сам экран.
+            if (view != null) ConnectionBanner(state.connection)
+            Box(Modifier.weight(1f)) {
+                when (screen) {
+                    Screen.Dwellings -> DwellingsScreen(state, session, onBack = back, onVisit = { host ->
+                        session.visit(host)
+                        screen = Screen.Main
                     })
-                    is View.Room -> when (view.aspect) {
-                        Aspect.Threshold -> GatesScreen(state, view, session)
-                        Aspect.Dwellers -> UpperRoomScreen(state, view, session)
-                        Aspect.Birth -> BirthRoomScreen(state, view, session)
-                        Aspect.Words -> RoomScreen(state, view, session)
+                    Screen.Supplications -> SupplicationsScreen(state, session, onBack = back)
+                    Screen.Lineage -> LineageScreen(state, session, onBack = back)
+                    Screen.Main -> when (view) {
+                        null -> ConnectingScreen()
+                        is View.Abode -> AbodeScreen(state, view, session, menu = {
+                            AbodeMenu(
+                                waiting = state.supplications.size,
+                                onOpen = { screen = it },
+                                onUpperRoom = { session.upperRoom() },
+                                onBirthRoom = { session.birthRoom() },
+                                onGates = { going = true },
+                            )
+                        })
+                        is View.Room -> when (view.aspect) {
+                            Aspect.Threshold -> GatesScreen(state, view, session)
+                            Aspect.Dwellers -> UpperRoomScreen(state, view, session)
+                            Aspect.Birth -> BirthRoomScreen(state, view, session)
+                            Aspect.Words -> RoomScreen(state, view, session)
+                        }
                     }
                 }
             }

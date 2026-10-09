@@ -49,7 +49,6 @@ fun AbodeScreen(
             }) else null,
             actions = { if (own) menu() },
         )
-        ConnectionBanner(state.connection)
 
         LazyColumn(Modifier.fillMaxSize()) {
             // Пустой раздел не показывается.

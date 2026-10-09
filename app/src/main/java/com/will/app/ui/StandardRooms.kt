@@ -37,7 +37,6 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
             subtitle = if (own) "Моя Обитель" else "Обитель ${view.host}",
             onBack = { session.back() },
         )
-        ConnectionBanner(state.connection)
 
         if (view.keeping) {
             Hint(
@@ -95,7 +94,6 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
             subtitle = if (own) "Мои обитатели" else "Обитатели ${view.host}",
             onBack = { session.back() },
         )
-        ConnectionBanner(state.connection)
         if (view.people.isEmpty()) {
             Hint(if (own) "В вашей Обители никто не обитает. Впускают у Врат." else "Здесь никто не обитает")
         }

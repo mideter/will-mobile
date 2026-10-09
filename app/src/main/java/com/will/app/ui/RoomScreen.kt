@@ -113,7 +113,6 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
             subtitle = if (view.host.isEmpty()) "Моя Обитель" else "Обитель ${view.host}",
             onBack = { session.back() },
         )
-        ConnectionBanner(state.connection)
 
         if (view.words.isEmpty() && !state.loading) {
             Column(Modifier.weight(1f)) { Hint("Здесь пока ничего нет") }
