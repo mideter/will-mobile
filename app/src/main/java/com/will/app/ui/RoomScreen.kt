@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.will.app.UnderwayItem
 import com.will.app.View
 import com.will.app.WillSession
+import com.will.app.Willing
 import com.will.app.WillState
 import com.will.app.WordItem
 import will.v1.MessengerOuterClass.Word
@@ -56,32 +58,36 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     val novice = view.host.isEmpty() && !view.writable
     // Писать можно и не в Келье — значит, это Ведение: здесь велят и тренировки.
     val trainer = view.writable && view.room != WillSession.CELL
-    var fulfilling by remember { mutableStateOf<WordItem?>(null) }
-    var composing by remember { mutableStateOf(false) }
+    // Что открыто, переживает поворот экрана: задание — по номеру, само оно — из ленты.
+    var fulfillingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val fulfilling = fulfillingId?.let { id -> view.words.firstOrNull { it.id == id && it.id !in fulfilled } }
+    var composing by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val names = view.words.flatMap { w -> w.exercises.map { it.name } }.distinct()
 
+    // Редактор закрывается, когда сервер сказал, что тренировка задана; иначе остаётся с набранным.
+    LaunchedEffect(state.willing) {
+        if (state.willing == Willing.Willed) {
+            composing = false
+            session.willingSeen()
+        }
+    }
     if (composing) {
         TrainingEditor(
             heading = view.room,
             names = names,
-            onDone = { title, exercises ->
-                session.train(title, exercises)
-                composing = false
-            },
+            sending = state.willing == Willing.Pending,
+            onDone = session::train,
             onCancel = { composing = false },
         )
         return
     }
+    // Исполненное или пропавшее из ленты закрывается.
+    if (fulfillingId != null && fulfilling == null) fulfillingId = null
     // Тренировку выполняют по подходам; берётся живая — с усилиями, пришедшими только что.
-    fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { chosen ->
-        val training = view.words.firstOrNull { it.id == chosen.id }
-        if (training == null || training.id in fulfilled) {
-            fulfilling = null
-        } else {
-            TrainingRun(training, view.underway, session, onClose = { fulfilling = null })
-            return
-        }
+    fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { training ->
+        TrainingRun(training, view.underway, session, onClose = { fulfillingId = null })
+        return
     }
 
     LaunchedEffect(view.words.size) {
@@ -106,7 +112,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
                         deed = deeds[word.id],
                         underway = view.underway?.takeIf { it.behestId == word.id },
                         onFulfil = if (novice && word.kind == Word.Kind.BEHEST && word.id !in fulfilled) {
-                            { fulfilling = word }
+                            { fulfillingId = word.id }
                         } else {
                             null
                         },
@@ -131,9 +137,9 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     }
 
     fulfilling?.let { behest ->
-        var report by remember { mutableStateOf("") }
+        var report by rememberSaveable { mutableStateOf("") }
         AlertDialog(
-            onDismissRequest = { fulfilling = null },
+            onDismissRequest = { fulfillingId = null },
             title = { Text("Выполнить") },
             text = {
                 Column {
@@ -148,10 +154,10 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
             confirmButton = {
                 TextButton(onClick = {
                     session.fulfil(behest.id, report)
-                    fulfilling = null
+                    fulfillingId = null
                 }) { Text("Выполнить") }
             },
-            dismissButton = { TextButton(onClick = { fulfilling = null }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { fulfillingId = null }) { Text("Отмена") } },
         )
     }
 }

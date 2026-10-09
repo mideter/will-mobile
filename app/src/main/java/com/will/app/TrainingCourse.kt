@@ -10,11 +10,12 @@ package com.will.app
  */
 object TrainingCourse {
 
-    /** Сколько подходов у упражнения: заданные и сделанные сверх них. */
-    fun count(training: WordItem, exercise: Int): Int =
+    /** Сколько подходов у упражнения: заданные, сделанные сверх них и идущий [underway]. */
+    fun count(training: WordItem, exercise: Int, underway: UnderwayItem? = null): Int =
         maxOf(
             training.exercises[exercise].approaches.size,
             (training.efforts.filter { it.exercise == exercise }.maxOfOrNull { it.approach } ?: -1) + 1,
+            underway?.takeIf { it.behestId == training.id && it.exercise == exercise }?.let { it.approach + 1 } ?: 0,
         )
 
     fun done(training: WordItem, exercise: Int, approach: Int): Boolean =

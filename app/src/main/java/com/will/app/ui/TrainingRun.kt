@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,8 +65,9 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
     BackHandler(onBack = onClose)
     val doing = underway?.takeIf { it.behestId == training.id }
     // Выбирают упражнение: выбор держится его, пока подходы не кончатся (см. TrainingCourse).
-    var chosen by remember { mutableStateOf<Int?>(null) }
-    var extraFor by remember { mutableStateOf<Int?>(null) }
+    // Выбор и открытые окна переживают поворот экрана.
+    var chosen by rememberSaveable { mutableStateOf<Int?>(null) }
+    var extraFor by rememberSaveable { mutableStateOf<Int?>(null) }
     LaunchedEffect(doing) {
         // Начатый подход — где бы его ни начали — ведёт фокус; «сверх заданного» не залипает.
         if (doing != null) {
@@ -75,8 +77,8 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
     }
     val focus = TrainingCourse.focus(training, doing, chosen)
     val selected = if (doing == null) TrainingCourse.next(training, focus, extraFor) else null
-    var confirming by remember { mutableStateOf(false) }
-    var closing by remember { mutableStateOf(false) }
+    var confirming by rememberSaveable { mutableStateOf(false) }
+    var closing by rememberSaveable { mutableStateOf(false) }
 
     // Часы: раз в четверть секунды.
     var nowNs by remember { mutableLongStateOf(System.currentTimeMillis() * 1_000_000) }
@@ -123,7 +125,7 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                     Text(exercise.name, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                     // Нажимается только следующий подход упражнения: подходы идут по порядку.
                     val next = TrainingCourse.nextIn(training, e)
-                    for (a in 0 until TrainingCourse.count(training, e)) {
+                    for (a in 0 until TrainingCourse.count(training, e, doing)) {
                         val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                         val begun = effort?.begunAtNs ?: doing?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
                         val willedRest = TrainingCourse.restWilled(training, e, a)
@@ -209,7 +211,9 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
     if (confirming && doing != null) {
         // Сделанное — как задано, если не поправить; сверх заданного — как последний подход.
         val like = TrainingCourse.proposal(training, doing.exercise, doing.approach)
-        val draft = remember(doing) { ApproachDraft(like?.weightGrams ?: 0, like?.repetitions ?: 10) }
+        val draft = rememberSaveable(doing, saver = ApproachDraft.Saver) {
+            ApproachDraft(like?.weightGrams ?: 0, like?.repetitions ?: 10)
+        }
         AlertDialog(
             onDismissRequest = { confirming = false },
             title = { Text("Что сделано") },
@@ -231,7 +235,7 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
     }
 
     if (closing) {
-        var remark by remember { mutableStateOf("") }
+        var remark by rememberSaveable { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { closing = false },
             title = { Text("Завершить тренировку") },
@@ -338,7 +342,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
     Column(Modifier.padding(top = 4.dp)) {
         training.exercises.forEachIndexed { e, exercise ->
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            for (a in 0 until TrainingCourse.count(training, e)) {
+            for (a in 0 until TrainingCourse.count(training, e, underway)) {
                 val asked = exercise.approaches.getOrNull(a)
                 val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                 val begun = effort?.begunAtNs ?: underway?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs

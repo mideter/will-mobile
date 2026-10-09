@@ -32,8 +32,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -169,6 +172,14 @@ internal class ApproachDraft(grams: Int, repetitions: Int, rest: Int = DEFAULT_R
     var rest by mutableStateOf(rest)
 
     val item get() = ApproachItem(grams, repetitions, rest)
+
+    companion object {
+        /** Черновик переживает поворот экрана: три числа. */
+        val Saver = Saver<ApproachDraft, IntArray>(
+            save = { intArrayOf(it.grams, it.repetitions, it.rest) },
+            restore = { ApproachDraft(it[0], it[1], it[2]) },
+        )
+    }
 }
 
 /** Черновик упражнения. */
@@ -176,6 +187,20 @@ private class ExerciseDraft(name: String, approaches: List<ApproachDraft>) {
     var name by mutableStateOf(name)
     val approaches: SnapshotStateList<ApproachDraft> = mutableStateListOf<ApproachDraft>().apply { addAll(approaches) }
 }
+
+/** Черновики упражнений переживают поворот экрана: по упражнению — название и числа его подходов подряд. */
+private val ExerciseDraftsSaver = Saver<SnapshotStateList<ExerciseDraft>, ArrayList<Any>>(
+    save = { drafts ->
+        drafts.flatMapTo(ArrayList()) { draft ->
+            listOf(draft.name, draft.approaches.flatMap { listOf(it.grams, it.repetitions, it.rest) }.toIntArray())
+        }
+    },
+    restore = { saved ->
+        saved.chunked(2).map { (name, numbers) ->
+            ExerciseDraft(name as String, (numbers as IntArray).toList().chunked(3).map { (g, r, s) -> ApproachDraft(g, r, s) })
+        }.toMutableStateList()
+    },
+)
 
 /** Граммы из набранного: «62,5» → 62500; пусто или 0 — свой вес. Null, если это не вес. */
 private fun gramsOf(text: String): Int? {
@@ -203,18 +228,22 @@ private fun exercisesOf(drafts: List<ExerciseDraft>): List<ExerciseItem> =
 /**
  * Редактор тренировки: Тренер составляет её — заголовок, упражнения карточками, подходы:
  * отдых перед подходом, вес и повторы — шагами. [names] — прежние названия упражнений для подсказки.
+ * [sending] — тренировка отправлена и ждёт ответа сервера: второй раз её не задать.
  */
 @Composable
 fun TrainingEditor(
     heading: String,
     names: List<String>,
+    sending: Boolean,
     onDone: (title: String, exercises: List<ExerciseItem>) -> Unit,
     onCancel: () -> Unit,
 ) {
     BackHandler(onBack = onCancel)
-    var title by remember { mutableStateOf("") }
-    val drafts = remember { mutableStateListOf(ExerciseDraft("", listOf(ApproachDraft(0, 10)))) }
-    val trouble = troubleOf(drafts)
+    var title by rememberSaveable { mutableStateOf("") }
+    val drafts = rememberSaveable(saver = ExerciseDraftsSaver) {
+        mutableStateListOf(ExerciseDraft("", listOf(ApproachDraft(0, 10))))
+    }
+    val trouble = troubleOf(drafts) ?: if (sending) "Отправляется…" else null
 
     Column(Modifier.fillMaxSize()) {
         Header(title = "Новая тренировка", subtitle = heading, onBack = onCancel)
@@ -404,7 +433,7 @@ private class ExactInput(
 /** Шаговое число: − значение +; нажатие на значение — точный ввод. */
 @Composable
 private fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit, exact: ExactInput, modifier: Modifier) {
-    var typing by remember { mutableStateOf(false) }
+    var typing by rememberSaveable { mutableStateOf(false) }
     Row(
         modifier
             .clip(RoundedCornerShape(10.dp))
@@ -424,10 +453,10 @@ private fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit, exact
     }
     if (typing) {
         // Поле сразу в фокусе, прежнее значение выделено — его можно сразу перебить.
-        var value by remember {
+        var value by rememberSaveable(stateSaver = TextFieldValue.Saver) {
             mutableStateOf(TextFieldValue(exact.initial, selection = TextRange(0, exact.initial.length)))
         }
-        var wrong by remember { mutableStateOf(false) }
+        var wrong by rememberSaveable { mutableStateOf(false) }
         val focus = remember { FocusRequester() }
         LaunchedEffect(Unit) { focus.requestFocus() }
         AlertDialog(

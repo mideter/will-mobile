@@ -42,6 +42,9 @@ import will.v1.turn
 /** Связь с сервером. */
 enum class Connection { Connecting, Ready, Reconnecting }
 
+/** Тренировка из редактора: не отправлена, ждёт ответа сервера или задана. */
+enum class Willing { None, Pending, Willed }
+
 /** Комната в списке Обители. */
 data class RoomItem(val name: String, val outer: Boolean)
 
@@ -150,6 +153,8 @@ data class WillState(
     val unbornMark: Long? = null,
     /** Моя духовная линия, поколение за поколением. */
     val lineage: List<Descent> = emptyList(),
+    /** Что с тренировкой, отправленной из редактора. */
+    val willing: Willing = Willing.None,
 )
 
 
@@ -201,7 +206,8 @@ class WillSession(context: Context) {
     }
 
     private fun onClosed(reason: String) {
-        _state.update { it.copy(connection = Connection.Reconnecting) }
+        // Ответа на отправленную тренировку уже не будет: редактор остаётся открытым.
+        _state.update { it.copy(connection = Connection.Reconnecting, willing = Willing.None) }
         android.util.Log.w(TAG, "connection lost: $reason")
         _notices.tryEmit("Связь потеряна, переподключаюсь…")
         mainHandler.removeCallbacks(reconnect)
@@ -271,17 +277,26 @@ class WillSession(context: Context) {
             finishApproach = finishApproach { this.behestId = behestId; this.weightGrams = weightGrams; this.repetitions = repetitions }
         })
 
-    /** Велеть тренировку в Узах, где стоишь Тренером. */
+    /**
+     * Велеть тренировку в Узах, где стоишь Тренером. Сервер отвечает ровно одним
+     * уведомлением — «задана» или почему нет; до него [WillState.willing] — `Pending`.
+     */
     fun train(title: String, exercises: List<ExerciseItem>) {
         val view = _state.value.view as? View.Room ?: return
-        send(clientEvent {
+        if (_state.value.willing == Willing.Pending) return
+        val sent = send(clientEvent {
             train = train {
                 this.title = title.trim()
                 this.exercises.addAll(exercises.map { it.toWire() })
             }
         })
+        if (!sent) return
+        _state.update { it.copy(willing = Willing.Pending) }
         look(view.host, view.room)
     }
+
+    /** Редактор закрыт после того, как тренировка задана. */
+    fun willingSeen() = _state.update { it.copy(willing = Willing.None) }
 
     /** Перенести комнату своей Обители в другую часть — стоя в своей Горнице. */
     fun arrange(room: String, outer: Boolean) =
@@ -324,8 +339,10 @@ class WillSession(context: Context) {
         send(clientEvent { turn = turn { abodeOf = host; this.room = room } })
     }
 
-    private fun send(event: ClientEvent) {
-        if (!bridge.send(event)) _notices.tryEmit("Нет связи с сервером")
+    private fun send(event: ClientEvent): Boolean {
+        val sent = bridge.send(event)
+        if (!sent) _notices.tryEmit("Нет связи с сервером")
+        return sent
     }
 
     // ── События сервера ───────────────────────────────────────────────────────
@@ -420,7 +437,14 @@ class WillSession(context: Context) {
                 _state.update { it.copy(view = shown ?: it.view, loading = false) }
             }
             ServerEvent.EventCase.RECEIPT_ACK -> Unit
-            ServerEvent.EventCase.PROTOCOL_NOTICE -> _notices.tryEmit(Notices.ru(event.protocolNotice.message))
+            ServerEvent.EventCase.PROTOCOL_NOTICE -> {
+                val message = event.protocolNotice.message
+                // Пока тренировка ждёт ответа, первое уведомление — её ответ.
+                if (_state.value.willing == Willing.Pending) {
+                    _state.update { it.copy(willing = if (TRAINING_WILLED.matches(message)) Willing.Willed else Willing.None) }
+                }
+                _notices.tryEmit(Notices.ru(message))
+            }
             ServerEvent.EventCase.DWELLING -> {
                 _notices.tryEmit("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
                 listDwellings()
@@ -524,6 +548,7 @@ class WillSession(context: Context) {
         private const val TAG = "WillSession"
         private const val RECONNECT_DELAY_MS = 3_000L
         private const val HISTORY_LIMIT = 200
+        private val TRAINING_WILLED = Regex("training \\d+ willed")
 
         /** Имена стандартных комнат, как их называет сервер. */
         const val CELL = "Келья"

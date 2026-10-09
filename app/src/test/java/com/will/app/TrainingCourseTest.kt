@@ -132,6 +132,17 @@ class TrainingCourseTest {
         assertEquals(3, TrainingCourse.count(training(done(0, 0, 0), done(0, 1, 100), done(0, 2, 200)), 0))
     }
 
+    @Test
+    fun `an approach beyond the willed is counted while it is underway`() {
+        // Подтягивания: задан один подход, он сделан, идёт второй — сверх заданного.
+        val t = training(done(2, 0, at = 0))
+        val underway = UnderwayItem(behestId = 1, exercise = 2, approach = 1, begunAtNs = 100 * NS)
+        assertEquals(2, TrainingCourse.count(t, 2, underway))
+        // Идущий подход другого упражнения или другой тренировки не в счёт.
+        assertEquals(1, TrainingCourse.count(t, 2, underway.copy(behestId = 9)))
+        assertEquals(2, TrainingCourse.count(t, 1, underway))
+    }
+
     private companion object {
         const val NS = 1_000_000_000L
     }
