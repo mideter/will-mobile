@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import io.grpc.ManagedChannel
 import io.grpc.okhttp.OkHttpChannelBuilder
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +50,15 @@ class WillBridge {
         disconnect()
         val gen = ++generation
 
-        val ch = OkHttpChannelBuilder.forAddress(host, port).usePlaintext().build()
+        // Сеть может пропасть молча: поток жив на вид, а сервер давно не слышит. Пинг раз в
+        // минуту — без ответа поток рвётся, и сессия переподключается. Сервер такие пинги
+        // разрешает (не чаще раза в 5 с) и пингует сам — так он замечает пропавших.
+        val ch = OkHttpChannelBuilder.forAddress(host, port)
+            .usePlaintext()
+            .keepAliveTime(KEEPALIVE_SECONDS, TimeUnit.SECONDS)
+            .keepAliveTimeout(KEEPALIVE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .keepAliveWithoutCalls(true)
+            .build()
         val out = Channel<ClientEvent>(Channel.UNLIMITED)
         val stub = MessengerGrpcKt.MessengerCoroutineStub(ch)
 
@@ -101,5 +110,8 @@ class WillBridge {
         /** Debug — локальный сервер (эмулятор видит хост как 10.0.2.2), release — удалённый. */
         val HOST: String = BuildConfig.WILL_HOST
         val PORT: Int = BuildConfig.WILL_PORT
+
+        private const val KEEPALIVE_SECONDS = 60L
+        private const val KEEPALIVE_TIMEOUT_SECONDS = 15L
     }
 }
