@@ -11,6 +11,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -26,17 +27,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
 import com.will.app.Aspect
+import com.will.app.Connection
 import com.will.app.View
 import com.will.app.WillSession
 
 /** Экраны из меню Обители; [Main] — вид из сессии (Обитель или комната). */
 private enum class Screen { Main, Dwellings, Supplications, Lineage }
 
-/** Корень приложения: вид из состояния сессии, уведомления — снекбаром, «назад» — к Обители. */
+/**
+ * Корень приложения: вид из состояния сессии, «назад» — к Обители. Всё системное — уведомления
+ * сервера и связь — говорит всплывающее поле, а не полосы на экранах.
+ */
 @Composable
 fun WillApp(session: WillSession) {
     val state by session.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
+    val link = remember { SnackbarHostState() }
     var screen by rememberSaveable { mutableStateOf(Screen.Main) }
     var going by remember { mutableStateOf(false) }
 
@@ -44,13 +50,30 @@ fun WillApp(session: WillSession) {
         session.notices.collect { snackbar.showSnackbar(it) }
     }
 
+    // Связи нет — поле висит, пока она не вернётся; тогда на миг — что вернулась. Первое
+    // подключение показывает свой экран, поэтому здесь — только когда уже было что показать.
+    val lost = state.connection != Connection.Ready && (state.view != null || state.unbornMark != null)
+    var wasLost by remember { mutableStateOf(false) }
+    LaunchedEffect(lost) {
+        if (lost) {
+            wasLost = true
+            link.showSnackbar("Нет связи — переподключаюсь…", duration = SnackbarDuration.Indefinite)
+        } else if (wasLost) {
+            wasLost = false
+            link.showSnackbar("Связь восстановлена")
+        }
+    }
+    val popups: @Composable () -> Unit = {
+        Column {
+            SnackbarHost(snackbar)
+            SnackbarHost(link)
+        }
+    }
+
     // Нерождённый только ждёт.
     state.unbornMark?.let { mark ->
-        Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding)) {
-                ConnectionBanner(state.connection)
-                Box(Modifier.weight(1f)) { UnbornScreen(mark) }
-            }
+        Scaffold(snackbarHost = popups) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) { UnbornScreen(mark) }
         }
         return
     }
@@ -62,10 +85,8 @@ fun WillApp(session: WillSession) {
     }
 
     val back = { screen = Screen.Main }
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+    Scaffold(snackbarHost = popups) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
-            // Связь — одной полосой над любым экраном; пока идёт первое подключение, о нём говорит сам экран.
-            if (view != null) ConnectionBanner(state.connection)
             Box(Modifier.weight(1f)) {
                 when (screen) {
                     Screen.Dwellings -> DwellingsScreen(state, session, onBack = back, onVisit = { host ->

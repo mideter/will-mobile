@@ -1,6 +1,5 @@
 package com.will.app.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.will.app.Connection
 
 /** Шапка экрана: «назад», заголовок с подписью и действия справа. */
 @Composable
@@ -51,22 +49,6 @@ fun Header(
         }
         HorizontalDivider(color = WillColors.Divider)
     }
-}
-
-/** Полоса о связи над любым экраном, пока связь не готова; одна на всё приложение — в [WillApp]. */
-@Composable
-fun ConnectionBanner(connection: Connection) {
-    val text = when (connection) {
-        Connection.Ready -> return
-        Connection.Connecting -> "Подключение к серверу…"
-        Connection.Reconnecting -> "Переподключение…"
-    }
-    Text(
-        text,
-        modifier = Modifier.fillMaxWidth().background(WillColors.Row).padding(horizontal = 16.dp, vertical = 6.dp),
-        fontSize = 13.sp,
-        color = WillColors.Muted,
-    )
 }
 
 @Composable
