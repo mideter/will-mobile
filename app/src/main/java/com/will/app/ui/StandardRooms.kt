@@ -24,9 +24,10 @@ import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Врата. Кто может впускать — хозяин или обитатель, чьему статусу открыта их часть, — стоя в них,
- * держит их открытыми: видит, кто ждёт, и впускает знакомым хозяина. Пришедший видит,
- * открыты ли Врата, и ждёт сколько хочет.
+ * Врата — порог Обители: через них входят рождённые и рождаются. Кто может впускать —
+ * хозяин или обитатель, чьему статусу открыта их часть, — стоя в них, держит их открытыми:
+ * видит, кто ждёт, и впускает знакомым хозяина; видит нерождённых и рождает их чадами
+ * хозяина. Пришедший видит, открыты ли Врата, и ждёт сколько хочет.
  */
 @Composable
 fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
@@ -46,16 +47,36 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
                     "Вы можете впускать во Врата ${view.host}: впущенный станет его знакомым."
                 },
             )
-            SectionTitle("У Врат")
-            if (view.waiting.isEmpty()) Hint("Никто не ждёт")
             LazyColumn(Modifier.fillMaxSize()) {
-                items(view.waiting, key = { it }) { name ->
+                item { SectionTitle("У Врат") }
+                if (view.waiting.isEmpty()) item { Hint("Никто не ждёт") }
+                items(view.waiting, key = { "waiting $it" }) { name ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(name, fontSize = 16.sp, modifier = Modifier.weight(1f))
                         TextButton(onClick = { session.admit(name) }) { Text("Впустить") }
+                    }
+                    HorizontalDivider(color = WillColors.Divider)
+                }
+
+                // Через эти же Врата рождаются: отцом по плоти станет их хозяин.
+                item { SectionTitle("Ждут рождения") }
+                item {
+                    Hint(
+                        if (own) "Рождённый здесь станет вашим чадом по плоти."
+                        else "Рождённый здесь станет чадом ${view.host}, а не вашим.",
+                    )
+                }
+                if (view.unborn.isEmpty()) item { Hint("Никто не ждёт") }
+                items(view.unborn, key = { "unborn $it" }) { mark ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("#$mark", fontSize = 18.sp, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { session.bear(mark) }) { Text("Родить") }
                     }
                     HorizontalDivider(color = WillColors.Divider)
                 }

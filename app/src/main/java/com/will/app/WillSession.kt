@@ -102,7 +102,7 @@ enum class Standing { Asked, Asks, Trainer, Novice }
 data class Person(val name: String, val kind: Kind, val standings: Set<Standing> = emptySet())
 
 /** Что отражает комната. */
-enum class Aspect { Words, Threshold, Dwellers, Birth }
+enum class Aspect { Words, Threshold, Dwellers }
 
 /** Чадо по духу и его отец — звено духовной линии. */
 data class Descent(val name: String, val father: String)
@@ -124,8 +124,8 @@ sealed interface View {
      * Комната. [aspect] — что она отражает: слова (Келья, Узы), порог (Врата) или
      * обитателей (Горница). [writable] — здесь пишут: своя Келья; Ведение — у Тренера.
      * Во Вратах — [gatesOpen], [keeping] (я привратник: хозяин или обитатель, чьему роду
-     * открыта их часть) и, привратнику, [waiting]; в Горнице — [people]; в Родильной —
-     * метки нерождённых [unborn].
+     * открыта их часть) и, привратнику, [waiting] и метки нерождённых [unborn]; в Горнице —
+     * [people].
      */
     data class Room(
         override val host: String,
@@ -157,7 +157,7 @@ data class WillState(
     val dwellers: List<Person> = emptyList(),
     val dwellings: List<Person> = emptyList(),
     val supplications: List<String> = emptyList(),
-    /** Тело ещё не рождено: метка, по которой его видят в Родильных. */
+    /** Тело ещё не рождено: метка, по которой его видят во Вратах. */
     val unbornMark: Long? = null,
     /** Моя духовная линия, поколение за поколением. */
     val lineage: List<Descent> = emptyList(),
@@ -285,10 +285,7 @@ class WillSession(context: Context) {
     /** В свою Горницу — к своим обитателям. */
     fun upperRoom() = look("", UPPER_ROOM)
 
-    /** В свою Родильную — к нерождённым. */
-    fun birthRoom() = look("", BIRTH_ROOM)
-
-    /** Родить нерождённого, стоя в Родильной: отцом станет её хозяин. */
+    /** Родить нерождённого, стоя во Вратах, где можешь впускать: отцом станет их хозяин. */
     fun bear(mark: Long) = send(clientEvent { bear = bear { this.mark = mark } })
 
     /** Избрать отца по духу; он отказаться не может. */
@@ -596,12 +593,13 @@ class WillSession(context: Context) {
             }
             ServerEvent.EventCase.UNBORN -> {
                 val marks = event.unborn.marksList
-                val gatheringBirthRoom = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Birth }
-                if (gatheringBirthRoom != null) {
-                    gathering = gatheringBirthRoom.copy(unborn = marks)
+                // Нерождённых видит привратник: они приходят во Врата.
+                val gatheringGates = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Threshold }
+                if (gatheringGates != null) {
+                    gathering = gatheringGates.copy(unborn = marks)
                 } else {
                     _state.update { s ->
-                        val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Birth } ?: return@update s
+                        val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Threshold } ?: return@update s
                         s.copy(view = shown.copy(unborn = marks))
                     }
                 }
@@ -678,7 +676,6 @@ class WillSession(context: Context) {
         const val CELL = "Келья"
         const val GATES = "Врата"
         const val UPPER_ROOM = "Горница"
-        const val BIRTH_ROOM = "Родильная"
 
         fun kindName(kind: Kind): String = when (kind) {
             Kind.Acquaintance -> "знакомый"
@@ -689,7 +686,6 @@ class WillSession(context: Context) {
         private fun RoomAspect.toAspect(): Aspect = when (this) {
             RoomAspect.THRESHOLD -> Aspect.Threshold
             RoomAspect.DWELLERS -> Aspect.Dwellers
-            RoomAspect.BIRTH -> Aspect.Birth
             else -> Aspect.Words
         }
 

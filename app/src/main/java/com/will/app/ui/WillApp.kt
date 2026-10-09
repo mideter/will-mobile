@@ -81,14 +81,12 @@ fun WillApp(session: WillSession) {
                                 waiting = state.supplications.size,
                                 onOpen = { screen = it },
                                 onUpperRoom = { session.upperRoom() },
-                                onBirthRoom = { session.birthRoom() },
                                 onGates = { going = true },
                             )
                         })
                         is View.Room -> when (view.aspect) {
                             Aspect.Threshold -> GatesScreen(state, view, session)
                             Aspect.Dwellers -> UpperRoomScreen(state, view, session)
-                            Aspect.Birth -> BirthRoomScreen(state, view, session)
                             Aspect.Words -> RoomScreen(state, view, session)
                         }
                     }
@@ -135,7 +133,6 @@ private fun AbodeMenu(
     waiting: Int,
     onOpen: (Screen) -> Unit,
     onUpperRoom: () -> Unit,
-    onBirthRoom: () -> Unit,
     onGates: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -144,7 +141,6 @@ private fun AbodeMenu(
     }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
         DropdownMenuItem(text = { Text("Обитатели — Горница") }, onClick = { open = false; onUpperRoom() })
-        DropdownMenuItem(text = { Text("Родильная") }, onClick = { open = false; onBirthRoom() })
         DropdownMenuItem(text = { Text("Пойти к Вратам…") }, onClick = { open = false; onGates() })
         DropdownMenuItem(text = { Text("Мои Обители") }, onClick = { open = false; onOpen(Screen.Dwellings) })
         DropdownMenuItem(

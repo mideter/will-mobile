@@ -2,17 +2,14 @@ package com.will.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -22,11 +19,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Descent
-import com.will.app.View
 import com.will.app.WillSession
 import com.will.app.WillState
 
-/** Тело ещё не рождено: только ждать. Метку видят в Родильных. */
+/** Тело ещё не рождено: только ждать. Метку видят во Вратах те, кто может впускать. */
 @Composable
 fun UnbornScreen(mark: Long) {
     Column(
@@ -39,48 +35,11 @@ fun UnbornScreen(mark: Long) {
         Text("#$mark", fontSize = 48.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
         Spacer(Modifier.height(24.dp))
         Text(
-            "По этой метке вас видят в Родильных. Назовите её тому, кто вас родит: " +
-                "отцом по плоти станет хозяин Родильной.",
+            "По этой метке вас видят во Вратах. Назовите её тому, кто вас родит: " +
+                "отцом по плоти станет хозяин этих Врат.",
             textAlign = TextAlign.Center,
             color = WillColors.Muted,
         )
-    }
-}
-
-/**
- * Родильная: нерождённые по меткам. Стоящий здесь рождает; отцом по плоти станет хозяин
- * Родильной. Здесь бывает только один.
- */
-@Composable
-fun BirthRoomScreen(state: WillState, view: View.Room, session: WillSession) {
-    val own = view.host.isEmpty()
-    Column(Modifier.fillMaxSize()) {
-        Header(
-            title = "Родильная",
-            subtitle = if (own) "Моя Обитель" else "Обитель ${view.host}",
-            onBack = { session.back() },
-        )
-        Hint(
-            if (own) {
-                "Рождённый здесь станет вашим чадом по плоти."
-            } else {
-                "Рождённый здесь станет чадом ${view.host}, а не вашим."
-            },
-        )
-        SectionTitle("Ждут рождения")
-        if (view.unborn.isEmpty()) Hint("Никто не ждёт")
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(view.unborn, key = { it }) { mark ->
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("#$mark", fontSize = 18.sp, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { session.bear(mark) }) { Text("Родить") }
-                }
-                HorizontalDivider(color = WillColors.Divider)
-            }
-        }
     }
 }
 
