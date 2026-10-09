@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Значок заставки без движения — для Android до 12: бирюзовый круг и три полосы, как у значка приложения. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/ic_launcher_background"
+        android:pathData="M18,54a36,36 0 1,0 72,0a36,36 0 1,0 -72,0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,38h8v32h-8zM50,38h8v32h-8zM66,38h8v20h-8z" />
+</vector>

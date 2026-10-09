@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Тема запуска: системная заставка «Смирение» (анимированная), затем обычная тема. -->
+    <style name="Theme.Will.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/will_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_animated</item>
+        <item name="windowSplashScreenAnimationDuration">1440</item>
+        <item name="postSplashScreenTheme">@android:style/Theme.Material.Light.NoActionBar</item>
+    </style>
+</resources>

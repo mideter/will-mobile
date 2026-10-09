@@ -115,6 +115,8 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.9.3")
+    // Системная заставка с анимированным значком; до Android 12 — неподвижным.
+    implementation("androidx.core:core-splashscreen:1.0.1")
 
     // gRPC over OkHttp with lite protobuf, Kotlin stubs on coroutines.
     implementation("io.grpc:grpc-okhttp:$grpcVersion")

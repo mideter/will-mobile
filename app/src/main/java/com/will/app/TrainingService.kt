@@ -232,9 +232,13 @@ class TrainingService : Service() {
             .build()
     }
 
-    /** Открыть приложение — тем же намерением, что и значок, чтобы вернуться в его задачу. */
+    /**
+     * Открыть приложение — тем же намерением, что и значок, чтобы вернуться в его задачу;
+     * с меткой, что идут к тренировке: заставку тогда не держат.
+     */
     private fun openApp(): PendingIntent? =
         packageManager.getLaunchIntentForPackage(packageName)?.let {
+            it.putExtra(MainActivity.EXTRA_TRAINING, true)
             PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         }
 

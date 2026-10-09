@@ -68,7 +68,7 @@ fun WillApp(session: WillSession) {
                 Screen.Supplications -> SupplicationsScreen(state, session, onBack = back)
                 Screen.Lineage -> LineageScreen(state, session, onBack = back)
                 Screen.Main -> when (view) {
-                    null -> Centered("Подключение к серверу…")
+                    null -> ConnectingScreen()
                     is View.Abode -> AbodeScreen(state, view, session, menu = {
                         AbodeMenu(
                             waiting = state.supplications.size,

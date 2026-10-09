@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Заставка «Смирение», 1,44 с: правая полоса прорисовывается сверху вниз, из неё выходят две
+  таких же, и она умаляет себя перед ними. «И кто хочет между вами быть первым, да будет вам
+  рабом» (Мф. 20:27). Кончается нынешним значком приложения.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path
+                android:fillColor="@color/ic_launcher_background"
+                android:pathData="M18,54a36,36 0 1,0 72,0a36,36 0 1,0 -72,0z" />
+            <!-- Вначале видна только пустая правая полоса: левые две — в ней, прозрачные. -->
+            <group
+                android:name="left"
+                android:translateX="32">
+                <path
+                    android:name="leftBar"
+                    android:fillAlpha="0"
+                    android:fillColor="#FFFFFF"
+                    android:pathData="M34,38h8v32h-8z" />
+            </group>
+            <group
+                android:name="middle"
+                android:translateX="16">
+                <path
+                    android:name="middleBar"
+                    android:fillAlpha="0"
+                    android:fillColor="#FFFFFF"
+                    android:pathData="M50,38h8v32h-8z" />
+            </group>
+            <group
+                android:name="first"
+                android:pivotY="38"
+                android:scaleY="0">
+                <path
+                    android:fillColor="#FFFFFF"
+                    android:pathData="M66,38h8v32h-8z" />
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <!-- Первая: прорисовывается (0,10–0,44 с), стоит, пока выходят другие, и укорачивается до 20 из 32 (1,00–1,44 с). -->
+    <target android:name="first">
+        <aapt:attr name="android:animation">
+            <set android:ordering="sequentially">
+                <objectAnimator android:propertyName="scaleY" android:valueFrom="0" android:valueTo="0" android:duration="100" />
+                <objectAnimator android:propertyName="scaleY" android:valueFrom="0" android:valueTo="1" android:duration="340"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+                <objectAnimator android:propertyName="scaleY" android:valueFrom="1" android:valueTo="1" android:duration="560" />
+                <objectAnimator android:propertyName="scaleY" android:valueFrom="1" android:valueTo="0.625" android:duration="440"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <!-- Средняя выходит из неё первой (0,50–0,84 с). -->
+    <target android:name="middleBar">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="fillAlpha" android:valueFrom="0" android:valueTo="1"
+                android:startOffset="500" android:duration="1" />
+        </aapt:attr>
+    </target>
+    <target android:name="middle">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="translateX" android:valueFrom="16" android:valueTo="0"
+                android:startOffset="500" android:duration="340"
+                android:interpolator="@android:interpolator/fast_out_slow_in" />
+        </aapt:attr>
+    </target>
+
+    <!-- Левая — следом и дальше (0,56–0,92 с). -->
+    <target android:name="leftBar">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="fillAlpha" android:valueFrom="0" android:valueTo="1"
+                android:startOffset="560" android:duration="1" />
+        </aapt:attr>
+    </target>
+    <target android:name="left">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="translateX" android:valueFrom="32" android:valueTo="0"
+                android:startOffset="560" android:duration="360"
+                android:interpolator="@android:interpolator/fast_out_slow_in" />
+        </aapt:attr>
+    </target>
+</animated-vector>
