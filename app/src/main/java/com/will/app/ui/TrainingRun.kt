@@ -58,10 +58,11 @@ private const val NANOS = 1_000_000_000L
  * выбираешь упражнение (первое с несделанными подходами выбрано само) и «Приступить» — идёт
  * таймер подхода; «Завершить подход» — подтверждаешь сделанное, и идёт отдых: обратный
  * отсчёт до заданного, с вибрацией в конце. Каждый подход сразу уходит Тренеру. Экран не
- * гаснет, пока открыт; таймеры считаются от меток времени.
+ * гаснет, пока открыт; таймеры считаются от меток времени. [finishing] — тренировка отправлена
+ * на завершение и ждёт ответа сервера; закрывает экран сам ответ.
  */
 @Composable
-fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSession, onClose: () -> Unit) {
+fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSession, finishing: Boolean, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
     val doing = underway?.takeIf { it.behestId == training.id }
     // Выбирают упражнение: выбор держится его, пока подходы не кончатся (см. TrainingCourse).
@@ -252,11 +253,9 @@ fun TrainingRun(training: WordItem, underway: UnderwayItem?, session: WillSessio
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    session.fulfil(training.id, remark)
-                    closing = false
-                    onClose()
-                }) { Text("Завершить") }
+                TextButton(onClick = { session.fulfil(training.id, remark) }, enabled = !finishing) {
+                    Text(if (finishing) "Отправляется…" else "Завершить")
+                }
             },
             dismissButton = { TextButton(onClick = { closing = false }) { Text("Отмена") } },
         )

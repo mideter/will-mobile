@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.will.app.UnderwayItem
 import com.will.app.View
 import com.will.app.WillSession
-import com.will.app.Willing
+import com.will.app.Reply
 import com.will.app.WillState
 import com.will.app.WordItem
 import will.v1.MessengerOuterClass.Word
@@ -67,16 +67,24 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
 
     // Редактор закрывается, когда сервер сказал, что тренировка задана; иначе остаётся с набранным.
     LaunchedEffect(state.willing) {
-        if (state.willing == Willing.Willed) {
+        if (state.willing == Reply.Granted) {
             composing = false
             session.willingSeen()
         }
     }
+    // Окно выполнения закрывается, когда сервер сказал, что задание выполнено.
+    LaunchedEffect(state.fulfilling) {
+        if (state.fulfilling == Reply.Granted) {
+            fulfillingId = null
+            session.fulfillingSeen()
+        }
+    }
+    val sendingFulfil = state.fulfilling == Reply.Pending
     if (composing) {
         TrainingEditor(
             heading = view.room,
             names = names,
-            sending = state.willing == Willing.Pending,
+            sending = state.willing == Reply.Pending,
             onDone = session::train,
             onCancel = { composing = false },
         )
@@ -86,7 +94,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     if (fulfillingId != null && fulfilling == null) fulfillingId = null
     // Тренировку выполняют по подходам; берётся живая — с усилиями, пришедшими только что.
     fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { training ->
-        TrainingRun(training, view.underway, session, onClose = { fulfillingId = null })
+        TrainingRun(training, view.underway, session, finishing = sendingFulfil, onClose = { fulfillingId = null })
         return
     }
 
@@ -152,10 +160,9 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    session.fulfil(behest.id, report)
-                    fulfillingId = null
-                }) { Text("Выполнить") }
+                TextButton(onClick = { session.fulfil(behest.id, report) }, enabled = !sendingFulfil) {
+                    Text(if (sendingFulfil) "Отправляется…" else "Выполнить")
+                }
             },
             dismissButton = { TextButton(onClick = { fulfillingId = null }) { Text("Отмена") } },
         )

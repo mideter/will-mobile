@@ -42,8 +42,11 @@ import will.v1.turn
 /** Связь с сервером. */
 enum class Connection { Connecting, Ready, Reconnecting }
 
-/** Тренировка из редактора: не отправлена, ждёт ответа сервера или задана. */
-enum class Willing { None, Pending, Willed }
+/**
+ * Ответ сервера, которого ждёт окно: просьбы нет, она отправлена и ждёт или исполнена.
+ * Сервер отвечает на неё ровно одним уведомлением; отказ возвращает к `None`.
+ */
+enum class Reply { None, Pending, Granted }
 
 /** Комната в списке Обители. */
 data class RoomItem(val name: String, val outer: Boolean)
@@ -154,7 +157,9 @@ data class WillState(
     /** Моя духовная линия, поколение за поколением. */
     val lineage: List<Descent> = emptyList(),
     /** Что с тренировкой, отправленной из редактора. */
-    val willing: Willing = Willing.None,
+    val willing: Reply = Reply.None,
+    /** Что с заданием, отправленным на выполнение. */
+    val fulfilling: Reply = Reply.None,
 )
 
 
@@ -206,8 +211,8 @@ class WillSession(context: Context) {
     }
 
     private fun onClosed(reason: String) {
-        // Ответа на отправленную тренировку уже не будет: редактор остаётся открытым.
-        _state.update { it.copy(connection = Connection.Reconnecting, willing = Willing.None) }
+        // Ответов на отправленное уже не будет: окна остаются открытыми.
+        _state.update { it.copy(connection = Connection.Reconnecting, willing = Reply.None, fulfilling = Reply.None) }
         android.util.Log.w(TAG, "connection lost: $reason")
         _notices.tryEmit("Связь потеряна, переподключаюсь…")
         mainHandler.removeCallbacks(reconnect)
@@ -260,12 +265,21 @@ class WillSession(context: Context) {
         look(view.host, view.room)
     }
 
-    /** Выполнить задание; тренировку — завершить: сделанное сервер складывает из подходов. */
+    /**
+     * Выполнить задание; тренировку — завершить: сделанное сервер складывает из подходов.
+     * До ответа сервера [WillState.fulfilling] — `Pending`.
+     */
     fun fulfil(behestId: Long, report: String) {
         val view = _state.value.view as? View.Room ?: return
-        send(clientEvent { fulfil = fulfil { this.behestId = behestId; this.report = report.trim() } })
+        if (_state.value.fulfilling == Reply.Pending) return
+        val sent = send(clientEvent { fulfil = fulfil { this.behestId = behestId; this.report = report.trim() } })
+        if (!sent) return
+        _state.update { it.copy(fulfilling = Reply.Pending) }
         look(view.host, view.room)
     }
+
+    /** Окно выполнения закрыто после того, как задание выполнено. */
+    fun fulfillingSeen() = _state.update { it.copy(fulfilling = Reply.None) }
 
     /** Приступить к подходу тренировки (номера с нуля). */
     fun beginApproach(behestId: Long, exercise: Int, approach: Int) =
@@ -283,7 +297,7 @@ class WillSession(context: Context) {
      */
     fun train(title: String, exercises: List<ExerciseItem>) {
         val view = _state.value.view as? View.Room ?: return
-        if (_state.value.willing == Willing.Pending) return
+        if (_state.value.willing == Reply.Pending) return
         val sent = send(clientEvent {
             train = train {
                 this.title = title.trim()
@@ -291,12 +305,12 @@ class WillSession(context: Context) {
             }
         })
         if (!sent) return
-        _state.update { it.copy(willing = Willing.Pending) }
+        _state.update { it.copy(willing = Reply.Pending) }
         look(view.host, view.room)
     }
 
     /** Редактор закрыт после того, как тренировка задана. */
-    fun willingSeen() = _state.update { it.copy(willing = Willing.None) }
+    fun willingSeen() = _state.update { it.copy(willing = Reply.None) }
 
     /** Перенести комнату своей Обители в другую часть — стоя в своей Горнице. */
     fun arrange(room: String, outer: Boolean) =
@@ -439,9 +453,13 @@ class WillSession(context: Context) {
             ServerEvent.EventCase.RECEIPT_ACK -> Unit
             ServerEvent.EventCase.PROTOCOL_NOTICE -> {
                 val message = event.protocolNotice.message
-                // Пока тренировка ждёт ответа, первое уведомление — её ответ.
-                if (_state.value.willing == Willing.Pending) {
-                    _state.update { it.copy(willing = if (TRAINING_WILLED.matches(message)) Willing.Willed else Willing.None) }
+                // Пока просьба ждёт ответа, первое уведомление — её ответ.
+                _state.update {
+                    when {
+                        it.willing == Reply.Pending -> it.copy(willing = replyOf(TRAINING_WILLED, message))
+                        it.fulfilling == Reply.Pending -> it.copy(fulfilling = replyOf(BEHEST_FULFILLED, message))
+                        else -> it
+                    }
                 }
                 _notices.tryEmit(Notices.ru(message))
             }
@@ -549,6 +567,9 @@ class WillSession(context: Context) {
         private const val RECONNECT_DELAY_MS = 3_000L
         private const val HISTORY_LIMIT = 200
         private val TRAINING_WILLED = Regex("training \\d+ willed")
+        private val BEHEST_FULFILLED = Regex("behest \\d+ fulfilled")
+
+        private fun replyOf(granted: Regex, notice: String) = if (granted.matches(notice)) Reply.Granted else Reply.None
 
         /** Имена стандартных комнат, как их называет сервер. */
         const val CELL = "Келья"
