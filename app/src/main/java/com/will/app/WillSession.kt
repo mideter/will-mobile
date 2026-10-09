@@ -184,6 +184,13 @@ class WillSession(context: Context) {
     private val bridge = WillBridge()
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /** Часы сервера: метки времени тренировки сравнивают с «сейчас» только по ним. */
+    val clock = ServerClock()
+
+    /** Когда (по [ServerClock.mark]) ушли «Приступить» и «Завершить подход»: ответ на них сверяет часы. */
+    private var beginSentAt: Long? = null
+    private var finishSentAt: Long? = null
+
     private val _state = MutableStateFlow(WillState())
     val state: StateFlow<WillState> = _state
 
@@ -229,6 +236,8 @@ class WillSession(context: Context) {
         _state.update {
             it.copy(connection = Connection.Reconnecting, willing = Reply.None, fulfilling = Reply.None, beginning = Reply.None)
         }
+        beginSentAt = null
+        finishSentAt = null
         android.util.Log.w(TAG, "connection lost: $reason")
         _notices.tryEmit("Связь потеряна, переподключаюсь…")
         mainHandler.removeCallbacks(reconnect)
@@ -314,10 +323,13 @@ class WillSession(context: Context) {
             ?: s.workout?.takeIf { it.behestId == behestId }
             ?: return
         if (shown == null) look(workout.host, workout.room)
+        // После поворота ответ ждёт ещё и слова комнаты: для сверки часов он слишком поздний.
+        val sentAt = clock.mark().takeIf { shown != null }
         val sent = send(clientEvent {
             beginApproach = beginApproach { this.behestId = behestId; this.exercise = exercise; this.approach = approach }
         })
         if (!sent) return
+        beginSentAt = sentAt
         _state.update { it.copy(beginning = Reply.Pending, workout = workout) }
         TrainingService.start(appContext)
     }
@@ -326,10 +338,13 @@ class WillSession(context: Context) {
     fun stopWorkout() = _state.update { it.copy(workout = null) }
 
     /** Завершить идущий подход: что сделано. */
-    fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) =
-        send(clientEvent {
+    fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) {
+        val sentAt = clock.mark()
+        val sent = send(clientEvent {
             finishApproach = finishApproach { this.behestId = behestId; this.weightGrams = weightGrams; this.repetitions = repetitions }
         })
+        if (sent) finishSentAt = sentAt
+    }
 
     /**
      * Велеть тренировку в Узах, где стоишь Тренером. Сервер отвечает ровно одним
@@ -455,6 +470,9 @@ class WillSession(context: Context) {
             ServerEvent.EventCase.UNDERWAY -> {
                 val u = event.underway
                 val doing = if (u.doing) UnderwayItem(u.behestId, u.exercise, u.approach, u.begunAtNs) else null
+                // Ответ на своё «Приступить»: сервер отметил начало, когда принял его.
+                if (doing != null) beginSentAt?.let { clock.observe(doing.begunAtNs, it, clock.mark()) }
+                beginSentAt = null
                 (gathering as? View.Room)?.let { gathering = it.copy(underway = doing) }
                 _state.update { s ->
                     // Подход пошёл — к нему больше не приступают; выбор держится его упражнения,
@@ -470,6 +488,9 @@ class WillSession(context: Context) {
             }
             ServerEvent.EventCase.EXERTED -> {
                 val e = event.exerted.effort
+                // Ответ на своё «Завершить подход»: сервер отметил конец, когда принял его.
+                finishSentAt?.let { clock.observe(e.finishedAtNs, it, clock.mark()) }
+                finishSentAt = null
                 val effort = EffortItem(e.exercise, e.approach, e.weightGrams, e.repetitions, e.begunAtNs, e.finishedAtNs)
                 val add = { words: List<WordItem> ->
                     words.map { if (it.id == event.exerted.behestId) it.copy(efforts = it.efforts + effort) else it }

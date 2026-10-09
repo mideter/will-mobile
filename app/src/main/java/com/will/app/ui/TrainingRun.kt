@@ -86,11 +86,11 @@ fun TrainingRun(
     var confirming by rememberSaveable { mutableStateOf(false) }
     var closing by rememberSaveable { mutableStateOf(false) }
 
-    // Часы: раз в четверть секунды.
-    var nowNs by remember { mutableLongStateOf(System.currentTimeMillis() * 1_000_000) }
+    // Часы сервера — метки подходов ставит он: раз в четверть секунды.
+    var nowNs by remember { mutableLongStateOf(session.clock.nowNs()) }
     LaunchedEffect(Unit) {
         while (true) {
-            nowNs = System.currentTimeMillis() * 1_000_000
+            nowNs = session.clock.nowNs()
             delay(250)
         }
     }

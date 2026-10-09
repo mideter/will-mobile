@@ -63,6 +63,12 @@ class TrainingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /** Сейчас по часам сервера: с ними сравнивают метки тренировки. */
+    private fun nowNs() = session.clock.nowNs()
+
+    /** Метка сервера для хронометра уведомления: его тикает система по часам телефона. */
+    private fun wallMs(serverNs: Long) = session.clock.toWallMs(serverNs)
+
     override fun onCreate() {
         super.onCreate()
         running = true
@@ -200,7 +206,7 @@ class TrainingService : Service() {
         if (doing != null) {
             return builder
                 .setContentTitle("Подход · " + captionOf(t, doing.exercise, doing.approach))
-                .setWhen(doing.begunAtNs / 1_000_000)
+                .setWhen(wallMs(doing.begunAtNs))
                 .setUsesChronometer(true)
                 .setShowWhen(true)
                 .build()
@@ -219,7 +225,7 @@ class TrainingService : Service() {
         return builder
             .setContentTitle(if (rest.willed > 0) "Отдых · задано ${restText(rest.willed)}" else "Отдых")
             // Пока заданный не вышел — обратный отсчёт до его конца, потом — сколько отдыхает всего.
-            .setWhen((if (counting) rest.endNs else rest.sinceNs) / 1_000_000)
+            .setWhen(wallMs(if (counting) rest.endNs else rest.sinceNs))
             .setUsesChronometer(true)
             .setChronometerCountDown(counting)
             .setShowWhen(true)
@@ -250,8 +256,6 @@ class TrainingService : Service() {
 
         @Volatile
         private var running = false
-
-        private fun nowNs() = System.currentTimeMillis() * 1_000_000
 
         /** Начать вести тренировку; уже ведёт — ничего. Вызывать, пока приложение на экране. */
         fun start(context: Context) {
