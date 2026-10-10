@@ -29,10 +29,6 @@ import com.will.app.Aspect
 import com.will.app.Connection
 import com.will.app.View
 import com.will.app.WillSession
-import kotlinx.coroutines.delay
-
-/** Сколько ждать, прежде чем закрыть экран заставкой, когда связь пропала: короткий обрыв её не вызывает. */
-private const val VEIL_DELAY_MS = 2_000L
 
 /** Экраны из меню Обители; [Main] — вид из сессии (Обитель или комната). */
 private enum class Screen { Main, Dwellings, Supplications, Lineage }
@@ -52,16 +48,10 @@ fun WillApp(session: WillSession) {
         session.notices.collect { snackbar.showSnackbar(it) }
     }
 
-    // Связи нет дольше двух секунд — поверх всего заставка: без связи с Центром нельзя ничего.
-    // Мгновенный обрыв её не вызывает. Первое подключение показывает свой экран, поэтому
-    // здесь — только когда уже было что показать.
+    // Связи нет — сразу поверх всего заставка: без связи с Центром нельзя ничего. Первое
+    // подключение показывает свой экран, поэтому здесь — только когда уже было что показать.
     val lost = state.connection != Connection.Ready && (state.view != null || state.unbornMark != null)
-    var veiled by remember { mutableStateOf(false) }
-    LaunchedEffect(lost) {
-        if (lost) delay(VEIL_DELAY_MS)
-        veiled = lost
-    }
-    if (veiled) Veil()
+    if (lost) Veil()
     val popups: @Composable () -> Unit = { SnackbarHost(snackbar) }
 
     // Нерождённый только ждёт.

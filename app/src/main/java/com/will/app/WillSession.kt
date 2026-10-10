@@ -426,11 +426,8 @@ class WillSession(context: Context) {
         send(clientEvent { turn = turn { abodeOf = host; this.room = room } })
     }
 
-    private fun send(event: ClientEvent): Boolean {
-        val sent = bridge.send(event)
-        if (!sent) _notices.tryEmit("Нет связи с сервером")
-        return sent
-    }
+    /** Отправить; `false` — связи нет: тогда экран и так закрыт заставкой, говорить не о чем. */
+    private fun send(event: ClientEvent): Boolean = bridge.send(event)
 
     // ── События сервера ───────────────────────────────────────────────────────
 
