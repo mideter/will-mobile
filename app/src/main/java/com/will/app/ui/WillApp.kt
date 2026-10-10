@@ -11,7 +11,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -30,19 +29,22 @@ import com.will.app.Aspect
 import com.will.app.Connection
 import com.will.app.View
 import com.will.app.WillSession
+import kotlinx.coroutines.delay
+
+/** Сколько ждать, прежде чем закрыть экран заставкой, когда связь пропала: короткий обрыв её не вызывает. */
+private const val VEIL_DELAY_MS = 2_000L
 
 /** Экраны из меню Обители; [Main] — вид из сессии (Обитель или комната). */
 private enum class Screen { Main, Dwellings, Supplications, Lineage }
 
 /**
- * Корень приложения: вид из состояния сессии, «назад» — к Обители. Всё системное — уведомления
- * сервера и связь — говорит всплывающее поле, а не полосы на экранах.
+ * Корень приложения: вид из состояния сессии, «назад» — к Обители. Уведомления сервера — во
+ * всплывающем поле; связь не уведомление: без неё экран закрывает заставка ([Veil]).
  */
 @Composable
 fun WillApp(session: WillSession) {
     val state by session.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
-    val link = remember { SnackbarHostState() }
     var screen by rememberSaveable { mutableStateOf(Screen.Main) }
     var going by remember { mutableStateOf(false) }
 
@@ -50,25 +52,17 @@ fun WillApp(session: WillSession) {
         session.notices.collect { snackbar.showSnackbar(it) }
     }
 
-    // Связи нет — поле висит, пока она не вернётся; тогда на миг — что вернулась. Первое
-    // подключение показывает свой экран, поэтому здесь — только когда уже было что показать.
+    // Связи нет дольше двух секунд — поверх всего заставка: без связи с Центром нельзя ничего.
+    // Мгновенный обрыв её не вызывает. Первое подключение показывает свой экран, поэтому
+    // здесь — только когда уже было что показать.
     val lost = state.connection != Connection.Ready && (state.view != null || state.unbornMark != null)
-    var wasLost by remember { mutableStateOf(false) }
+    var veiled by remember { mutableStateOf(false) }
     LaunchedEffect(lost) {
-        if (lost) {
-            wasLost = true
-            link.showSnackbar("Нет связи — переподключаюсь…", duration = SnackbarDuration.Indefinite)
-        } else if (wasLost) {
-            wasLost = false
-            link.showSnackbar("Связь восстановлена")
-        }
+        if (lost) delay(VEIL_DELAY_MS)
+        veiled = lost
     }
-    val popups: @Composable () -> Unit = {
-        Column {
-            SnackbarHost(snackbar)
-            SnackbarHost(link)
-        }
-    }
+    if (veiled) Veil()
+    val popups: @Composable () -> Unit = { SnackbarHost(snackbar) }
 
     // Нерождённый только ждёт.
     state.unbornMark?.let { mark ->

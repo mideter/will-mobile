@@ -1,8 +1,13 @@
 package com.will.app.ui
 
+import android.os.Build
 import android.provider.Settings
+import android.view.WindowManager
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -10,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -17,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,9 +31,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 
 /** Бирюза значка (`ic_launcher_background`). */
 private val Teal = Color(0xFF0D7377)
@@ -35,28 +46,72 @@ private val Teal = Color(0xFF0D7377)
 private const val HOLD_S = 1.2f
 private const val STORY_S = 2.6f
 
+/** Первое подключение и потерянная связь говорят одним языком. */
+const val CONNECTING = "Устанавливаем связь с Центром"
+const val RECONNECTING = "Восстанавливаем связь с Центром"
+
+/**
+ * Без связи с Центром нельзя ничего: «без Меня не можете делать ничего» (Ин. 15:5). Поверх
+ * экрана и всех его окон — заставка с замыслом, пока связь не вернётся; она перехватывает
+ * касания, «назад» и клавиатуру. Экран под ней остаётся как был — с набранным и открытым, —
+ * и, когда связь вернётся, человек окажется там же. Появляется плавно, уходит сразу.
+ */
+@Composable
+fun Veil() {
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        // Не затемнять экран под заставкой: она сама проступает поверх него.
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect { window?.setDimAmount(0f) }
+        val shown = remember { Animatable(0f) }
+        LaunchedEffect(Unit) { shown.animateTo(1f, tween(400)) }
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = shown.value }.background(WillColors.Background)) {
+            ConnectingScreen(RECONNECTING)
+        }
+    }
+}
+
 /**
  * Пока приложение подключается к серверу: значок того же размера и на том же месте, что в
  * системной заставке, — переход из неё незаметен; связи всё нет — значок проигрывает свой
- * замысел, по кругу.
+ * замысел, по кругу. [text] — что происходит.
  */
 @Composable
-fun ConnectingScreen() {
-    // Заставка ставит значок в середину окна, а экран начинается под строкой состояния:
-    // сдвинуть значок туда, где он был в заставке.
+fun ConnectingScreen(text: String = CONNECTING) {
+    // Системная заставка ставит значок в середину экрана, а этот экран начинается под строкой
+    // состояния, и заставка поверх окон живёт в своём окне: сдвинуть значок туда, где он был.
     val window = LocalView.current.rootView
+    val context = LocalContext.current
+    val screenHeight = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.getSystemService(WindowManager::class.java)?.maximumWindowMetrics?.bounds?.height()
+        } else {
+            null
+        }
+    }
     var shift by remember { mutableFloatStateOf(0f) }
     Box(
         Modifier
             .fillMaxSize()
             .onGloballyPositioned { box ->
-                shift = window.height / 2f - (box.positionInWindow().y + box.size.height / 2f)
+                shift = if (screenHeight != null) {
+                    screenHeight / 2f - (box.positionOnScreen().y + box.size.height / 2f)
+                } else {
+                    window.height / 2f - (box.positionInWindow().y + box.size.height / 2f)
+                }
             },
     ) {
         val y = shift.toInt()
         Emblem(Modifier.align(Alignment.Center).offset { IntOffset(0, y) })
         Text(
-            "Подключение к серверу…",
+            text,
             color = WillColors.Muted,
             modifier = Modifier.align(Alignment.Center).offset { IntOffset(0, y) }.offset(y = 120.dp),
         )
