@@ -113,7 +113,7 @@ fun ConnectingScreen(text: String = CONNECTING) {
         Text(
             text,
             color = WillColors.Muted,
-            modifier = Modifier.align(Alignment.Center).offset { IntOffset(0, y) }.offset(y = 120.dp),
+            modifier = Modifier.align(Alignment.Center).offset { IntOffset(0, y) }.offset(y = 104.dp),
         )
     }
 }
@@ -124,7 +124,7 @@ fun ConnectingScreen(text: String = CONNECTING) {
  * ними. «И кто хочет между вами быть первым, да будет вам рабом» (Мф. 20:27). Кончается
  * значком приложения. Без анимаций в системе — неподвижный значок.
  *
- * Размер — как в системной заставке: круг значка 192 dp.
+ * Размер — как в системной заставке: круг значка 160 dp (фон значка заставки, `IconBackground`).
  */
 @Composable
 fun Emblem(modifier: Modifier = Modifier) {
@@ -142,7 +142,7 @@ fun Emblem(modifier: Modifier = Modifier) {
             }
         }
     }
-    Canvas(modifier.size(192.dp)) { drawEmblem(t) }
+    Canvas(modifier.size(160.dp)) { drawEmblem(t) }
 }
 
 /** Доля пути от [from] до [to] к мигу [t], сглаженная. */

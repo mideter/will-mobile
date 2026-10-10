@@ -2,7 +2,8 @@
 <!--
   Заставка «Смирение», 1,44 с: правая полоса прорисовывается сверху вниз, из неё выходят две
   таких же, и она умаляет себя перед ними. «И кто хочет между вами быть первым, да будет вам
-  рабом» (Мф. 20:27). Кончается нынешним значком приложения.
+  рабом» (Мф. 20:27). Кончается нынешним значком приложения. Здесь только полосы: бирюзовый фон под
+  ними рисует сама заставка (windowSplashScreenIconBackgroundColor) маской телефона, и обрезать нечему.
 -->
 <animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt">
@@ -12,9 +13,6 @@
             android:height="108dp"
             android:viewportWidth="108"
             android:viewportHeight="108">
-            <path
-                android:fillColor="@color/ic_launcher_background"
-                android:pathData="M18,54a36,36 0 1,0 72,0a36,36 0 1,0 -72,0z" />
             <!-- Вначале видна только пустая правая полоса: левые две — в ней, прозрачные. -->
             <group
                 android:name="left"
