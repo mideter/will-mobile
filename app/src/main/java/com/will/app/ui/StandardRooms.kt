@@ -100,8 +100,8 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
 }
 
 /**
- * Горница: обитатели Обители. Хозяин, стоя здесь, меняет их род; тому, кто принял
- * и его, можно подать Прошение.
+ * Горница: обитатели Обители. Хозяин, стоя здесь, меняет их статус; тому, кто принял
+ * и его, можно подать Просьбу.
  */
 @Composable
 fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {

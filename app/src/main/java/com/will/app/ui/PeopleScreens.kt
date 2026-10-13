@@ -46,7 +46,7 @@ fun DwellingsScreen(state: WillState, session: WillSession, onBack: () -> Unit, 
     }
 }
 
-/** Прошения, ждущие моего ответа. */
+/** Просьбы, ждущие моего ответа. */
 @Composable
 fun SupplicationsScreen(state: WillState, session: WillSession, onBack: () -> Unit) {
     LaunchedEffect(Unit) { session.listSupplications() }
