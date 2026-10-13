@@ -192,6 +192,16 @@ class WillSession(context: Context) {
     /** Когда (по [ServerClock.mark]) началось подключение: `AuthOk` несёт время сервера и сверяет часы. */
     private var bindSentAt: Long? = null
 
+    /**
+     * Номера своих запросов, ждущих ответа (`Reply`): ответ узнаётся по номеру, а не по
+     * словам уведомления. Номер растёт на всё время жизни сессии.
+     */
+    private var lastRequest = 0L
+    private var willingRequest: Long? = null
+    private var fulfillingRequest: Long? = null
+    private var fulfillingBehest: Long? = null
+    private var beginningRequest: Long? = null
+
     /** Когда (по [ServerClock.mark]) ушли «Приступить» и «Завершить подход»: ответ на них сверяет часы. */
     private var beginSentAt: Long? = null
     private var finishSentAt: Long? = null
@@ -265,9 +275,13 @@ class WillSession(context: Context) {
         }
         beginSentAt = null
         finishSentAt = null
+        willingRequest = null
+        fulfillingRequest = null
+        fulfillingBehest = null
+        beginningRequest = null
         val delay = backoff.next()
         android.util.Log.w(TAG, "connection lost: $reason; again in $delay ms")
-        // Сказать об этом — дело полосы «Переподключение…» над экраном: она видна, пока связи нет.
+        // Сказать об этом — дело заставки: пока связи нет, она закрывает экран.
         mainHandler.removeCallbacks(reconnect)
         mainHandler.postDelayed(reconnect, delay)
     }
@@ -318,8 +332,9 @@ class WillSession(context: Context) {
     fun fulfil(behestId: Long, report: String) {
         val view = _state.value.view as? View.Room ?: return
         if (_state.value.fulfilling == Reply.Pending) return
-        val sent = send(clientEvent { fulfil = fulfil { this.behestId = behestId; this.report = report.trim() } })
-        if (!sent) return
+        val asked = ask(clientEvent { fulfil = fulfil { this.behestId = behestId; this.report = report.trim() } }) ?: return
+        fulfillingRequest = asked
+        fulfillingBehest = behestId
         _state.update { it.copy(fulfilling = Reply.Pending) }
         look(view.host, view.room)
     }
@@ -333,7 +348,7 @@ class WillSession(context: Context) {
 
     /**
      * Приступить к подходу тренировки (номера с нуля). Сервер отвечает идущим подходом
-     * (`Underway`) или уведомлением, почему нет; до того [WillState.beginning] — `Pending`.
+     * (`Underway`) и ответом на запрос — или ответом, почему нет; до того [WillState.beginning] — `Pending`.
      * Сервер принимает подход только в комнате Уз: из уведомления, когда смотришь в другое
      * место, сначала поворачиваешься к ней. С первым подходом тренировку ведёт [TrainingService].
      */
@@ -347,10 +362,10 @@ class WillSession(context: Context) {
         if (shown == null) look(workout.host, workout.room)
         // После поворота ответ ждёт ещё и слова комнаты: для сверки часов он слишком поздний.
         val sentAt = clock.mark().takeIf { shown != null }
-        val sent = send(clientEvent {
+        val asked = ask(clientEvent {
             beginApproach = beginApproach { this.behestId = behestId; this.exercise = exercise; this.approach = approach }
-        })
-        if (!sent) return
+        }) ?: return
+        beginningRequest = asked
         beginSentAt = sentAt
         _state.update { it.copy(beginning = Reply.Pending, workout = workout) }
         TrainingService.start(appContext)
@@ -369,19 +384,19 @@ class WillSession(context: Context) {
     }
 
     /**
-     * Велеть тренировку в Узах, где стоишь Тренером. Сервер отвечает ровно одним
-     * уведомлением — «задана» или почему нет; до него [WillState.willing] — `Pending`.
+     * Велеть тренировку в Узах, где стоишь Тренером. Сервер отвечает на запрос — «задана»
+     * или почему нет; до ответа [WillState.willing] — `Pending`.
      */
     fun train(title: String, exercises: List<ExerciseItem>) {
         val view = _state.value.view as? View.Room ?: return
         if (_state.value.willing == Reply.Pending) return
-        val sent = send(clientEvent {
+        val asked = ask(clientEvent {
             train = train {
                 this.title = title.trim()
                 this.exercises.addAll(exercises.map { it.toWire() })
             }
-        })
-        if (!sent) return
+        }) ?: return
+        willingRequest = asked
         _state.update { it.copy(willing = Reply.Pending) }
         look(view.host, view.room)
     }
@@ -432,6 +447,12 @@ class WillSession(context: Context) {
 
     /** Отправить; `false` — связи нет: тогда экран и так закрыт заставкой, говорить не о чем. */
     private fun send(event: ClientEvent): Boolean = bridge.send(event)
+
+    /** Отправить запрос с новым номером: ответ на него придёт `Reply` с тем же номером. `null` — связи нет. */
+    private fun ask(event: ClientEvent): Long? {
+        val id = ++lastRequest
+        return id.takeIf { send(event.toBuilder().setRequestId(it).build()) }
+    }
 
     // ── События сервера ───────────────────────────────────────────────────────
 
@@ -537,21 +558,29 @@ class WillSession(context: Context) {
                     (_state.value.view as? View.Room)?.let { look(it.host, it.room) }
                 }
             }
-            ServerEvent.EventCase.PROTOCOL_NOTICE -> {
-                val message = event.protocolNotice.message
-                // Завершённую тренировку больше не ведут, кто бы её ни завершил.
-                val fulfilled = BEHEST_FULFILLED.matchEntire(message)?.groupValues?.get(1)?.toLongOrNull()
-                if (fulfilled != null && fulfilled == _state.value.workout?.behestId) stopWorkout()
-                // Пока просьба ждёт ответа, первое уведомление — её ответ.
-                _state.update {
-                    when {
-                        it.willing == Reply.Pending -> it.copy(willing = replyOf(TRAINING_WILLED, message))
-                        it.fulfilling == Reply.Pending -> it.copy(fulfilling = replyOf(BEHEST_FULFILLED, message))
-                        it.beginning == Reply.Pending -> it.copy(beginning = Reply.None)
-                        else -> it
+            ServerEvent.EventCase.PROTOCOL_NOTICE -> _notices.tryEmit(Notices.ru(event.protocolNotice.message))
+            ServerEvent.EventCase.REPLY -> {
+                // Ответ на свой запрос — по его номеру; что сказано о нём, говорит всплывающее поле.
+                val reply = event.reply
+                val outcome = if (reply.granted) Reply.Granted else Reply.None
+                when (reply.requestId) {
+                    willingRequest -> {
+                        willingRequest = null
+                        _state.update { it.copy(willing = outcome) }
+                    }
+                    fulfillingRequest -> {
+                        // Завершённую тренировку больше не ведут.
+                        if (reply.granted && fulfillingBehest == _state.value.workout?.behestId) stopWorkout()
+                        fulfillingRequest = null
+                        fulfillingBehest = null
+                        _state.update { it.copy(fulfilling = outcome) }
+                    }
+                    beginningRequest -> {
+                        beginningRequest = null
+                        _state.update { it.copy(beginning = Reply.None) }
                     }
                 }
-                _notices.tryEmit(Notices.ru(message))
+                if (reply.notice.isNotEmpty()) _notices.tryEmit(Notices.ru(reply.notice))
             }
             ServerEvent.EventCase.DWELLING -> {
                 _notices.tryEmit("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
@@ -669,11 +698,6 @@ class WillSession(context: Context) {
     companion object {
         private const val TAG = "WillSession"
         private const val HISTORY_LIMIT = 200
-        private val TRAINING_WILLED = Regex("training \\d+ willed")
-        private val BEHEST_FULFILLED = Regex("behest (\\d+) fulfilled")
-
-        private fun replyOf(granted: Regex, notice: String) = if (granted.matches(notice)) Reply.Granted else Reply.None
-
         /** Имена стандартных комнат, как их называет сервер. */
         const val CELL = "Слово"
         const val GATES = "Врата"
