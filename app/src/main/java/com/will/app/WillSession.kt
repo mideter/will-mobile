@@ -558,7 +558,9 @@ class WillSession(context: Context) {
                     (_state.value.view as? View.Room)?.let { look(it.host, it.room) }
                 }
             }
-            ServerEvent.EventCase.PROTOCOL_NOTICE -> _notices.tryEmit(Notices.ru(event.protocolNotice.message))
+            ServerEvent.EventCase.PROTOCOL_NOTICE -> event.protocolNotice.let {
+                _notices.tryEmit(Notices.say(it.code, it.argsList, it.message))
+            }
             ServerEvent.EventCase.REPLY -> {
                 // Ответ на свой запрос — по его номеру; что сказано о нём, говорит всплывающее поле.
                 val reply = event.reply
@@ -580,7 +582,7 @@ class WillSession(context: Context) {
                         _state.update { it.copy(beginning = Reply.None) }
                     }
                 }
-                if (reply.notice.isNotEmpty()) _notices.tryEmit(Notices.ru(reply.notice))
+                if (reply.notice.isNotEmpty()) _notices.tryEmit(Notices.say(reply.code, reply.argsList, reply.notice))
             }
             ServerEvent.EventCase.DWELLING -> {
                 _notices.tryEmit("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
