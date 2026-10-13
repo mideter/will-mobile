@@ -189,6 +189,9 @@ class WillSession(context: Context) {
     /** Часы сервера: метки времени тренировки сравнивают с «сейчас» только по ним. */
     val clock = ServerClock()
 
+    /** Когда (по [ServerClock.mark]) началось подключение: `AuthOk` несёт время сервера и сверяет часы. */
+    private var bindSentAt: Long? = null
+
     /** Когда (по [ServerClock.mark]) ушли «Приступить» и «Завершить подход»: ответ на них сверяет часы. */
     private var beginSentAt: Long? = null
     private var finishSentAt: Long? = null
@@ -245,6 +248,7 @@ class WillSession(context: Context) {
 
     private fun connect() {
         mainHandler.removeCallbacks(reconnect)
+        bindSentAt = clock.mark()
         bridge.connect(
             WillBridge.HOST,
             WillBridge.PORT,
@@ -435,6 +439,10 @@ class WillSession(context: Context) {
         when (event.eventCase) {
             ServerEvent.EventCase.AUTH_OK -> {
                 backoff.reset()
+                // Сервер говорит своё время, принимая тело: часы сверяются сразу при входе.
+                val sent = bindSentAt
+                bindSentAt = null
+                if (sent != null && event.authOk.serverTimeNs != 0L) clock.observe(event.authOk.serverTimeNs, sent, clock.mark())
                 if (event.authOk.unborn) {
                     // Тело ещё не рождено: только ждать.
                     _state.update { it.copy(connection = Connection.Ready, ownName = "", unbornMark = event.authOk.mark) }
