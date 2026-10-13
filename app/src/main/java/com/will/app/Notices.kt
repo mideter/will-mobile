@@ -15,6 +15,7 @@ object Notices {
         "you do not enter that room" to "Вам не открыта эта комната",
         "one writes in a room: /room Слово" to "Пишут в комнатах: войдите в Слово",
         "only the host writes in his abode" to "В Обители пишет только хозяин",
+        "one does not write here" to "Здесь не пишут",
         "in a tie the novice fulfils behests: /done <number> [report]" to "Послушник выполняет задание, нажав на него",
         "enter the room of the tie first: /room <name>" to "Сначала войдите в комнату Тренера или ученика",
         "unknown behest" to "Такого задания нет",
