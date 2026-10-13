@@ -4,7 +4,12 @@ import android.os.Handler
 import android.os.Looper
 import io.grpc.ManagedChannel
 import io.grpc.okhttp.OkHttpChannelBuilder
+import java.security.KeyStore
+import java.security.cert.CertificateFactory
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManagerFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +31,10 @@ import will.v1.clientEvent
  * `AuthOk`, пришедший сразу, не теряется. События сервера отдаются как есть, на главном
  * потоке; что они значат, решает [WillSession].
  */
-class WillBridge {
+class WillBridge(
+    /** Сертификат сервера (PEM): с ним — только TLS и доверие только ему; без него — открытый текст. */
+    private val certificate: String?,
+) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -53,8 +61,9 @@ class WillBridge {
         // Сеть может пропасть молча: поток жив на вид, а сервер давно не слышит. Пинг раз в
         // минуту — без ответа поток рвётся, и сессия переподключается. Сервер такие пинги
         // разрешает (не чаще раза в 5 с) и пингует сам — так он замечает пропавших.
-        val ch = OkHttpChannelBuilder.forAddress(host, port)
-            .usePlaintext()
+        val builder = OkHttpChannelBuilder.forAddress(host, port)
+        if (certificate != null) builder.sslSocketFactory(trusting(certificate)) else builder.usePlaintext()
+        val ch = builder
             .keepAliveTime(KEEPALIVE_SECONDS, TimeUnit.SECONDS)
             .keepAliveTimeout(KEEPALIVE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .keepAliveWithoutCalls(true)
@@ -110,6 +119,24 @@ class WillBridge {
         /** Debug — локальный сервер (эмулятор видит хост как 10.0.2.2), release — удалённый. */
         val HOST: String = BuildConfig.WILL_HOST
         val PORT: Int = BuildConfig.WILL_PORT
+
+        /** TLS — в release всегда; в debug — по `-PwillTls=true`. */
+        val TLS: Boolean = BuildConfig.WILL_TLS
+
+        /**
+         * Сокеты TLS, доверяющие только этому сертификату — не удостоверяющим центрам
+         * телефона: подменить сервер, не похитив его ключ, нельзя. Имя проверяется как
+         * обычно: адрес сервера должен быть в сертификате.
+         */
+        private fun trusting(pem: String): SSLSocketFactory {
+            val certificate = CertificateFactory.getInstance("X.509").generateCertificate(pem.byteInputStream())
+            val store = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+                load(null)
+                setCertificateEntry("will", certificate)
+            }
+            val trust = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(store) }
+            return SSLContext.getInstance("TLS").apply { init(null, trust.trustManagers, null) }.socketFactory
+        }
 
         private const val KEEPALIVE_SECONDS = 60L
         private const val KEEPALIVE_TIMEOUT_SECONDS = 15L

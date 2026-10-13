@@ -48,14 +48,21 @@ android {
 
     buildTypes {
         debug {
+            // Beside the release, not instead of it: removing the release to try a debug
+            // build would lose its device token, kept nowhere else.
+            applicationIdSuffix = ".debug"
             // The emulator reaches the host machine's local server as 10.0.2.2.
             buildConfigField("String", "WILL_HOST", "\"10.0.2.2\"")
             // `-PwillPort=…` points a debug build at another local server.
             buildConfigField("int", "WILL_PORT", (project.findProperty("willPort") ?: "7770").toString())
+            // In the open by default; `-PwillTls=true` speaks TLS, trusting src/debug/assets/will_server.pem.
+            buildConfigField("boolean", "WILL_TLS", (project.findProperty("willTls") ?: "false").toString())
         }
         release {
             buildConfigField("String", "WILL_HOST", "\"83.217.202.145\"")
-            buildConfigField("int", "WILL_PORT", "7770")
+            // Only TLS, trusting only the server's own certificate (src/release/assets/will_server.pem).
+            buildConfigField("int", "WILL_PORT", "17771")
+            buildConfigField("boolean", "WILL_TLS", "true")
             signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = false
             proguardFiles(
@@ -128,4 +135,14 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     compileOnly("org.apache.tomcat:annotations-api:6.0.53")
+}
+
+// A release speaks only with TLS and trusts only the server's certificate: without it,
+// it is not built at all, rather than built to trust nothing or everything.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    doFirst {
+        val certificate = file("src/release/assets/will_server.pem")
+        if (!certificate.isFile)
+            throw GradleException("No server certificate: put the server's server.crt at $certificate")
+    }
 }

@@ -183,7 +183,7 @@ data class WillState(
 class WillSession(context: Context) {
 
     private val appContext = context.applicationContext
-    private val bridge = WillBridge()
+    private val bridge = WillBridge(if (WillBridge.TLS) serverCertificate(context) else null)
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /** Часы сервера: метки времени тренировки сравнивают с «сейчас» только по ним. */
@@ -697,3 +697,12 @@ class WillSession(context: Context) {
         }
     }
 }
+
+
+/** Сертификат сервера из сборки (assets/will_server.pem): ему одному доверяет TLS. */
+private fun serverCertificate(context: Context): String =
+    try {
+        context.assets.open("will_server.pem").bufferedReader().use { it.readText() }
+    } catch (e: java.io.IOException) {
+        throw IllegalStateException("В сборке нет сертификата сервера (assets/will_server.pem)", e)
+    }

@@ -15,3 +15,6 @@ captures
 *.aab
 *.ap_
 *.dex
+
+# A local server's certificate for trying TLS in a debug build; not kept.
+/app/src/debug/assets/will_server.pem
