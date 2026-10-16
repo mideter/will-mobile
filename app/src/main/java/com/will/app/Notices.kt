@@ -28,7 +28,6 @@ object Notices {
             NoticeCode.NOTICE_ARRANGE_ONLY_IN_UPPER_ROOM -> "Комнаты переносят в Горнице"
             NoticeCode.NOTICE_FATHER_BY_FLESH_NEIGHBOUR -> "Отец по плоти — всегда не ниже ближнего"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_FRIEND -> "Отец по духу — всегда друг"
-            NoticeCode.NOTICE_ONLY_HOST_WRITES -> "В Обители пишет только хозяин"
             NoticeCode.NOTICE_SAY_ONLY_IN_WORD -> "Здесь не пишут: пишут в своём Слове или в комнате ученика"
             NoticeCode.NOTICE_CANNOT_SUPPLICATE_ONESELF -> "Нельзя просить самого себя"
             NoticeCode.NOTICE_SUPPLICATE_ONLY_DWELLER -> "Просить можно только того, кто обитает у вас"
