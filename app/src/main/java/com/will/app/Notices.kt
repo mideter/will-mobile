@@ -15,7 +15,6 @@ object Notices {
         fun arg(i: Int) = args.getOrElse(i) { "" }
         return when (code) {
             // Чего не позволяет мир.
-            NoticeCode.NOTICE_ADMIT_ONLY_AT_GATES -> "Впускают, стоя во Вратах"
             NoticeCode.NOTICE_KEEP_GATES_BY_KIND -> "Ваш статус в этой Обители не позволяет впускать в эти Врата"
             NoticeCode.NOTICE_ALREADY_DWELLS -> "Он уже обитает у вас"
             NoticeCode.NOTICE_NOT_AT_GATES -> "Его уже нет у Врат"
@@ -24,12 +23,12 @@ object Notices {
             NoticeCode.NOTICE_NO_SUCH_UNBORN -> "Такого нерождённого нет"
             NoticeCode.NOTICE_DOES_NOT_DWELL -> "Он не обитает у вас"
             NoticeCode.NOTICE_DOES_NOT_ENTER_ROOM -> "Вам не открыта эта комната"
-            NoticeCode.NOTICE_REGARD_ONLY_IN_UPPER_ROOM -> "Статус обитателя меняют в Горнице"
-            NoticeCode.NOTICE_ARRANGE_ONLY_IN_UPPER_ROOM -> "Комнаты переносят в Горнице"
             NoticeCode.NOTICE_REGARD_NOT_ONESELF -> "Свой статус менять нельзя"
+            NoticeCode.NOTICE_STAND_IN_CELL -> "Это делают в Слове, Ведении или Послушании"
+            NoticeCode.NOTICE_STAND_IN_UPPER_ROOM -> "Это делают в Горнице"
+            NoticeCode.NOTICE_STAND_AT_GATES -> "Это делают, стоя во Вратах"
             NoticeCode.NOTICE_FATHER_BY_FLESH_NEIGHBOUR -> "Отец по плоти — всегда не ниже ближнего"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_FRIEND -> "Отец по духу — всегда друг"
-            NoticeCode.NOTICE_SAY_ONLY_IN_WORD -> "Здесь не пишут: пишут в своём Слове или в комнате ученика"
             NoticeCode.NOTICE_CANNOT_SUPPLICATE_ONESELF -> "Нельзя просить самого себя"
             NoticeCode.NOTICE_SUPPLICATE_ONLY_DWELLER -> "Просить можно только того, кто обитает у вас"
             NoticeCode.NOTICE_HEAR_ONLY_DWELLER -> "Он ещё не принял вас в свою Обитель"
