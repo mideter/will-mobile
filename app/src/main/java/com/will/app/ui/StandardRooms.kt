@@ -100,8 +100,8 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
 }
 
 /**
- * Горница: обитатели Обители. Хозяин, стоя здесь, меняет их статус; тому, кто принял
- * и его, можно подать Просьбу.
+ * Горница: обитатели Обители. Кто стоит здесь, меняет их статус и переносит комнаты, как
+ * хозяин, — только не свой статус. В своей Горнице ещё и просят стать Тренером.
  */
 @Composable
 fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
@@ -122,7 +122,7 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
             items(view.people, key = { it.name }) { dweller ->
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
                     Text(dweller.name, fontSize = 16.sp)
-                    if (own) {
+                    if (dweller.name != state.ownName) {
                         Row {
                             for (kind in Kind.entries) {
                                 val chosen = kind == dweller.kind
@@ -135,6 +135,10 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
                                 }
                             }
                         }
+                    } else {
+                        Text(WillSession.kindName(dweller.kind), fontSize = 13.sp, color = WillColors.Muted)
+                    }
+                    if (own) {
                         // Как он стоит ко мне в тренерстве; просить — только где есть смысл.
                         val standings = dweller.standings
                         if (Standing.Trainer in standings) Text("Ваш Тренер", fontSize = 13.sp, color = WillColors.Accent)
@@ -152,13 +156,11 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
                         if (dweller.name in mutual && Standing.Trainer !in standings && Standing.Asked !in standings) {
                             TextButton(onClick = { session.ask(dweller.name) }) { Text("Просить стать Тренером") }
                         }
-                    } else {
-                        Text(WillSession.kindName(dweller.kind), fontSize = 13.sp, color = WillColors.Muted)
                     }
                 }
                 HorizontalDivider(color = WillColors.Divider)
             }
-            if (own && view.rooms.isNotEmpty()) {
+            if (view.rooms.isNotEmpty()) {
                 item { SectionTitle("Комнаты") }
                 item { Hint("Внутренние видят только друзья; внешние — ещё и ближние.") }
                 items(view.rooms, key = { "room:" + it.name }) { room ->
