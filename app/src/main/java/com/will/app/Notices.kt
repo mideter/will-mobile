@@ -26,6 +26,7 @@ object Notices {
             NoticeCode.NOTICE_DOES_NOT_ENTER_ROOM -> "Вам не открыта эта комната"
             NoticeCode.NOTICE_REGARD_ONLY_IN_UPPER_ROOM -> "Статус обитателя меняют в Горнице"
             NoticeCode.NOTICE_ARRANGE_ONLY_IN_UPPER_ROOM -> "Комнаты переносят в Горнице"
+            NoticeCode.NOTICE_REGARD_NOT_ONESELF -> "Свой статус менять нельзя"
             NoticeCode.NOTICE_FATHER_BY_FLESH_NEIGHBOUR -> "Отец по плоти — всегда не ниже ближнего"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_FRIEND -> "Отец по духу — всегда друг"
             NoticeCode.NOTICE_SAY_ONLY_IN_WORD -> "Здесь не пишут: пишут в своём Слове или в комнате ученика"
