@@ -105,8 +105,8 @@ class TrainingCourseTest {
         val first = done(0, 0, at = 0)
         val second = done(0, 1, at = 75)
         val t = training(first, second)
-        assertNull(TrainingCourse.restBefore(t.efforts, first))
-        assertEquals(45L, TrainingCourse.restBefore(t.efforts, second))
+        assertNull(TrainingCourse.restUntil(t.efforts, first.begunAtNs))
+        assertEquals(45L, TrainingCourse.restUntil(t.efforts, second.begunAtNs))
     }
 
     @Test

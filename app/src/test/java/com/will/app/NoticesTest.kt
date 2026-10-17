@@ -30,7 +30,7 @@ class NoticesTest {
 
     @Test
     fun `without a code the server's words are translated as before, and the unknown shown as it is`() {
-        assertEquals("Такой комнаты нет", Notices.say(NoticeCode.NOTICE_UNSPECIFIED, emptyList(), "no such room"))
+        assertEquals("Пустое сообщение", Notices.say(NoticeCode.NOTICE_UNSPECIFIED, emptyList(), "Saying must be non-empty"))
         assertEquals("something new", Notices.say(NoticeCode.NOTICE_UNSPECIFIED, emptyList(), "something new"))
     }
 }

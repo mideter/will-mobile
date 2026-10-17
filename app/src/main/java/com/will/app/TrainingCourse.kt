@@ -112,9 +112,6 @@ object TrainingCourse {
         return (begunAtNs - before.finishedAtNs) / 1_000_000_000L
     }
 
-    /** Отдых перед сделанным подходом; null — первое усилие тренировки. */
-    fun restBefore(efforts: List<EffortItem>, effort: EffortItem): Long? = restUntil(efforts, effort.begunAtNs)
-
     /** Что предложить в подтверждении: заданное; сверх заданного — как последний сделанный в упражнении. */
     fun proposal(training: WordItem, exercise: Int, approach: Int): ApproachItem? =
         training.exercises[exercise].approaches.getOrNull(approach)
