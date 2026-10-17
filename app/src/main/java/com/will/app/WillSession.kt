@@ -385,7 +385,9 @@ class WillSession(context: Context) {
                 // Ответ на своё «Приступить»: сервер отметил начало, когда принял его.
                 if (doing != null) beginSentAt?.let { clock.observe(doing.begunAtNs, it, clock.mark()) }
                 beginSentAt = null
-                (gathering as? View.Room)?.let { gathering = it.copy(underway = doing) }
+                // Сервер называет тренировку и тогда, когда в ней подход завершён.
+                fun Map<Long, UnderwayItem>.told() = if (doing != null) this + (u.behestId to doing) else this - u.behestId
+                (gathering as? View.Room)?.let { gathering = it.copy(underways = it.underways.told()) }
                 _state.update { s ->
                     // Подход пошёл — к нему больше не приступают; выбор держится его упражнения,
                     // где бы его ни начали, а «сверх заданного» не залипает.
@@ -395,7 +397,7 @@ class WillSession(context: Context) {
                         s
                     }
                     val shown = begun.view as? View.Room ?: return@update begun
-                    begun.copy(view = shown.copy(underway = doing))
+                    begun.copy(view = shown.copy(underways = shown.underways.told()))
                 }
             }
             ServerEvent.EventCase.EXERTED -> {

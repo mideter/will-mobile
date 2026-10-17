@@ -99,8 +99,8 @@ sealed interface View {
         val waiting: List<String> = emptyList(),
         val people: List<Person> = emptyList(),
         val unborn: List<Long> = emptyList(),
-        /** В комнате Уз — подход, который Послушник выполняет сейчас. */
-        val underway: UnderwayItem? = null,
+        /** В комнате Уз — начатые подходы её тренировок, по номеру тренировки: в каждой не больше одного. */
+        val underways: Map<Long, UnderwayItem> = emptyMap(),
         /** В своей Горнице — все комнаты Обители с их частями: здесь их переносят. */
         val rooms: List<RoomItem> = emptyList(),
     ) : View

@@ -109,7 +109,7 @@ class TrainingService : Service() {
                 return
             }
             room.words.firstOrNull { it.id == workout.behestId }?.let { training = it }
-            underway = room.underway?.takeIf { it.behestId == workout.behestId }
+            underway = room.underways[workout.behestId]
         }
         show(state)
         awaitRestEnd(state)

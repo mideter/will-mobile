@@ -95,7 +95,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     // Тренировку выполняют по подходам; берётся живая — с усилиями, пришедшими только что.
     fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { training ->
         TrainingRun(
-            training, view.underway, state.choice, session,
+            training, view.underways[training.id], state.choice, session,
             beginning = state.beginning == Reply.Pending,
             finishing = sendingFulfil,
             onClose = { fulfillingId = null },
@@ -122,7 +122,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
                     WordRow(
                         word = word,
                         deed = deeds[word.id],
-                        underway = view.underway?.takeIf { it.behestId == word.id },
+                        underway = view.underways[word.id],
                         onFulfil = if (novice && word.kind == Word.Kind.BEHEST && word.id !in fulfilled) {
                             { fulfillingId = word.id }
                         } else {
