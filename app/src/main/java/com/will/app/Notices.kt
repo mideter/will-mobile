@@ -15,19 +15,16 @@ object Notices {
         fun arg(i: Int) = args.getOrElse(i) { "" }
         return when (code) {
             // Чего не позволяет мир.
-            NoticeCode.NOTICE_KEEP_GATES_BY_KIND -> "Ваш статус в этой Обители не позволяет впускать в эти Врата"
             NoticeCode.NOTICE_ALREADY_DWELLS -> "Он уже обитает у вас"
             NoticeCode.NOTICE_NOT_AT_GATES -> "Его уже нет у Врат"
             NoticeCode.NOTICE_BEAR_ONLY_AT_GATES -> "Рождают, стоя во Вратах"
-            NoticeCode.NOTICE_BEAR_ONLY_AT_KEPT_GATES -> "Рождает тот, кто может впускать в эти Врата"
             NoticeCode.NOTICE_NO_SUCH_UNBORN -> "Такого нерождённого нет"
             NoticeCode.NOTICE_DOES_NOT_DWELL -> "Он не обитает у вас"
             NoticeCode.NOTICE_DOES_NOT_ENTER_ROOM -> "Вам не открыта эта комната"
-            NoticeCode.NOTICE_REGARD_NOT_ONESELF -> "Свой статус менять нельзя"
             NoticeCode.NOTICE_STAND_IN_CELL -> "Это делают в Слове, Ведении или Послушании"
             NoticeCode.NOTICE_STAND_IN_UPPER_ROOM -> "Это делают в Горнице"
             NoticeCode.NOTICE_STAND_AT_GATES -> "Это делают, стоя во Вратах"
-            NoticeCode.NOTICE_SUPPLICATE_ONLY_IN_OWN_UPPER_ROOM -> "Просят стать Тренером только в своей Горнице"
+            NoticeCode.NOTICE_ONLY_HOST_ACTS -> "Здесь действует только хозяин"
             NoticeCode.NOTICE_FATHER_BY_FLESH_NEIGHBOUR -> "Отец по плоти — всегда не ниже ближнего"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_FRIEND -> "Отец по духу — всегда друг"
             NoticeCode.NOTICE_HEAR_ONLY_DWELLER -> "Он ещё не принял вас в свою Обитель"
@@ -67,7 +64,6 @@ object Notices {
             NoticeCode.NOTICE_SUPPLICATION_SENT -> "Просьба отправлена"
             NoticeCode.NOTICE_BEHEST_FULFILLED -> "Задание выполнено"
             NoticeCode.NOTICE_ADMITTED -> "${arg(0)} принят знакомым"
-            NoticeCode.NOTICE_LET_IN -> "${arg(0)} впустил ${arg(1)} знакомым"
             NoticeCode.NOTICE_REGARDED -> "Статус ${arg(0)} изменён"
             NoticeCode.NOTICE_ARRANGED_OUTER -> "«${arg(0)}» — во внешней части"
             NoticeCode.NOTICE_ARRANGED_INNER -> "«${arg(0)}» — во внутренней части"

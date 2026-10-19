@@ -22,8 +22,8 @@ class NoticesTest {
     fun `the names in a notice are put in their places`() {
         assertEquals("Родился yc01fdhl", Notices.say(NoticeCode.NOTICE_BORN, listOf("yc01fdhl"), "yc01fdhl born"))
         assertEquals(
-            "anna впустил boris знакомым",
-            Notices.say(NoticeCode.NOTICE_LET_IN, listOf("anna", "boris"), "anna let boris in as an acquaintance"),
+            "boris принят знакомым",
+            Notices.say(NoticeCode.NOTICE_ADMITTED, listOf("boris"), "boris admitted as an acquaintance"),
         )
         assertEquals("«Слово» — во внешней части", Notices.say(NoticeCode.NOTICE_ARRANGED_OUTER, listOf("Слово"), ""))
     }

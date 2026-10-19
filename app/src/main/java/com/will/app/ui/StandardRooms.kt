@@ -24,10 +24,9 @@ import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Врата — порог Обители: через них входят рождённые и рождаются. Кто может впускать —
- * хозяин или обитатель, чьему статусу открыта их часть, — стоя в них, держит их открытыми:
- * видит, кто ждёт, и впускает знакомым хозяина; видит нерождённых и рождает их чадами
- * хозяина. Пришедший видит, открыты ли Врата, и ждёт сколько хочет.
+ * Врата — порог Обители: через них входят рождённые и рождаются. Хозяин, стоя в них, держит
+ * их открытыми: видит, кто ждёт, и впускает знакомым; видит нерождённых и рождает их своими
+ * чадами. Пришедший видит, открыты ли Врата, и ждёт сколько хочет.
  */
 @Composable
 fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
@@ -40,13 +39,7 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
         )
 
         if (view.keeping) {
-            Hint(
-                if (own) {
-                    "Врата открыты, пока здесь вы или кто-то, кто может впускать."
-                } else {
-                    "Вы можете впускать во Врата ${view.host}: впущенный станет его знакомым."
-                },
-            )
+            Hint("Врата открыты, пока вы здесь.")
             LazyColumn(Modifier.fillMaxSize()) {
                 item { SectionTitle("У Врат") }
                 if (view.waiting.isEmpty()) item { Hint("Никто не ждёт") }
@@ -63,12 +56,7 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
 
                 // Через эти же Врата рождаются: отцом по плоти станет их хозяин.
                 item { SectionTitle("Ждут рождения") }
-                item {
-                    Hint(
-                        if (own) "Рождённый здесь станет вашим чадом по плоти."
-                        else "Рождённый здесь станет чадом ${view.host}, а не вашим.",
-                    )
-                }
+                item { Hint("Рождённый здесь станет вашим чадом по плоти.") }
                 if (view.unborn.isEmpty()) item { Hint("Никто не ждёт") }
                 items(view.unborn, key = { "unborn $it" }) { mark ->
                     Row(
@@ -83,7 +71,7 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
             }
         } else {
             Text(
-                if (view.gatesOpen) "Врата открыты." else "Врата закрыты: нет никого, кто может впускать.",
+                if (view.gatesOpen) "Врата открыты." else "Врата закрыты: хозяина нет у Врат.",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Medium,
@@ -92,7 +80,7 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
                 if (view.gatesOpen) {
                     "Ждите, пока вас впустят."
                 } else {
-                    "Можно ждать здесь: когда войдёт тот, кто может впускать, он увидит вас."
+                    "Можно ждать здесь: когда хозяин подойдёт к Вратам, он увидит вас."
                 },
             )
         }
@@ -100,8 +88,8 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
 }
 
 /**
- * Горница: обитатели Обители. Кто стоит здесь, меняет их статус и переносит комнаты, как
- * хозяин, — только не свой статус. В своей Горнице ещё и просят стать Тренером.
+ * Горница: обитатели Обители и её комнаты. Видит их всякий, кто стоит здесь; меняет статусы,
+ * переносит комнаты и просит стать Тренером только хозяин.
  */
 @Composable
 fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
@@ -122,7 +110,7 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
             items(view.people, key = { it.name }) { dweller ->
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
                     Text(dweller.name, fontSize = 16.sp)
-                    if (dweller.name != state.ownName) {
+                    if (own) {
                         Row {
                             for (kind in Kind.entries) {
                                 val chosen = kind == dweller.kind
@@ -176,8 +164,10 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
                                 color = WillColors.Muted,
                             )
                         }
-                        TextButton(onClick = { session.arrange(room.name, outer = !room.outer) }) {
-                            Text(if (room.outer) "Во внутреннюю" else "Во внешнюю")
+                        if (own) {
+                            TextButton(onClick = { session.arrange(room.name, outer = !room.outer) }) {
+                                Text(if (room.outer) "Во внутреннюю" else "Во внешнюю")
+                            }
                         }
                     }
                     HorizontalDivider(color = WillColors.Divider)
