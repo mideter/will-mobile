@@ -22,7 +22,10 @@ import com.will.app.Descent
 import com.will.app.WillSession
 import com.will.app.WillState
 
-/** Тело ещё не рождено: только ждать. Метку видят во Вратах те, кто может впускать. */
+/**
+ * Тело ещё не рождено: только ждать. Метку видит хозяин в своих Вратах и рождает его своим
+ * чадом; здесь об этом не говорится — только что делать.
+ */
 @Composable
 fun UnbornScreen(mark: Long) {
     Column(
@@ -30,13 +33,13 @@ fun UnbornScreen(mark: Long) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Вы ещё не рождены", fontSize = 20.sp, fontWeight = FontWeight.Medium)
+        Text("Пока у вас здесь ничего нет", fontSize = 20.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
         Text("#$mark", fontSize = 48.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
         Spacer(Modifier.height(24.dp))
         Text(
-            "По этой метке вас видят во Вратах. Назовите её тому, кто вас родит: " +
-                "отцом по плоти станет хозяин этих Врат.",
+            "Получить что-то можно, только если кто-то, кто уже здесь, поделится с вами. " +
+                "Назовите ему этот номер — он знает, что с ним делать.",
             textAlign = TextAlign.Center,
             color = WillColors.Muted,
         )
