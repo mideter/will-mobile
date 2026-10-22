@@ -71,7 +71,7 @@ fun WillApp(session: WillSession) {
                         is View.Abode -> AbodeScreen(state, view, session)
                         is View.Room -> when (view.aspect) {
                             Aspect.Threshold -> GatesScreen(state, view, session)
-                            Aspect.Dwellers -> UpperRoomScreen(state, view, session)
+                            Aspect.Dwellers -> HelmScreen(state, view, session)
                             Aspect.Words -> RoomScreen(state, view, session)
                         }
                     }

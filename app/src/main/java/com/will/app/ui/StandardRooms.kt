@@ -165,16 +165,16 @@ private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
 }
 
 /**
- * Горница — ядро внутренней части, только хозяина: Просьбы к нему, обитатели и их статусы,
+ * Кормчая — ядро внутренней части, только хозяина: Просьбы к нему, обитатели и их статусы,
  * Кельи и их части. Здесь он отвечает на Просьбы, просит сам, меняет статусы и переносит Кельи.
  */
 @Composable
-fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
+fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
     LaunchedEffect(Unit) { session.listDwellings() }
     val mutual = state.dwellings.map { it.name }.toSet()
 
     Column(Modifier.fillMaxSize()) {
-        Header(title = "Горница", subtitle = "Мои обитатели", onBack = { session.back() })
+        Header(title = "Кормчая", subtitle = "Мои обитатели", onBack = { session.back() })
         LazyColumn(Modifier.fillMaxSize()) {
             if (state.supplications.isNotEmpty()) {
                 item { SectionTitle("Просьбы") }
@@ -232,7 +232,7 @@ fun UpperRoomScreen(state: WillState, view: View.Room, session: WillSession) {
             if (cells.isNotEmpty()) {
                 item { SectionTitle("Кельи") }
                 item {
-                    Hint("Во внутреннюю часть входят только друзья; во внешнюю — ещё и ближние. Врата всегда во внешней части, Горница — во внутренней.")
+                    Hint("Во внутреннюю часть входят только друзья; во внешнюю — ещё и ближние. Врата всегда во внешней части, Кормчая — во внутренней.")
                 }
                 items(cells, key = { "room:" + it.name }) { room ->
                     Row(

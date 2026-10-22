@@ -21,7 +21,7 @@ object Notices {
             NoticeCode.NOTICE_DOES_NOT_DWELL -> "Он не обитает у вас"
             NoticeCode.NOTICE_DOES_NOT_ENTER_ROOM -> "Вам не открыта эта комната"
             NoticeCode.NOTICE_STAND_IN_CELL -> "Это делают в Слове, Ведении или Послушании"
-            NoticeCode.NOTICE_STAND_IN_UPPER_ROOM -> "Это делают в Горнице"
+            NoticeCode.NOTICE_STAND_AT_HELM -> "Это делают в Кормчей"
             NoticeCode.NOTICE_STAND_AT_GATES -> "Это делают, стоя во Вратах"
             NoticeCode.NOTICE_ONLY_HOST_ACTS -> "Здесь действует только хозяин"
             NoticeCode.NOTICE_PASS_THROUGH_GATES -> "Туда идут через Врата"

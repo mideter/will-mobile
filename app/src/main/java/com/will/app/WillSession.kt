@@ -279,7 +279,7 @@ class WillSession(context: Context) {
     /** Редактор закрыт после того, как тренировка задана. */
     fun willingSeen() = _state.update { it.copy(willing = Reply.None) }
 
-    /** Перенести комнату своей Обители в другую часть — стоя в своей Горнице. */
+    /** Перенести комнату своей Обители в другую часть — стоя в своей Кормчей. */
     fun arrange(room: String, outer: Boolean) =
         send(clientEvent { arrange = arrange { this.room = room; part = if (outer) RoomPart.OUTER else RoomPart.INNER } })
 
@@ -383,10 +383,10 @@ class WillSession(context: Context) {
                 val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.aspect.toAspect()) }
                 when (val gathered = gathering) {
                     is View.Abode -> gathering = gathered.copy(rooms = rooms)
-                    // В Горнице — комнаты, Кельи которых здесь переносят.
+                    // В Кормчей — комнаты, Кельи которых здесь переносят.
                     is View.Room -> gathering = gathered.copy(rooms = rooms)
                     null -> _state.update { s ->
-                        // Перенесли комнату, стоя в Горнице: список приходит заново.
+                        // Перенесли комнату, стоя в Кормчей: список приходит заново.
                         val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers } ?: return@update s
                         s.copy(view = shown.copy(rooms = rooms))
                     }
@@ -488,14 +488,14 @@ class WillSession(context: Context) {
                     }
                     Person(it.name, it.kind.toKind(), standings)
                 }
-                // В Горнице — её обитатели; своя Горница — это и мои обитатели.
-                val gatheringUpperRoom = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
-                if (gatheringUpperRoom != null) gathering = gatheringUpperRoom.copy(people = people)
+                // В Кормчей — её обитатели; своя Кормчая — это и мои обитатели.
+                val gatheringHelm = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
+                if (gatheringHelm != null) gathering = gatheringHelm.copy(people = people)
                 _state.update { s ->
                     val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Dwellers }
-                    val upperRoom = gatheringUpperRoom ?: shown
+                    val helm = gatheringHelm ?: shown
                     s.copy(
-                        dwellers = if (upperRoom == null || upperRoom.host.isEmpty()) people else s.dwellers,
+                        dwellers = if (helm == null || helm.host.isEmpty()) people else s.dwellers,
                         view = if (shown != null) shown.copy(people = people) else s.view,
                     )
                 }
