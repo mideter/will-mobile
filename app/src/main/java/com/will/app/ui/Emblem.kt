@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -152,12 +153,15 @@ private fun lerp(a: Float, b: Float, f: Float) = a + (b - a) * f
 
 /**
  * Значок в миг [t] замысла (секунды; отрицательный — готовый). Единицы — как в значке
- * приложения: холст 108, круг радиусом 36 в середине, полосы шириной 8 от высоты 38.
+ * приложения: холст 108, круг радиусом 36 в середине, полосы шириной 8 с круглыми концами от
+ * высоты 38.
  */
 private fun DrawScope.drawEmblem(t: Float) {
     val u = size.width / 72f
     fun at(x: Float) = (x - 18f) * u
-    fun bar(x: Float, length: Float) = drawRect(Color.White, Offset(at(x), at(38f)), Size(8f * u, 32f * length * u))
+    // Концы круглые, как точка: полоса в четверть длины — сама точка.
+    fun bar(x: Float, length: Float) =
+        drawRoundRect(Color.White, Offset(at(x), at(38f)), Size(8f * u, 32f * length * u), CornerRadius(4f * u))
 
     drawCircle(Teal, radius = 36f * u, center = Offset(at(54f), at(54f)))
     if (t < 0f) {
