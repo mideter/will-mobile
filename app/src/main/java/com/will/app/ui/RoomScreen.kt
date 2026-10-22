@@ -40,14 +40,13 @@ import com.will.app.WillState
 import com.will.app.WordItem
 import will.v1.MessengerOuterClass.Word
 
+private const val SILENT_DEED = "совершено"
+
 /**
  * Комната: лента слов отражаемого места. Видит её всякий, кому она открыта; действует только
  * хозяин: пишет в Слове, задаёт в Ведении (там же — «Тренировка»), выполняет в Послушании —
  * нажав на задание; тренировку — по подходам или отчётом о сделанном.
  */
-/** Слово, которым сервер называет Дело без отчёта. */
-private const val SILENT_DEED = "совершено"
-
 @Composable
 fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     // Отчёт — ответ на задание: он показывается внутри него, а не отдельной записью.
@@ -173,12 +172,8 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     }
 }
 
-/**
- * Лента: слова по времени, но отчёт не отдельной записью — он внутри своего задания, а
- * задание с отчётом стоит там, где пришёл отчёт: новое — внизу. Отчёт, чьё задание
- * не видно, остаётся записью.
- */
 private fun feedOf(words: List<WordItem>): List<WordItem> {
+    // Отчёт — внутри своего задания, а задание с отчётом стоит там, где пришёл отчёт.
     val ids = words.map { it.id }.toSet()
     val answeredAt = words.withIndex()
         .filter { it.value.kind == Word.Kind.DEED && it.value.behestId in ids }

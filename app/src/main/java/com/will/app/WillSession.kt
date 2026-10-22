@@ -45,7 +45,29 @@ import will.v1.turn
  * Сессия приложения: соединение, переподключение и одно состояние [state], из которого
  * рисуются экраны. Действия уходят на сервер; ответы сервера собираются в состояние.
  * Вид меняется только по слову сервера (`Turned` … `HistoryEnd`): пока новый вид идёт,
- * на экране остаётся прежний.
+ * на экране остаётся прежний. Сессия одна на всё приложение: поворот экрана её не рвёт.
+ *
+ * Связь: появилась сеть — переподключаемся сразу, не дожидаясь конца паузы. Пока связи нет,
+ * отправить нельзя, и говорить об этом незачем: экран закрывает заставка. После входа
+ * возвращаемся только в свою комнату, где был экран, — проснувшись, всякий дома.
+ *
+ * Часы: метки времени тренировки сравнивают с «сейчас» только по часам сервера ([clock]).
+ * Они сверяются при входе (`AuthOk`) и по ответам на «Приступить» и «Завершить подход».
+ *
+ * Запросы: свои запросы нумеруются, ответ (`Reply`) узнаётся по номеру, а не по словам
+ * уведомления; номер растёт на всё время жизни сессии. Задание и тренировку, отправленные
+ * на выполнение и из редактора, ждут как `Pending` до ответа.
+ *
+ * Путь: ходят путём мира — из Обители через её Врата, к Вратам той, куда идут, и внутрь;
+ * «назад» — тем же путём. От своих Врат идут к чужим; у чужих входят, если там обитают.
+ * Рождают, стоя в своих Вратах, — рождённый станет чадом по плоти. Переносят Кельи, стоя в
+ * своей Кормчей. Отец по духу отказаться не может. Приступить к подходу из уведомления,
+ * стоя в другом месте, — значит сначала дойти до комнаты Уз; с первым подходом тренировку
+ * ведёт [TrainingService], пока её не завершат или не забросят.
+ *
+ * Слова: новое слово идёт в собираемый вид или, живое, в тот, на который смотрят. Обзор
+ * своей Обители меняется от Уз — его перечитывают, если он перед глазами. Своё
+ * уведомление ([tell]) идёт туда же, куда и уведомления сервера.
  */
 class WillSession(context: Context) {
 
@@ -53,23 +75,16 @@ class WillSession(context: Context) {
     private val bridge = WillBridge(if (WillBridge.TLS) serverCertificate(context) else null)
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    /** Часы сервера: метки времени тренировки сравнивают с «сейчас» только по ним. */
     val clock = ServerClock()
 
-    /** Когда (по [ServerClock.mark]) началось подключение: `AuthOk` несёт время сервера и сверяет часы. */
     private var bindSentAt: Long? = null
 
-    /**
-     * Номера своих запросов, ждущих ответа (`Reply`): ответ узнаётся по номеру, а не по
-     * словам уведомления. Номер растёт на всё время жизни сессии.
-     */
     private var lastRequest = 0L
     private var willingRequest: Long? = null
     private var fulfillingRequest: Long? = null
     private var fulfillingBehest: Long? = null
     private var beginningRequest: Long? = null
 
-    /** Когда (по [ServerClock.mark]) ушли «Приступить» и «Завершить подход»: ответ на них сверяет часы. */
     private var beginSentAt: Long? = null
     private var finishSentAt: Long? = null
 
@@ -81,7 +96,6 @@ class WillSession(context: Context) {
 
     private var gathering: View? = null
 
-    /** Куда смотреть после переподключения: хозяин Обители и комната. */
     var target: Pair<String, String> = "" to ""
         private set
 
@@ -91,10 +105,6 @@ class WillSession(context: Context) {
 
     private var started = false
 
-    /**
-     * Начать сессию один раз на всё приложение (экран при повороте пересоздаётся, сессия — нет).
-     * [resumed] — куда смотреть после входа: где был экран, когда система выгрузила процесс.
-     */
     fun start(resumed: Pair<String, String> = "" to "") {
         if (started) return
         started = true
@@ -103,10 +113,6 @@ class WillSession(context: Context) {
         watchNetwork()
     }
 
-    /**
-     * Сеть появилась — например, телефон вышел из подвала, — переподключиться сразу, не
-     * дожидаясь конца паузы: она могла вырасти до полуминуты.
-     */
     private fun watchNetwork() {
         val connectivity = appContext.getSystemService(ConnectivityManager::class.java) ?: return
         connectivity.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
@@ -154,26 +160,18 @@ class WillSession(context: Context) {
 
     fun home() = look("", "")
 
-    /** Войти в Обитель хозяина, у Врат которого стоишь, — если обитаешь там. */
     fun visit(host: String) = look(host, "")
 
     fun enter(room: String) = look(_state.value.view?.host.orEmpty(), room)
 
-    /** К Вратам: своим (пустое имя) или, от своих Врат, к чужим — войти или ждать, пока впустят. */
     fun gates(host: String) = look(host.trim(), GATES)
 
-    /** Стоя в своих Вратах: рождённый станет моим чадом по плоти. */
     fun bear(mark: Long) = send(clientEvent { bear = bear { this.mark = mark } })
 
-    /** Избрать отца по духу; он отказаться не может. */
     fun chooseFather(name: String) = send(clientEvent { chooseFather = chooseFather { this.name = name.trim() } })
 
     fun listLineage() = send(clientEvent { listLineage = listLineage {} })
 
-    /**
-     * Назад тем путём, каким пришли: из комнаты — к её Обители; из чужой Обители — к её Вратам,
-     * от них — к своим, из своих Врат — домой.
-     */
     fun back(): Boolean {
         val view = _state.value.view ?: return false
         val own = view.host.isEmpty()
@@ -195,10 +193,6 @@ class WillSession(context: Context) {
         send(clientEvent { chat = chatMessage { body = text.trim() } })
     }
 
-    /**
-     * Выполнить задание; тренировку — завершить: сделанное сервер складывает из подходов.
-     * До ответа сервера [WillState.fulfilling] — `Pending`.
-     */
     fun fulfil(behestId: Long, report: String) {
         val view = _state.value.view as? View.Room ?: return
         if (_state.value.fulfilling == Reply.Pending) return
@@ -211,16 +205,9 @@ class WillSession(context: Context) {
 
     fun fulfillingSeen() = _state.update { it.copy(fulfilling = Reply.None) }
 
-    /** Выбрать в тренировке упражнение и, может быть, подход сверх заданного в нём. */
     fun choose(behestId: Long, exercise: Int, extra: Int? = null) =
         _state.update { it.copy(choice = Choice(behestId, exercise, extra)) }
 
-    /**
-     * Приступить к подходу тренировки (номера с нуля). Сервер отвечает идущим подходом
-     * (`Underway`) и ответом на запрос — или ответом, почему нет; до того [WillState.beginning] — `Pending`.
-     * Сервер принимает подход только в комнате Уз: из уведомления, когда смотришь в другое
-     * место, сначала поворачиваешься к ней. С первым подходом тренировку ведёт [TrainingService].
-     */
     fun beginApproach(behestId: Long, exercise: Int, approach: Int) {
         val s = _state.value
         if (s.beginning == Reply.Pending) return
@@ -240,7 +227,6 @@ class WillSession(context: Context) {
         TrainingService.start(appContext)
     }
 
-    /** Тренировку больше не ведут: она завершена или давно заброшена. */
     fun stopWorkout() = _state.update { it.copy(workout = null) }
 
     fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) {
@@ -251,10 +237,6 @@ class WillSession(context: Context) {
         if (sent) finishSentAt = sentAt
     }
 
-    /**
-     * Велеть тренировку в Узах, где стоишь Тренером. Сервер отвечает на запрос — «задана»
-     * или почему нет; до ответа [WillState.willing] — `Pending`.
-     */
     fun train(title: String, exercises: List<ExerciseItem>) {
         val view = _state.value.view as? View.Room ?: return
         if (_state.value.willing == Reply.Pending) return
@@ -271,7 +253,6 @@ class WillSession(context: Context) {
 
     fun willingSeen() = _state.update { it.copy(willing = Reply.None) }
 
-    /** Перенести комнату своей Обители в другую часть — стоя в своей Кормчей. */
     fun arrange(room: String, outer: Boolean) =
         send(clientEvent { arrange = arrange { this.room = room; part = if (outer) RoomPart.OUTER else RoomPart.INNER } })
 
@@ -298,7 +279,6 @@ class WillSession(context: Context) {
         listSupplications()
     }
 
-    /** Сказать что-то от себя — например, «Имя скопировано». */
     fun tell(text: String) {
         _notices.tryEmit(text)
     }
@@ -307,10 +287,6 @@ class WillSession(context: Context) {
     fun listDwellings() = send(clientEvent { listDwellings = listDwellings {} })
     fun listSupplications() = send(clientEvent { listSupplications = listSupplications {} })
 
-    /**
-     * Пройти к месту путём мира: из Обители, где стоишь, — через её Врата, к Вратам той, куда
-     * идёшь, и внутрь. В пределах одной Обители — прямо.
-     */
     private fun walk(host: String, room: String) {
         val view = _state.value.view
         if (view != null && view.host != host) {
@@ -325,10 +301,8 @@ class WillSession(context: Context) {
         send(clientEvent { turn = turn { abodeOf = host; this.room = room } })
     }
 
-    /** Отправить; `false` — связи нет: тогда экран и так закрыт заставкой, говорить не о чем. */
     private fun send(event: ClientEvent): Boolean = bridge.send(event)
 
-    /** Отправить запрос с новым номером: ответ на него придёт `Reply` с тем же номером. `null` — связи нет. */
     private fun ask(event: ClientEvent): Long? {
         val id = ++lastRequest
         return id.takeIf { send(event.toBuilder().setRequestId(it).build()) }
@@ -543,7 +517,6 @@ class WillSession(context: Context) {
         }
     }
 
-    /** Слово в комнату: в собираемую, иначе — живое, в ту, на которую смотрим. */
     private fun place(word: WordItem) {
         val room = gathering as? View.Room
         if (room != null) {
@@ -556,7 +529,6 @@ class WillSession(context: Context) {
         }
     }
 
-    /** Обзор своей Обители меняется от Уз: перечитать, если он перед глазами. */
     private fun refreshIfHome() {
         val view = _state.value.view
         if (view is View.Abode && view.host.isEmpty()) home()
@@ -580,7 +552,6 @@ class WillSession(context: Context) {
     companion object {
         private const val TAG = "WillSession"
         private const val HISTORY_LIMIT = 200
-        /** Имена стандартных комнат, как их называет сервер. */
         const val CELL = "Слово"
         const val GATES = "Врата"
 
@@ -605,7 +576,6 @@ class WillSession(context: Context) {
 }
 
 
-/** Сертификат сервера из сборки (assets/will_server.pem): ему одному доверяет TLS. */
 private fun serverCertificate(context: Context): String =
     try {
         context.assets.open("will_server.pem").bufferedReader().use { it.readText() }

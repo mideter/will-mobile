@@ -8,6 +8,11 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.will.app.ui.WillApp
 import com.will.app.ui.WillTheme
 
+/**
+ * Единственный экран. Заставка доигрывает «Смирение» — [SPLASH_MS], как в
+ * `splash_icon_animated.xml`, — но не тогда, когда приложение открывают, чтобы вернуться к
+ * тренировке ([EXTRA_TRAINING]).
+ */
 class MainActivity : ComponentActivity() {
 
     private val session get() = (application as WillApplication).session
@@ -37,12 +42,10 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        /** Приложение открывают, чтобы вернуться к тренировке. */
         const val EXTRA_TRAINING = "com.will.app.TRAINING"
 
         private const val KEY_HOST = "will.host"
         private const val KEY_ROOM = "will.room"
-        /** Сколько длится «Смирение» в `splash_icon_animated.xml`. */
         private const val SPLASH_MS = 1_440L
     }
 }

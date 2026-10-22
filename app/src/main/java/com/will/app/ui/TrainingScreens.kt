@@ -58,7 +58,6 @@ import androidx.compose.ui.unit.sp
 import com.will.app.ApproachItem
 import com.will.app.ExerciseItem
 
-/** Вес как его читают: «60 кг», «62,5 кг» или «свой вес». */
 fun weightText(grams: Int): String {
     if (grams == 0) return "свой вес"
     val kg = grams / 1000
@@ -67,10 +66,6 @@ fun weightText(grams: Int): String {
     return "$kg," + (1000 + rest).toString().substring(1).trimEnd('0') + " кг"
 }
 
-/**
- * Упражнения строками: название, под ним подходы. Если дано [willed], подходы, сделанные
- * не так, как велено, выделяются.
- */
 @Composable
 fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = null) {
     Column(Modifier.padding(top = 4.dp)) {
@@ -95,13 +90,9 @@ fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = n
     }
 }
 
-/**
- * Заданное и сделанное в одной строке на подход: «100 кг × 5 ✓», «100 кг × 5 → × 3»,
- * «свой вес × 8 — не сделан», «+ 100 кг × 3» сверх заданного. Упражнения сопоставляются
- * по названию, подходы — по порядку: отчёт несёт только сделанные, без номеров.
- */
 @Composable
 fun ComparedExercisesView(willed: List<ExerciseItem>, done: List<ExerciseItem>) {
+    // Упражнения сопоставляются по названию, подходы — по порядку: отчёт несёт только сделанные, без номеров.
     val unmatched = done.toMutableList()
     Column(Modifier.padding(top = 4.dp)) {
         willed.forEach { exercise ->
@@ -138,20 +129,16 @@ private fun ComparedApproach(number: Int, asked: ApproachItem?, did: ApproachIte
 }
 
 
-/** Шаг веса — 2,5 кг; шаг повторов — 1. */
 private const val WEIGHT_STEP = 2_500
 private const val MAX_GRAMS = 1_000_000
 private const val MAX_REPETITIONS = 10_000
-/** Отдых по умолчанию — полторы минуты; шаг — 15 секунд; не больше часа. */
 private const val DEFAULT_REST = 90
 private const val REST_STEP = 15
 private const val MAX_REST = 3_600
 
-/** Отдых как его читают: «1:30»; без отдыха — «без отдыха». */
 fun restText(seconds: Int): String =
     if (seconds == 0) "без отдыха" else "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 
-/** Секунды из набранного: «90», «1:30». Null, если это не отдых. */
 private fun secondsOf(text: String): Int? {
     val t = text.trim()
     if (t.isEmpty()) return 0
@@ -185,7 +172,6 @@ private class ExerciseDraft(name: String, approaches: List<ApproachDraft>) {
     val approaches: SnapshotStateList<ApproachDraft> = mutableStateListOf<ApproachDraft>().apply { addAll(approaches) }
 }
 
-/** Черновики упражнений переживают поворот экрана: по упражнению — название и числа его подходов подряд. */
 private val ExerciseDraftsSaver = Saver<SnapshotStateList<ExerciseDraft>, ArrayList<Any>>(
     save = { drafts ->
         drafts.flatMapTo(ArrayList()) { draft ->
@@ -199,7 +185,6 @@ private val ExerciseDraftsSaver = Saver<SnapshotStateList<ExerciseDraft>, ArrayL
     },
 )
 
-/** Граммы из набранного: «62,5» → 62500; пусто или 0 — свой вес. Null, если это не вес. */
 private fun gramsOf(text: String): Int? {
     val t = text.trim().replace(',', '.')
     if (t.isEmpty()) return 0
@@ -208,10 +193,8 @@ private fun gramsOf(text: String): Int? {
     return Math.round(kg * 1000).toInt()
 }
 
-/** Вес, как его набирают: «62,5»; свой вес — пусто. */
 private fun kilogramsText(grams: Int) = if (grams == 0) "" else weightText(grams).removeSuffix(" кг")
 
-/** Что не так в черновиках; null, если всё можно задать. */
 private fun troubleOf(drafts: List<ExerciseDraft>): String? {
     if (drafts.isEmpty()) return "Добавьте упражнение"
     if (drafts.any { it.name.isBlank() }) return "У каждого упражнения должно быть название"
@@ -272,12 +255,9 @@ fun TrainingEditor(
     }
 }
 
-/**
- * Кнопка внизу экрана: всегда видна; пока что-то не так — неактивна, и сказано почему.
- * [busy] — нажатое ещё в пути: неактивна, а что происходит, говорит сам [text].
- */
 @Composable
 internal fun BottomButton(text: String, trouble: String?, busy: Boolean = false, onClick: () -> Unit) {
+    // Всегда видна: пока что-то не так, неактивна и говорит почему; нажатое ещё в пути — говорит [text].
     Column(Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 8.dp, 16.dp, 12.dp)) {
         if (trouble != null) {
             Text(trouble, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(bottom = 6.dp))
@@ -291,7 +271,6 @@ internal fun BottomButton(text: String, trouble: String?, busy: Boolean = false,
     }
 }
 
-/** Поле без рамки: только текст и, пока пусто, подсказка. */
 @Composable
 private fun PlainField(
     value: String,
@@ -358,7 +337,6 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>,
     }
 }
 
-/** Подход в редакторе Тренера: отдых перед ним, затем номер, вес и повторы — шагами. */
 @Composable
 private fun ApproachRow(number: Int, approach: ApproachDraft, onRemove: (() -> Unit)?) {
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
@@ -429,7 +407,6 @@ private class ExactInput(
     val accept: (String) -> Boolean,
 )
 
-/** Шаговое число: − значение +; нажатие на значение — точный ввод. */
 @Composable
 private fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit, exact: ExactInput, modifier: Modifier) {
     var typing by rememberSaveable { mutableStateOf(false) }
@@ -488,7 +465,6 @@ private fun StepButton(sign: String, onClick: () -> Unit) {
     ) { Text(sign, fontSize = 20.sp, color = WillColors.Accent) }
 }
 
-/** Пунктирная карточка — «добавить ещё». */
 @Composable
 private fun DashedCard(onClick: () -> Unit, content: @Composable () -> Unit) {
     Box(

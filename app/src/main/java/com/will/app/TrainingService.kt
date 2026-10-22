@@ -36,21 +36,23 @@ import will.v1.MessengerOuterClass.Word
  * Ведёт идущую тренировку, пока экран погашен: уведомление с таймером подхода или отдыха
  * (его тикает сама система), «Приступить» прямо с экрана блокировки и вибрация, когда
  * заданный отдых вышел. Живёт с первого подхода до завершения тренировки; заброшенную —
- * без подхода дольше [IDLE_MS] после конца отдыха — гасит сам.
+ * без подхода дольше [IDLE_MS] после конца отдыха — гасит сам. Вести её начинают, пока
+ * приложение на экране; уже ведёт — второй раз не начинают.
  *
  * Тренировку видит из состояния сессии, пока смотрят в её комнату, и помнит последнюю
- * увиденную: отдых считается от меток времени и без связи.
+ * увиденную: отдых считается от меток времени по часам сервера, и без связи. Хронометр
+ * уведомления тикает система по часам телефона. Пока заведена вибрация конца отдыха,
+ * телефон не уснёт. Уведомление открывает приложение тем же намерением, что и значок, —
+ * чтобы вернуться в его задачу, — с меткой, что идут к тренировке: заставку тогда не держат.
  */
 class TrainingService : Service() {
 
     private val session get() = (application as WillApplication).session
     private val scope = MainScope()
 
-    /** Последнее, что видели о тренировке: она сама и идущий в ней подход. */
     private var training: WordItem? = null
     private var underway: UnderwayItem? = null
 
-    /** Будильник конца отдыха: на какой момент он заведён. */
     private var alarm: Job? = null
     private var alarmAtNs: Long? = null
     private var idle: Job? = null
@@ -63,10 +65,8 @@ class TrainingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    /** Сейчас по часам сервера: с ними сравнивают метки тренировки. */
     private fun nowNs() = session.clock.nowNs()
 
-    /** Метка сервера для хронометра уведомления: его тикает система по часам телефона. */
     private fun wallMs(serverNs: Long) = session.clock.toWallMs(serverNs)
 
     override fun onCreate() {
@@ -130,7 +130,6 @@ class TrainingService : Service() {
         session.beginApproach(t.id, e, a)
     }
 
-    /** Завести вибрацию на конец заданного отдыха; телефон не уснёт до неё. */
     private fun awaitRestEnd(state: WillState) {
         val t = training
         val rest = t?.let { TrainingCourse.rest(it, TrainingCourse.selected(it, underway, state.choice)) }
@@ -158,7 +157,6 @@ class TrainingService : Service() {
         if (wakeLock.isHeld) wakeLock.release()
     }
 
-    /** Заброшенную тренировку — без подхода дольше [IDLE_MS] после конца отдыха — больше не вести. */
     private fun awaitIdle(state: WillState) {
         idle?.cancel()
         if (underway != null || state.beginning == Reply.Pending) return
@@ -188,7 +186,6 @@ class TrainingService : Service() {
         }
     }
 
-    /** Уведомление о том, что сейчас: подход, отдых, ожидание первого подхода или всё сделано. */
     private fun notification(state: WillState? = null): Notification {
         val builder = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_training)
@@ -231,10 +228,6 @@ class TrainingService : Service() {
             .build()
     }
 
-    /**
-     * Открыть приложение — тем же намерением, что и значок, чтобы вернуться в его задачу;
-     * с меткой, что идут к тренировке: заставку тогда не держат.
-     */
     private fun openApp(): PendingIntent? =
         packageManager.getLaunchIntentForPackage(packageName)?.let {
             it.putExtra(MainActivity.EXTRA_TRAINING, true)
@@ -254,13 +247,11 @@ class TrainingService : Service() {
         private const val NOTIFICATION = 1
         private const val ACTION_BEGIN = "com.will.app.BEGIN"
         private const val WAKE_MARGIN_MS = 10_000L
-        /** Без подхода четверть часа после конца отдыха — тренировка заброшена. */
         private const val IDLE_MS = 15 * 60_000L
 
         @Volatile
         private var running = false
 
-        /** Начать вести тренировку; уже ведёт — ничего. Вызывать, пока приложение на экране. */
         fun start(context: Context) {
             if (running) return
             try {

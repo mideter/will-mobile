@@ -16,6 +16,7 @@ class Backoff(
     private var attempt = 0
 
     fun next(): Long {
+        // Дальше сдвигать незачем: пауза давно упёрлась в предел.
         val base = (firstMs shl attempt.coerceAtMost(MAX_SHIFT)).coerceAtMost(maxMs)
         if (base < maxMs) attempt++
         return (base * (1 + spread * (2 * random.nextDouble() - 1))).toLong()
@@ -26,7 +27,6 @@ class Backoff(
     }
 
     private companion object {
-        /** Сдвиг дальше уже не нужен: пауза давно упёрлась в предел. */
         const val MAX_SHIFT = 20
     }
 }

@@ -5,14 +5,14 @@ import java.security.SecureRandom
 
 /**
  * Как `will::DeviceTokenStore`: load-or-create opaque hex device token
- * (`DeviceToken::generate` — 32 hex chars from two uint64).
+ * (`DeviceToken::generate` — 32 hex chars from two uint64, `{:016x}{:016x}`), its length
+ * bounded as `DeviceToken::MinLength` / `MaxLength`.
  */
 object DeviceTokenStore {
 
     private const val PREFS_NAME = "will_device_token"
     private const val KEY_TOKEN = "token"
 
-    /** `DeviceToken::MinLength` / `MaxLength` */
     const val MIN_LENGTH = 32
     const val MAX_LENGTH = 128
 
@@ -32,7 +32,6 @@ object DeviceTokenStore {
         return token.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
     }
 
-    /** Как `DeviceToken::generate`: `{:016x}{:016x}`. */
     fun generate(): String {
         val random = SecureRandom()
         val bytes = ByteArray(16)

@@ -40,14 +40,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 
-/** Бирюза значка (`ic_launcher_background`). */
 private val Teal = Color(0xFF0D7377)
 
-/** Сколько стоит готовый значок перед замыслом и сколько длится сам замысел, в секундах. */
 private const val HOLD_S = 1.2f
 private const val STORY_S = 2.6f
 
-/** Первое подключение и потерянная связь говорят одним языком. */
 const val CONNECTING = "Устанавливаем связь с Центром"
 const val RECONNECTING = "Восстанавливаем связь с Центром"
 
@@ -146,17 +143,12 @@ fun Emblem(modifier: Modifier = Modifier) {
     Canvas(modifier.size(160.dp)) { drawEmblem(t) }
 }
 
-/** Доля пути от [from] до [to] к мигу [t], сглаженная. */
 private fun part(t: Float, from: Float, to: Float) = FastOutSlowInEasing.transform(((t - from) / (to - from)).coerceIn(0f, 1f))
 
 private fun lerp(a: Float, b: Float, f: Float) = a + (b - a) * f
 
-/**
- * Значок в миг [t] замысла (секунды; отрицательный — готовый). Единицы — как в значке
- * приложения: холст 108, круг радиусом 36 в середине, полосы шириной 8 с круглыми концами от
- * высоты 38.
- */
 private fun DrawScope.drawEmblem(t: Float) {
+    // Единицы — как в значке приложения: холст 108, круг радиусом 36, полосы шириной 8 от высоты 38.
     val u = size.width / 72f
     fun at(x: Float) = (x - 18f) * u
     // Концы круглые, как точка: полоса в четверть длины — сама точка.

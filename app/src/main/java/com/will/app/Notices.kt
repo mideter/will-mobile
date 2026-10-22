@@ -10,7 +10,6 @@ import will.v1.MessengerOuterClass.NoticeCode
  */
 object Notices {
 
-    /** Уведомление по его коду; имена и номера — из [args], по порядку, что называет код. */
     fun say(code: NoticeCode, args: List<String>, message: String): String {
         fun arg(i: Int) = args.getOrElse(i) { "" }
         return when (code) {
@@ -75,7 +74,6 @@ object Notices {
         }
     }
 
-    /** Без кода приходят только сбои, не ставшие отказами мира. */
     private val exact = mapOf(
         "pending supplication already exists for this pair" to "Просьба уже отправлена и ждёт ответа",
         "the host is not a dweller of his own abode" to "Себя принимать не нужно",

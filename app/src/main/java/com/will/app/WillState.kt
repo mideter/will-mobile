@@ -37,17 +37,19 @@ data class EffortItem(
 /** Подход, который Послушник выполняет сейчас. */
 data class UnderwayItem(val behestId: Long, val exercise: Int, val approach: Int, val begunAtNs: Long)
 
+/**
+ * Слово в ленте комнаты. У Дела [behestId] — номер Веления, которое оно исполняет. У
+ * тренировки [exercises] — велённые упражнения, у Дела, исполнившего её, — сделанные;
+ * [efforts] — подходы тренировки, сделанные по ходу.
+ */
 data class WordItem(
     val id: Long,
     val author: String,
     val body: String,
     val mine: Boolean,
     val kind: Word.Kind,
-    /** Для Дела — номер Веления, которое оно исполняет. */
     val behestId: Long,
-    /** У тренировки — велённые упражнения; у Дела, исполнившего её, — сделанные. */
     val exercises: List<ExerciseItem> = emptyList(),
-    /** У тренировки — подходы, сделанные по ходу. */
     val efforts: List<EffortItem> = emptyList(),
 )
 
@@ -67,12 +69,11 @@ data class Descent(val name: String, val father: String)
 sealed interface View {
     val host: String
 
+    /** Обитель. [owed] — что ожидает моего внимания, задания, где я Послушник; [awaited] — что я задал другим. */
     data class Abode(
         override val host: String,
         val rooms: List<RoomItem> = emptyList(),
-        /** Что ожидает моего внимания: задания, где я Послушник. */
         val owed: List<Waiting> = emptyList(),
-        /** Что я задал другим: задания, где я Тренер. */
         val awaited: List<Waiting> = emptyList(),
     ) : View
 
@@ -80,7 +81,9 @@ sealed interface View {
      * Комната. [aspect] — что она отражает: слова (Слово, Узы), порог (Врата) или
      * обитателей (Кормчая). [writable] — здесь пишут: своё Слово; Ведение — у Тренера.
      * Во Вратах — [gatesOpen], [keeping] (я их хозяин) и, хозяину, [waiting] и метки
-     * нерождённых [unborn]; в Кормчей — [people].
+     * нерождённых [unborn]; в Кормчей — [people] и все комнаты Обители с их частями [rooms]:
+     * здесь переносят Кельи. В комнате Уз [underways] — начатые подходы её тренировок, по
+     * номеру тренировки: в каждой не больше одного.
      */
     data class Room(
         override val host: String,
@@ -93,9 +96,7 @@ sealed interface View {
         val waiting: List<String> = emptyList(),
         val people: List<Person> = emptyList(),
         val unborn: List<Long> = emptyList(),
-        /** В комнате Уз — начатые подходы её тренировок, по номеру тренировки: в каждой не больше одного. */
         val underways: Map<Long, UnderwayItem> = emptyMap(),
-        /** В Кормчей — все комнаты Обители с их частями: здесь переносят Кельи. */
         val rooms: List<RoomItem> = emptyList(),
     ) : View
 }
@@ -103,26 +104,26 @@ sealed interface View {
 /** Тренировка, которую выполняют: где она — Обитель [host] и комната [room] — и её номер. */
 data class Workout(val host: String, val room: String, val behestId: Long)
 
+/**
+ * Всё, из чего рисуются экраны. [loading] — слова и списки нового вида ещё идут;
+ * [unbornMark] — тело ещё не рождено, вот его метка. [willing] и [fulfilling] — что с
+ * тренировкой из редактора и с заданием, отправленным на выполнение; [beginning] — `Pending`,
+ * пока сервер не сказал, что подход идёт, или почему нет. [choice] видят и экран выполнения, и
+ * уведомление; [workout] — тренировка с первого подхода до завершения, её ведёт [TrainingService].
+ */
 data class WillState(
     val connection: Connection = Connection.Connecting,
     val ownName: String = "",
     val view: View? = null,
-    /** Слова и списки нового вида ещё идут. */
     val loading: Boolean = true,
     val dwellers: List<Person> = emptyList(),
     val dwellings: List<Person> = emptyList(),
     val supplications: List<String> = emptyList(),
-    /** Тело ещё не рождено: метка, по которой его видят во Вратах. */
     val unbornMark: Long? = null,
     val lineage: List<Descent> = emptyList(),
-    /** Что с тренировкой, отправленной из редактора. */
     val willing: Reply = Reply.None,
-    /** Что с заданием, отправленным на выполнение. */
     val fulfilling: Reply = Reply.None,
-    /** Подход, к которому приступили: `Pending`, пока сервер не сказал, что он идёт, или почему нет. */
     val beginning: Reply = Reply.None,
-    /** Выбор Послушника в тренировке: его видят и экран выполнения, и уведомление. */
     val choice: Choice = Choice(),
-    /** Тренировка, которую выполняют, — с первого подхода до завершения; её ведёт [TrainingService]. */
     val workout: Workout? = null,
 )

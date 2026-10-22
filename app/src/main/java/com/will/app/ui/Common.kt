@@ -17,7 +17,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Шапка экрана: «назад», заголовок с подписью и действия справа. */
 @Composable
 fun Header(
     title: String,

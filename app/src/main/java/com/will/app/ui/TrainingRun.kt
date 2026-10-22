@@ -53,7 +53,6 @@ import com.will.app.WillSession
 import com.will.app.WordItem
 import kotlinx.coroutines.delay
 
-/** Промежуток как его читают: «1:05». */
 fun spanText(seconds: Long): String = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 
 private const val NANOS = 1_000_000_000L
@@ -269,7 +268,6 @@ fun TrainingRun(
     }
 }
 
-/** «Присед · подход 2 · 100 кг × 5». */
 internal fun captionOf(training: WordItem, exercise: Int, approach: Int): String {
     val name = training.exercises[exercise].name
     val asked = training.exercises[exercise].approaches.getOrNull(approach)
@@ -277,21 +275,16 @@ internal fun captionOf(training: WordItem, exercise: Int, approach: Int): String
         (asked?.let { " · ${weightText(it.weightGrams)} × ${it.repetitions}" } ?: " · сверх заданного")
 }
 
-/**
- * Отдых, взятый перед подходом: «отдых 2:10 (задано 1:30)»; до первого усилия тренировки
- * отдыхать было не от чего — «отдохнувшим».
- */
 internal fun restTaken(seconds: Long?, willed: Int): String =
     if (seconds == null) "отдохнувшим"
     else "отдых ${spanText(seconds)}" + if (willed > 0) " (задано ${restText(willed)})" else ""
 
-/** Отдых — своей строкой над подходом: он перед подходом, а не после. */
 @Composable
 private fun RestRow(text: String, colour: Color) {
+    // Своей строкой над подходом: отдых перед подходом, а не после.
     Text(text, fontSize = 12.sp, color = colour, modifier = Modifier.padding(start = 48.dp, top = 4.dp))
 }
 
-/** Подход в выполнении: сделан, идёт или ещё впереди (и, может быть, выбран). */
 @Composable
 private fun RunRow(
     number: Int,
@@ -338,11 +331,6 @@ private fun RunRow(
     }
 }
 
-/**
- * Ход тренировки в ленте: строка на подход — заданное и сделанное, длительность и отдых
- * перед подходом; идущий подход — «выполняется»; сверх заданного — «+». У выполненной
- * тренировки несделанные — «не сделан».
- */
 @Composable
 fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) {
     Column(Modifier.padding(top = 4.dp)) {

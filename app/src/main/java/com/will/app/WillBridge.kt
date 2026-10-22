@@ -29,10 +29,13 @@ import will.v1.clientEvent
  *
  * Первым уходит `BindToken`; поток ответов открывается вместе с потоком запросов, поэтому
  * `AuthOk`, пришедший сразу, не теряется. События сервера отдаются как есть, на главном
- * потоке; что они значат, решает [WillSession].
+ * потоке; что они значат, решает [WillSession]. События прежних соединений отбрасываются.
+ * С сертификатом сервера (PEM) — только TLS и доверие только ему, не удостоверяющим центрам
+ * телефона: подменить сервер, не похитив его ключ, нельзя; имя проверяется как обычно. Без
+ * сертификата — открытый текст. Debug ходит к локальному серверу (эмулятор видит хост как
+ * 10.0.2.2) и говорит TLS по `-PwillTls=true`; release — к удалённому и всегда по TLS.
  */
 class WillBridge(
-    /** Сертификат сервера (PEM): с ним — только TLS и доверие только ему; без него — открытый текст. */
     private val certificate: String?,
 ) {
 
@@ -44,7 +47,6 @@ class WillBridge(
     private var outbound: Channel<ClientEvent>? = null
     private var job: Job? = null
 
-    /** Номер текущего соединения: события прежних отбрасываются. */
     @Volatile
     private var generation = 0
 
@@ -95,7 +97,6 @@ class WillBridge(
         }
     }
 
-    /** Отправить событие клиента; `false`, если соединения нет. */
     fun send(event: ClientEvent): Boolean {
         val out = synchronized(lock) { outbound } ?: return false
         return out.trySend(event).isSuccess
@@ -116,18 +117,11 @@ class WillBridge(
     }
 
     companion object {
-        /** Debug — локальный сервер (эмулятор видит хост как 10.0.2.2), release — удалённый. */
         val HOST: String = BuildConfig.WILL_HOST
         val PORT: Int = BuildConfig.WILL_PORT
 
-        /** TLS — в release всегда; в debug — по `-PwillTls=true`. */
         val TLS: Boolean = BuildConfig.WILL_TLS
 
-        /**
-         * Сокеты TLS, доверяющие только этому сертификату — не удостоверяющим центрам
-         * телефона: подменить сервер, не похитив его ключ, нельзя. Имя проверяется как
-         * обычно: адрес сервера должен быть в сертификате.
-         */
         private fun trusting(pem: String): SSLSocketFactory {
             val certificate = CertificateFactory.getInstance("X.509").generateCertificate(pem.byteInputStream())
             val store = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
