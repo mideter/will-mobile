@@ -15,7 +15,7 @@ class Backoff(
 ) {
     private var attempt = 0
 
-    fun next(): Long {
+    fun nextPauseMs(): Long {
         // Дальше сдвигать незачем: пауза давно упёрлась в предел.
         val base = (firstMs shl attempt.coerceAtMost(MAX_SHIFT)).coerceAtMost(maxMs)
         if (base < maxMs) attempt++

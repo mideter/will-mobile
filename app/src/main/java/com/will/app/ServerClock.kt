@@ -22,7 +22,7 @@ class ServerClock(
 
     fun nowNs(): Long = elapsedNs() + baseNs
 
-    fun mark(): Long = elapsedNs()
+    fun phoneNowNs(): Long = elapsedNs()
 
     fun toWallMs(serverNs: Long): Long = (serverNs - nowNs() + wallNs()) / 1_000_000
 

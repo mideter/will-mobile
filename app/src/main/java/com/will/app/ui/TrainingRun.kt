@@ -130,13 +130,13 @@ fun TrainingRun(
                 ) {
                     Text(exercise.name, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                     // Нажимается только следующий подход упражнения: подходы идут по порядку.
-                    val next = TrainingCourse.nextIn(training, e)
-                    for (a in 0 until TrainingCourse.count(training, e, doing)) {
+                    val next = TrainingCourse.nextWilledIn(training, e)
+                    for (a in 0 until TrainingCourse.approachCount(training, e, doing)) {
                         val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                         val begun = effort?.begunAtNs ?: doing?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
                         val willedRest = TrainingCourse.restWilled(training, e, a)
                         when {
-                            begun != null -> RestRow(restTaken(TrainingCourse.restUntil(training.efforts, begun), willedRest), WillColors.Muted)
+                            begun != null -> RestRow(restTaken(TrainingCourse.restTakenBefore(training.efforts, begun), willedRest), WillColors.Muted)
                             resting && selected == e to a -> RestRow(restTaken(rested, willedRest), WillColors.Accent)
                             willedRest > 0 -> RestRow("отдых ${restText(willedRest)}", WillColors.Muted)
                         }
@@ -150,7 +150,7 @@ fun TrainingRun(
                         )
                     }
                     // Сверх заданного — когда заданные подходы упражнения сделаны.
-                    val extra = e to TrainingCourse.count(training, e)
+                    val extra = e to TrainingCourse.approachCount(training, e)
                     if (doing == null && next == null) {
                         if (selected == extra) {
                             if (resting) RestRow(restTaken(rested, TrainingCourse.restWilled(training, e, extra.second)), WillColors.Accent)
@@ -336,13 +336,13 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
     Column(Modifier.padding(top = 4.dp)) {
         training.exercises.forEachIndexed { e, exercise ->
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            for (a in 0 until TrainingCourse.count(training, e, underway)) {
+            for (a in 0 until TrainingCourse.approachCount(training, e, underway)) {
                 val asked = exercise.approaches.getOrNull(a)
                 val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                 val begun = effort?.begunAtNs ?: underway?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
                 val willedRest = TrainingCourse.restWilled(training, e, a)
                 when {
-                    begun != null -> FeedRestLine(restTaken(TrainingCourse.restUntil(training.efforts, begun), willedRest))
+                    begun != null -> FeedRestLine(restTaken(TrainingCourse.restTakenBefore(training.efforts, begun), willedRest))
                     asked != null && willedRest > 0 && !finished -> FeedRestLine("отдых ${restText(willedRest)}")
                 }
                 val (line, colour) = when {

@@ -26,7 +26,7 @@ data class Choice(val behestId: Long = 0, val exercise: Int? = null, val extra: 
  */
 object TrainingCourse {
 
-    fun count(training: WordItem, exercise: Int, underway: UnderwayItem? = null): Int =
+    fun approachCount(training: WordItem, exercise: Int, underway: UnderwayItem? = null): Int =
         maxOf(
             training.exercises[exercise].approaches.size,
             (training.efforts.filter { it.exercise == exercise }.maxOfOrNull { it.approach } ?: -1) + 1,
@@ -36,7 +36,7 @@ object TrainingCourse {
     fun done(training: WordItem, exercise: Int, approach: Int): Boolean =
         training.efforts.any { it.exercise == exercise && it.approach == approach }
 
-    fun nextIn(training: WordItem, exercise: Int): Int? =
+    fun nextWilledIn(training: WordItem, exercise: Int): Int? =
         training.exercises[exercise].approaches.indices.firstOrNull { !done(training, exercise, it) }
 
     fun focus(training: WordItem, underway: UnderwayItem?, chosen: Int?): Int? =
@@ -44,14 +44,14 @@ object TrainingCourse {
             ?: chosen
             ?: training.efforts.maxByOrNull { it.finishedAtNs }?.exercise
 
-    fun next(training: WordItem, focus: Int?, extra: Int? = null): Pair<Int, Int>? {
-        if (extra != null && nextIn(training, extra) == null) return extra to count(training, extra)
+    fun nextApproach(training: WordItem, focus: Int?, extra: Int? = null): Pair<Int, Int>? {
+        if (extra != null && nextWilledIn(training, extra) == null) return extra to approachCount(training, extra)
         val n = training.exercises.size
         if (n == 0) return null
         val start = focus?.coerceIn(0, n - 1) ?: 0
         for (step in 0 until n) {
             val e = (start + step) % n
-            nextIn(training, e)?.let { return e to it }
+            nextWilledIn(training, e)?.let { return e to it }
         }
         return null
     }
@@ -59,7 +59,7 @@ object TrainingCourse {
     fun selected(training: WordItem, underway: UnderwayItem?, choice: Choice): Pair<Int, Int>? {
         if (underway?.behestId == training.id) return null
         val mine = choice.takeIf { it.behestId == training.id } ?: Choice()
-        return next(training, focus(training, null, mine.exercise), mine.extra)
+        return nextApproach(training, focus(training, null, mine.exercise), mine.extra)
     }
 
     /** Отдых перед подходом: идёт с [sinceNs] — конца последнего усилия; задано [willed] секунд. */
@@ -84,7 +84,7 @@ object TrainingCourse {
     fun restClock(willed: Int, rested: Long): RestClock =
         if (rested < willed) RestClock(willed - rested, over = false) else RestClock(rested, over = true)
 
-    fun restUntil(efforts: List<EffortItem>, begunAtNs: Long): Long? {
+    fun restTakenBefore(efforts: List<EffortItem>, begunAtNs: Long): Long? {
         val before = efforts.filter { it.begunAtNs < begunAtNs && it.finishedAtNs <= begunAtNs }.maxByOrNull { it.finishedAtNs }
             ?: return null
         return (begunAtNs - before.finishedAtNs) / 1_000_000_000L

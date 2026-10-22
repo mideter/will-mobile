@@ -13,15 +13,15 @@ class BackoffTest {
     @Test
     fun `each pause is twice the one before, up to the limit`() {
         val backoff = plain()
-        assertEquals(listOf(1_000L, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000), List(7) { backoff.next() })
+        assertEquals(listOf(1_000L, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000), List(7) { backoff.nextPauseMs() })
     }
 
     @Test
     fun `after a good connection it starts short again`() {
         val backoff = plain()
-        repeat(10) { backoff.next() }
+        repeat(10) { backoff.nextPauseMs() }
         backoff.reset()
-        assertEquals(1_000L, backoff.next())
+        assertEquals(1_000L, backoff.nextPauseMs())
     }
 
     @Test
@@ -29,7 +29,7 @@ class BackoffTest {
         val backoff = Backoff(random = Random(7))
         repeat(100) {
             backoff.reset()
-            val pause = backoff.next()
+            val pause = backoff.nextPauseMs()
             assertTrue("$pause", pause in 800..1_200)
         }
     }

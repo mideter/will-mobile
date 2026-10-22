@@ -21,10 +21,10 @@ class ServerClockTest {
     fun `the server stamped halfway between sending and the answer`() {
         // Часы телефона отстают на 10 с: сервер поставил метку на 10 с позже середины.
         val start = wall
-        val sent = clock.mark()
+        val sent = clock.phoneNowNs()
         elapsed += 2 * NS
         wall += 2 * NS
-        val received = clock.mark()
+        val received = clock.phoneNowNs()
         clock.observe(stampNs = start + 1 * NS + 10 * NS, sentAt = sent, receivedAt = received)
         assertEquals(start + 12 * NS, clock.nowNs())
         // На хронометре телефона та же метка — на 10 с раньше.
@@ -41,9 +41,9 @@ class ServerClockTest {
     @Test
     fun `an answer that took too long is not trusted`() {
         val before = clock.nowNs()
-        val sent = clock.mark()
+        val sent = clock.phoneNowNs()
         elapsed += 30 * NS
-        clock.observe(stampNs = 0, sentAt = sent, receivedAt = clock.mark())
+        clock.observe(stampNs = 0, sentAt = sent, receivedAt = clock.phoneNowNs())
         assertEquals(before + 30 * NS, clock.nowNs())
     }
 
