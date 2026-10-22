@@ -17,7 +17,6 @@ object Notices {
             // Чего не позволяет мир.
             NoticeCode.NOTICE_ALREADY_DWELLS -> "Он уже обитает у вас"
             NoticeCode.NOTICE_NOT_AT_GATES -> "Его уже нет у Врат"
-            NoticeCode.NOTICE_BEAR_ONLY_AT_GATES -> "Рождают, стоя во Вратах"
             NoticeCode.NOTICE_NO_SUCH_UNBORN -> "Такого нерождённого нет"
             NoticeCode.NOTICE_DOES_NOT_DWELL -> "Он не обитает у вас"
             NoticeCode.NOTICE_DOES_NOT_ENTER_ROOM -> "Вам не открыта эта комната"
@@ -25,6 +24,7 @@ object Notices {
             NoticeCode.NOTICE_STAND_IN_UPPER_ROOM -> "Это делают в Горнице"
             NoticeCode.NOTICE_STAND_AT_GATES -> "Это делают, стоя во Вратах"
             NoticeCode.NOTICE_ONLY_HOST_ACTS -> "Здесь действует только хозяин"
+            NoticeCode.NOTICE_PASS_THROUGH_GATES -> "Туда идут через Врата"
             NoticeCode.NOTICE_FATHER_BY_FLESH_NEIGHBOUR -> "Отец по плоти — всегда не ниже ближнего"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_FRIEND -> "Отец по духу — всегда друг"
             NoticeCode.NOTICE_HEAR_ONLY_DWELLER -> "Он ещё не принял вас в свою Обитель"

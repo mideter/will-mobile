@@ -158,13 +158,13 @@ class WillSession(context: Context) {
     /** Своя Обитель: обзор и комнаты. */
     fun home() = look("", "")
 
-    /** Обитель хозяина, у которого обитаешь. */
+    /** Войти в Обитель хозяина, у Врат которого стоишь, — если обитаешь там. */
     fun visit(host: String) = look(host, "")
 
     /** Комната Обители, на которую смотришь. */
     fun enter(room: String) = look(_state.value.view?.host.orEmpty(), room)
 
-    /** К Вратам хозяина, чтобы он впустил. */
+    /** К Вратам: своим (пустое имя) или, от своих Врат, к чужим — войти или ждать, пока впустят. */
     fun gates(host: String) = look(host.trim(), GATES)
 
     /** Родить нерождённого, стоя во Вратах, где можешь впускать: отцом станет их хозяин. */
@@ -175,14 +175,22 @@ class WillSession(context: Context) {
 
     fun listLineage() = send(clientEvent { listLineage = listLineage {} })
 
-    /** Из комнаты — к её Обители; из чужой Обители — домой. */
+    /**
+     * Назад тем путём, каким пришли: из комнаты — к её Обители; из чужой Обители — к её Вратам,
+     * от них — к своим, из своих Врат — домой.
+     */
     fun back(): Boolean {
         val view = _state.value.view ?: return false
-        return when {
-            view is View.Room -> { look(view.host, ""); true }
-            view.host.isNotEmpty() -> { home(); true }
-            else -> false
+        val own = view.host.isEmpty()
+        val atGates = view is View.Room && view.aspect == Aspect.Threshold
+        when {
+            own && view is View.Abode -> return false
+            own -> home()
+            atGates -> gates("")
+            view is View.Room -> look(view.host, "")
+            else -> gates(view.host)
         }
+        return true
     }
 
     fun say(text: String) {
@@ -226,7 +234,7 @@ class WillSession(context: Context) {
         val workout = shown?.let { Workout(it.host, it.room, behestId) }
             ?: s.workout?.takeIf { it.behestId == behestId }
             ?: return
-        if (shown == null) look(workout.host, workout.room)
+        if (shown == null) walk(workout.host, workout.room)
         // После поворота ответ ждёт ещё и слова комнаты: для сверки часов он слишком поздний.
         val sentAt = clock.mark().takeIf { shown != null }
         val asked = ask(clientEvent {
@@ -307,6 +315,19 @@ class WillSession(context: Context) {
     fun listDwellings() = send(clientEvent { listDwellings = listDwellings {} })
     fun listSupplications() = send(clientEvent { listSupplications = listSupplications {} })
 
+    /**
+     * Пройти к месту путём мира: из Обители, где стоишь, — через её Врата, к Вратам той, куда
+     * идёшь, и внутрь. В пределах одной Обители — прямо.
+     */
+    private fun walk(host: String, room: String) {
+        val view = _state.value.view
+        if (view != null && view.host != host) {
+            if (!(view is View.Room && view.aspect == Aspect.Threshold)) look(view.host, GATES)
+            if (room != GATES) look(host, GATES)
+        }
+        look(host, room)
+    }
+
     private fun look(host: String, room: String) {
         target = host to room
         send(clientEvent { turn = turn { abodeOf = host; this.room = room } })
@@ -339,11 +360,11 @@ class WillSession(context: Context) {
                 _state.update {
                     it.copy(connection = Connection.Ready, ownName = event.authOk.name, unbornMark = null, loading = true)
                 }
-                // После входа взгляд — на своей Обители; вернуться туда, где был.
+                // Проснувшись, всякий дома: вернуться можно только в свою комнату, где был.
                 gathering = View.Abode("")
                 send(clientEvent { historyRequest = historyRequest { limit = HISTORY_LIMIT } })
                 val (host, room) = target
-                if (host.isNotEmpty() || room.isNotEmpty()) look(host, room)
+                if (host.isEmpty() && room.isNotEmpty()) look(host, room) else target = "" to ""
                 listDwellers()
                 listDwellings()
                 listSupplications()
@@ -359,10 +380,10 @@ class WillSession(context: Context) {
                 _state.update { it.copy(loading = true) }
             }
             ServerEvent.EventCase.ROOMS -> {
-                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER) }
+                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.aspect.toAspect()) }
                 when (val gathered = gathering) {
                     is View.Abode -> gathering = gathered.copy(rooms = rooms)
-                    // В своей Горнице — комнаты, которые здесь переносят.
+                    // В Горнице — комнаты, Кельи которых здесь переносят.
                     is View.Room -> gathering = gathered.copy(rooms = rooms)
                     null -> _state.update { s ->
                         // Перенесли комнату, стоя в Горнице: список приходит заново.

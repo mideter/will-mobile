@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.will.app.Aspect
 import com.will.app.RoomItem
 import com.will.app.View
 import com.will.app.Waiting
@@ -25,15 +26,15 @@ import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Обитель. Своя: обзор — что ждёт, — и комнаты (переносят их в Горнице). Чужая: комнаты,
- * открытые моему роду.
+ * Обитель. Своя: обзор — что ждёт, — и комнаты по частям: во внешней — Врата, через них
+ * выходят; во внутренней — Горница, где ждут Просьбы. Чужая: комнаты, открытые моему роду;
+ * назад — к её Вратам.
  */
 @Composable
 fun AbodeScreen(
     state: WillState,
     view: View.Abode,
     session: WillSession,
-    menu: @Composable () -> Unit,
 ) {
     val own = view.host.isEmpty()
     val clipboard = LocalClipboardManager.current
@@ -47,7 +48,6 @@ fun AbodeScreen(
                 clipboard.setText(AnnotatedString(state.ownName))
                 session.tell("Имя ${state.ownName} скопировано")
             }) else null,
-            actions = { if (own) menu() },
         )
 
         LazyColumn(Modifier.fillMaxSize()) {
@@ -65,12 +65,14 @@ fun AbodeScreen(
                 item { SectionTitle("Комнаты") }
                 item { Hint(if (own) "Комнат нет" else "Ни одна комната вам здесь не открыта") }
             }
-            for ((title, outer) in listOf("Внутренние комнаты" to false, "Внешние комнаты" to true)) {
-                val rooms = view.rooms.filter { it.outer == outer }
+            for ((title, outer) in listOf("Внутренняя часть" to false, "Внешняя часть" to true)) {
+                // Ядро части — Врата или Горница — впереди её Келий.
+                val rooms = view.rooms.filter { it.outer == outer }.sortedBy { it.aspect == Aspect.Words }
                 if (rooms.isEmpty()) continue
                 item { SectionTitle(title) }
                 items(rooms) { room ->
-                    RoomRow(room = room, onClick = { session.enter(room.name) })
+                    val waiting = if (own && room.aspect == Aspect.Dwellers) state.supplications.size else 0
+                    RoomRow(room = room, waiting = waiting, onClick = { session.enter(room.name) })
                 }
             }
         }
@@ -94,7 +96,7 @@ private fun WaitingCard(waiting: Waiting, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RoomRow(room: RoomItem, onClick: () -> Unit) {
+private fun RoomRow(room: RoomItem, waiting: Int, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -103,6 +105,7 @@ private fun RoomRow(room: RoomItem, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(room.name, fontSize = 16.sp, modifier = Modifier.weight(1f))
+        if (waiting > 0) Text("Просьбы: $waiting", fontSize = 13.sp, color = WillColors.Accent, modifier = Modifier.padding(end = 8.dp))
         Text("›", fontSize = 18.sp, color = WillColors.Muted)
     }
 }

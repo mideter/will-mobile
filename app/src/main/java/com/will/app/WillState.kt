@@ -11,8 +11,8 @@ enum class Connection { Connecting, Ready, Reconnecting }
  */
 enum class Reply { None, Pending, Granted }
 
-/** Комната в списке Обители. */
-data class RoomItem(val name: String, val outer: Boolean)
+/** Комната в списке Обители: в какой она части и что отражает — переносят только Кельи ([Aspect.Words]). */
+data class RoomItem(val name: String, val outer: Boolean, val aspect: Aspect = Aspect.Words)
 
 /** Неисполненное Веление в обзоре хозяина. */
 data class Waiting(val room: String, val behestId: Long, val body: String)
@@ -84,9 +84,8 @@ sealed interface View {
     /**
      * Комната. [aspect] — что она отражает: слова (Слово, Узы), порог (Врата) или
      * обитателей (Горница). [writable] — здесь пишут: своё Слово; Ведение — у Тренера.
-     * Во Вратах — [gatesOpen], [keeping] (я привратник: хозяин или обитатель, чьему роду
-     * открыта их часть) и, привратнику, [waiting] и метки нерождённых [unborn]; в Горнице —
-     * [people].
+     * Во Вратах — [gatesOpen], [keeping] (я их хозяин) и, хозяину, [waiting] и метки
+     * нерождённых [unborn]; в Горнице — [people].
      */
     data class Room(
         override val host: String,
@@ -101,7 +100,7 @@ sealed interface View {
         val unborn: List<Long> = emptyList(),
         /** В комнате Уз — начатые подходы её тренировок, по номеру тренировки: в каждой не больше одного. */
         val underways: Map<Long, UnderwayItem> = emptyMap(),
-        /** В своей Горнице — все комнаты Обители с их частями: здесь их переносят. */
+        /** В Горнице — все комнаты Обители с их частями: здесь переносят Кельи. */
         val rooms: List<RoomItem> = emptyList(),
     ) : View
 }
