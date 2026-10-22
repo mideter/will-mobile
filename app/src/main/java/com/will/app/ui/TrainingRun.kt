@@ -210,7 +210,7 @@ fun TrainingRun(
             } else {
                 BottomButton(
                     text = if (beginning) "Начинается…" else "Приступить",
-                    trouble = if (selected == null) "Заданные подходы сделаны: завершите тренировку или добавьте подход" else null,
+                    trouble = if (selected == null) "Завершите тренировку или добавьте подход" else null,
                     busy = beginning,
                 ) { selected?.let { (e, a) -> session.beginApproach(training.id, e, a) } }
                 TextButton(onClick = { closing = true }) { Text("Завершить тренировку") }
