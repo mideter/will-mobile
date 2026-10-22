@@ -82,7 +82,6 @@ fun TrainingRun(
     val doing = underway?.takeIf { it.behestId == training.id }
     // Выбирают упражнение: выбор держится его, пока подходы не кончатся (см. TrainingCourse).
     val selected = TrainingCourse.selected(training, doing, choice)
-    // Открытые окна переживают поворот экрана.
     var confirming by rememberSaveable { mutableStateOf(false) }
     var closing by rememberSaveable { mutableStateOf(false) }
 
@@ -94,7 +93,6 @@ fun TrainingRun(
             delay(250)
         }
     }
-    // Экран не гаснет, пока идёт выполнение.
     val screen = LocalView.current
     DisposableEffect(Unit) {
         screen.keepScreenOn = true

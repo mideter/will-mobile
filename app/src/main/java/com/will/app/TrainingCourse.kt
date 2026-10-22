@@ -69,7 +69,6 @@ object TrainingCourse {
 
     /** Отдых перед подходом: идёт с [sinceNs] — конца последнего усилия; задано [willed] секунд. */
     data class Rest(val sinceNs: Long, val willed: Int) {
-        /** Когда заданный отдых выйдет. */
         val endNs: Long get() = sinceNs + willed * 1_000_000_000L
     }
 

@@ -124,7 +124,6 @@ class TrainingService : Service() {
         }
     }
 
-    /** Приступить к подходу, который предложен, — нажатием в уведомлении. */
     private fun begin() {
         val t = training ?: return
         val (e, a) = TrainingCourse.selected(t, underway, session.state.value.choice) ?: return

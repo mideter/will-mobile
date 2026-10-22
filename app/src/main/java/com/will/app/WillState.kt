@@ -2,7 +2,6 @@ package com.will.app
 
 import will.v1.MessengerOuterClass.Word
 
-/** Связь с сервером. */
 enum class Connection { Connecting, Ready, Reconnecting }
 
 /**
@@ -20,7 +19,6 @@ data class Waiting(val room: String, val behestId: Long, val body: String)
 /** Подход: вес в граммах (0 — свой вес), повторы и отдых перед ним, в секундах. */
 data class ApproachItem(val weightGrams: Int, val repetitions: Int, val restSeconds: Int = 0)
 
-/** Упражнение: свободное название и подходы. */
 data class ExerciseItem(val name: String, val approaches: List<ApproachItem>)
 
 /**
@@ -39,7 +37,6 @@ data class EffortItem(
 /** Подход, который Послушник выполняет сейчас. */
 data class UnderwayItem(val behestId: Long, val exercise: Int, val approach: Int, val begunAtNs: Long)
 
-/** Слово в ленте комнаты. */
 data class WordItem(
     val id: Long,
     val author: String,
@@ -54,7 +51,6 @@ data class WordItem(
     val efforts: List<EffortItem> = emptyList(),
 )
 
-/** Род обитателя. */
 enum class Kind { Acquaintance, Neighbour, Friend }
 
 /** Как обитатель стоит к хозяину в тренерстве; Узы бывают в обе стороны, поэтому отношений может быть несколько. */
@@ -62,7 +58,6 @@ enum class Standing { Asked, Asks, Trainer, Novice }
 
 data class Person(val name: String, val kind: Kind, val standings: Set<Standing> = emptySet())
 
-/** Что отражает комната. */
 enum class Aspect { Words, Threshold, Dwellers }
 
 /** Чадо по духу и его отец — звено духовной линии. */
@@ -119,7 +114,6 @@ data class WillState(
     val supplications: List<String> = emptyList(),
     /** Тело ещё не рождено: метка, по которой его видят во Вратах. */
     val unbornMark: Long? = null,
-    /** Моя духовная линия, поколение за поколением. */
     val lineage: List<Descent> = emptyList(),
     /** Что с тренировкой, отправленной из редактора. */
     val willing: Reply = Reply.None,

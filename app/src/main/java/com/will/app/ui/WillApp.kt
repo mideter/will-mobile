@@ -27,7 +27,7 @@ import com.will.app.WillSession
 private enum class Screen { Main, Lineage }
 
 /**
- * Корень приложения: вид из состояния сессии, «назад» — к Обители. Уведомления сервера — во
+ * Корень приложения: вид из состояния сессии, «назад» — тем путём, каким пришли. Уведомления сервера — во
  * всплывающем поле; связь не уведомление: без неё экран закрывает заставка ([Veil]).
  */
 @Composable
@@ -46,7 +46,6 @@ fun WillApp(session: WillSession) {
     if (lost) Veil()
     val popups: @Composable () -> Unit = { SnackbarHost(snackbar) }
 
-    // Нерождённый только ждёт.
     state.unbornMark?.let { mark ->
         Scaffold(snackbarHost = popups) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) { UnbornScreen(mark) }

@@ -173,7 +173,6 @@ internal class ApproachDraft(grams: Int, repetitions: Int, rest: Int = DEFAULT_R
     val item get() = ApproachItem(grams, repetitions, rest)
 
     companion object {
-        /** Черновик переживает поворот экрана: три числа. */
         val Saver = Saver<ApproachDraft, IntArray>(
             save = { intArrayOf(it.grams, it.repetitions, it.rest) },
             restore = { ApproachDraft(it[0], it[1], it[2]) },
@@ -181,7 +180,6 @@ internal class ApproachDraft(grams: Int, repetitions: Int, rest: Int = DEFAULT_R
     }
 }
 
-/** Черновик упражнения. */
 private class ExerciseDraft(name: String, approaches: List<ApproachDraft>) {
     var name by mutableStateOf(name)
     val approaches: SnapshotStateList<ApproachDraft> = mutableStateListOf<ApproachDraft>().apply { addAll(approaches) }
@@ -319,7 +317,6 @@ private fun PlainField(
     )
 }
 
-/** Карточка упражнения: номер, название, подходы. */
 @Composable
 private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>, onRemove: (() -> Unit)?) {
     Column(

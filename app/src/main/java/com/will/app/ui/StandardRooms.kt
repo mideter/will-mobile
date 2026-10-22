@@ -144,7 +144,6 @@ private fun OthersGates(state: WillState, view: View.Room, session: WillSession)
     }
 }
 
-/** Пойти от своих Врат к чужим по имени хозяина. */
 @Composable
 private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
     var host by remember { mutableStateOf("") }

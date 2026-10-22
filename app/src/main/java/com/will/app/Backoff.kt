@@ -15,7 +15,6 @@ class Backoff(
 ) {
     private var attempt = 0
 
-    /** Пауза перед следующей попыткой. */
     fun next(): Long {
         val base = (firstMs shl attempt.coerceAtMost(MAX_SHIFT)).coerceAtMost(maxMs)
         if (base < maxMs) attempt++

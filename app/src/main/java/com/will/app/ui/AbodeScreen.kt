@@ -51,7 +51,6 @@ fun AbodeScreen(
         )
 
         LazyColumn(Modifier.fillMaxSize()) {
-            // Пустой раздел не показывается.
             if (own && view.owed.isNotEmpty()) {
                 item { SectionTitle("Ожидает внимания") }
                 items(view.owed) { waiting -> WaitingCard(waiting) { session.enter(waiting.room) } }

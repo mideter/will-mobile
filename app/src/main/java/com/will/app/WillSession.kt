@@ -77,10 +77,8 @@ class WillSession(context: Context) {
     val state: StateFlow<WillState> = _state
 
     private val _notices = MutableSharedFlow<String>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    /** Короткие уведомления сервера — для снекбара. */
     val notices: SharedFlow<String> = _notices
 
-    /** Вид, который сейчас собирается из событий сервера. */
     private var gathering: View? = null
 
     /** Куда смотреть после переподключения: хозяин Обители и комната. */
@@ -89,7 +87,6 @@ class WillSession(context: Context) {
 
     private val reconnect = Runnable { connect() }
 
-    /** Паузы между попытками переподключиться: растут, пока связи нет. */
     private val backoff = Backoff()
 
     private var started = false
@@ -155,19 +152,17 @@ class WillSession(context: Context) {
 
     // ── Действия ──────────────────────────────────────────────────────────────
 
-    /** Своя Обитель: обзор и комнаты. */
     fun home() = look("", "")
 
     /** Войти в Обитель хозяина, у Врат которого стоишь, — если обитаешь там. */
     fun visit(host: String) = look(host, "")
 
-    /** Комната Обители, на которую смотришь. */
     fun enter(room: String) = look(_state.value.view?.host.orEmpty(), room)
 
     /** К Вратам: своим (пустое имя) или, от своих Врат, к чужим — войти или ждать, пока впустят. */
     fun gates(host: String) = look(host.trim(), GATES)
 
-    /** Родить нерождённого, стоя во Вратах, где можешь впускать: отцом станет их хозяин. */
+    /** Стоя в своих Вратах: рождённый станет моим чадом по плоти. */
     fun bear(mark: Long) = send(clientEvent { bear = bear { this.mark = mark } })
 
     /** Избрать отца по духу; он отказаться не может. */
@@ -214,7 +209,6 @@ class WillSession(context: Context) {
         look(view.host, view.room)
     }
 
-    /** Окно выполнения закрыто после того, как задание выполнено. */
     fun fulfillingSeen() = _state.update { it.copy(fulfilling = Reply.None) }
 
     /** Выбрать в тренировке упражнение и, может быть, подход сверх заданного в нём. */
@@ -249,7 +243,6 @@ class WillSession(context: Context) {
     /** Тренировку больше не ведут: она завершена или давно заброшена. */
     fun stopWorkout() = _state.update { it.copy(workout = null) }
 
-    /** Завершить идущий подход: что сделано. */
     fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) {
         val sentAt = clock.mark()
         val sent = send(clientEvent {
@@ -276,7 +269,6 @@ class WillSession(context: Context) {
         look(view.host, view.room)
     }
 
-    /** Редактор закрыт после того, как тренировка задана. */
     fun willingSeen() = _state.update { it.copy(willing = Reply.None) }
 
     /** Перенести комнату своей Обители в другую часть — стоя в своей Кормчей. */
@@ -353,7 +345,6 @@ class WillSession(context: Context) {
                 bindSentAt = null
                 if (sent != null && event.authOk.serverTimeNs != 0L) clock.observe(event.authOk.serverTimeNs, sent, clock.mark())
                 if (event.authOk.unborn) {
-                    // Тело ещё не рождено: только ждать.
                     _state.update { it.copy(connection = Connection.Ready, ownName = "", unbornMark = event.authOk.mark) }
                     return
                 }
@@ -383,7 +374,6 @@ class WillSession(context: Context) {
                 val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.aspect.toAspect()) }
                 when (val gathered = gathering) {
                     is View.Abode -> gathering = gathered.copy(rooms = rooms)
-                    // В Кормчей — комнаты, Кельи которых здесь переносят.
                     is View.Room -> gathering = gathered.copy(rooms = rooms)
                     null -> _state.update { s ->
                         // Перенесли комнату, стоя в Кормчей: список приходит заново.
@@ -516,7 +506,7 @@ class WillSession(context: Context) {
             }
             ServerEvent.EventCase.UNBORN -> {
                 val marks = event.unborn.marksList
-                // Нерождённых видит привратник: они приходят во Врата.
+                // Нерождённых видит хозяин в своих Вратах.
                 val gatheringGates = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Threshold }
                 if (gatheringGates != null) {
                     gathering = gatheringGates.copy(unborn = marks)
