@@ -1,11 +1,5 @@
 package com.will.app
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.Network
-import android.os.Handler
-import android.os.Looper
-import android.os.SystemClock
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +46,8 @@ import will.v1.turn
  * рисуются экраны. Действия уходят на сервер; ответы сервера собираются в состояние.
  * Вид меняется только по слову сервера (`Turned` … `HistoryEnd`): пока новый вид идёт,
  * на экране остаётся прежний. Сессия одна на всё приложение: поворот экрана её не рвёт.
+ * Живёт она в телефоне ([phone]) и говорит с сервером через связь ([transport]); больше
+ * ничего от Android не знает — в тестах оба подделывают.
  *
  * Связь: появилась сеть — переподключаемся сразу, не дожидаясь конца паузы. Соединение
  * живёт в сети, по которой открыто: пропала она или телефон перешёл на другую — соединение
@@ -82,16 +78,13 @@ import will.v1.turn
  * своей Обители меняется от Уз — его перечитывают, если он перед глазами. Своё
  * уведомление ([tell]) идёт туда же, куда и уведомления сервера.
  */
-class WillSession(context: Context) {
+class WillSession(
+    private val phone: Phone,
+    private val transport: Transport,
+    val clock: ServerClock = ServerClock(),
+) {
 
-    private val appContext = context.applicationContext
-    private val bridge = WillBridge(if (WillBridge.TLS) serverCertificate(context) else null)
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
-
-    private var connectedOn: Network? = null
-
-    val clock = ServerClock()
+    private var connectedOn: Any? = null
 
     private var bindSentAt: Long? = null
 
@@ -137,35 +130,24 @@ class WillSession(context: Context) {
     }
 
     private fun watchNetwork() {
-        val connectivity = connectivity ?: return
-        connectivity.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                mainHandler.post {
-                    // Перешли на другую сеть: прежнее соединение осталось в старой и мертво.
-                    if (network != connectedOn) abandon("сеть сменилась")
-                    if (_state.value.connection != Connection.Reconnecting) return@post
+        phone.watchNetwork(
+            onAvailable = { network ->
+                // Перешли на другую сеть: прежнее соединение осталось в старой и мертво.
+                if (network != connectedOn) abandon("сеть сменилась")
+                if (_state.value.connection == Connection.Reconnecting) {
                     backoff.reset()
                     connect()
                 }
-            }
-
-            override fun onLost(network: Network) {
-                mainHandler.post { if (network == connectedOn) abandon("сеть пропала") }
-            }
-        })
+            },
+            onLost = { network -> if (network == connectedOn) abandon("сеть пропала") },
+        )
     }
 
     private fun connect() {
-        mainHandler.removeCallbacks(reconnect)
-        connectedOn = connectivity?.activeNetwork
+        phone.cancel(reconnect)
+        connectedOn = phone.network
         bindSentAt = clock.phoneNowNs()
-        bridge.connect(
-            WillBridge.HOST,
-            WillBridge.PORT,
-            DeviceTokenStore.loadOrCreate(appContext),
-            ::onEvent,
-            ::onClosed,
-        )
+        transport.connect(phone.deviceToken, ::onEvent, ::onClosed)
     }
 
     private fun onClosed(reason: String) {
@@ -190,18 +172,18 @@ class WillSession(context: Context) {
         returningRequest = null
         tellingRequest = null
         remarkingRequest = null
-        mainHandler.removeCallbacks(beating)
+        phone.cancel(beating)
         val delay = backoff.nextPauseMs()
-        android.util.Log.w(TAG, "connection lost: $reason; again in $delay ms")
+        phone.log("connection lost: $reason; again in $delay ms")
         // Сказать об этом — дело заставки: пока связи нет, она закрывает экран.
-        mainHandler.removeCallbacks(reconnect)
-        mainHandler.postDelayed(reconnect, delay)
+        phone.cancel(reconnect)
+        phone.postDelayed(reconnect, delay)
     }
 
     private fun abandon(reason: String) {
         if (_state.value.connection == Connection.Reconnecting) return
         // Прежнее соединение больше не скажет, что закрылось: закрываем его сами.
-        bridge.disconnect()
+        transport.disconnect()
         onClosed(reason)
     }
 
@@ -273,7 +255,7 @@ class WillSession(context: Context) {
         beginningRequest = asked
         beginSentAt = sentAt
         _state.update { it.copy(beginning = Reply.Pending, workout = workout) }
-        TrainingService.start(appContext)
+        phone.leadTraining()
         beat()
     }
 
@@ -373,7 +355,7 @@ class WillSession(context: Context) {
         if (_state.value.workout != null) return
         val workout = underwayIn(_state.value.view) ?: return
         _state.update { it.copy(workout = workout) }
-        TrainingService.start(appContext)
+        phone.leadTraining()
         beat()
     }
 
@@ -391,12 +373,12 @@ class WillSession(context: Context) {
     }
 
     private fun beat() {
-        mainHandler.removeCallbacks(beating)
+        phone.cancel(beating)
         if (_state.value.connection != Connection.Ready) return
         val pace = if (_state.value.workout != null) TRAINING_PACE_MS else CALM_PACE_MS
-        val pulse = heart.pulse(SystemClock.uptimeMillis(), pace) ?: return abandon("сервер не слышен")
+        val pulse = heart.pulse(phone.uptimeMs(), pace) ?: return abandon("сервер не слышен")
         if (pulse.beat) ask(clientEvent { heartbeat = heartbeat {} })
-        mainHandler.postDelayed(beating, pulse.nextInMs)
+        phone.postDelayed(beating, pulse.nextInMs)
     }
 
     private fun look(host: String, room: String) {
@@ -404,7 +386,7 @@ class WillSession(context: Context) {
         send(clientEvent { turn = turn { abodeOf = host; this.room = room } })
     }
 
-    private fun send(event: ClientEvent): Boolean = bridge.send(event)
+    private fun send(event: ClientEvent): Boolean = transport.send(event)
 
     private fun ask(event: ClientEvent): Long? {
         val id = ++lastRequest
@@ -704,7 +686,6 @@ class WillSession(context: Context) {
     }
 
     companion object {
-        private const val TAG = "WillSession"
         private const val HISTORY_LIMIT = 200
         private const val TRAINING_PACE_MS = 500L
         private const val CALM_PACE_MS = 30_000L
@@ -730,11 +711,3 @@ class WillSession(context: Context) {
         }
     }
 }
-
-
-private fun serverCertificate(context: Context): String =
-    try {
-        context.assets.open("will_server.pem").bufferedReader().use { it.readText() }
-    } catch (e: java.io.IOException) {
-        throw IllegalStateException("В сборке нет сертификата сервера (assets/will_server.pem)", e)
-    }

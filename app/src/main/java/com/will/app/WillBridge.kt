@@ -37,7 +37,9 @@ import will.v1.clientEvent
  */
 class WillBridge(
     private val certificate: String?,
-) {
+    private val host: String = HOST,
+    private val port: Int = PORT,
+) : Transport {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -50,13 +52,7 @@ class WillBridge(
     @Volatile
     private var generation = 0
 
-    fun connect(
-        host: String,
-        port: Int,
-        deviceToken: String,
-        onEvent: (ServerEvent) -> Unit,
-        onClosed: (String) -> Unit,
-    ) {
+    override fun connect(deviceToken: String, onEvent: (ServerEvent) -> Unit, onClosed: (String) -> Unit) {
         disconnect()
         val gen = ++generation
 
@@ -97,12 +93,12 @@ class WillBridge(
         }
     }
 
-    fun send(event: ClientEvent): Boolean {
+    override fun send(event: ClientEvent): Boolean {
         val out = synchronized(lock) { outbound } ?: return false
         return out.trySend(event).isSuccess
     }
 
-    fun disconnect() {
+    override fun disconnect() {
         generation++
         val (ch, out, j) = synchronized(lock) {
             val taken = Triple(channel, outbound, job)
