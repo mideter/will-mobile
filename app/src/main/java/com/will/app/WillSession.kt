@@ -238,12 +238,14 @@ class WillSession(context: Context) {
         if (send(clientEvent { endApproach = endApproach { this.behestId = behestId } })) endSentAt = sentAt
     }
 
-    fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) {
+    fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int, strain: Int) {
         // Подход, законченный раньше, кончился не сейчас: по ответу часы не сверить.
         val ended = (_state.value.view as? View.Room)?.underways?.get(behestId)?.endedAtNs != null
         val sentAt = clock.phoneNowNs().takeIf { !ended }
         val sent = send(clientEvent {
-            finishApproach = finishApproach { this.behestId = behestId; this.weightGrams = weightGrams; this.repetitions = repetitions }
+            finishApproach = finishApproach {
+                this.behestId = behestId; this.weightGrams = weightGrams; this.repetitions = repetitions; this.strain = strain
+            }
         })
         if (sent && sentAt != null) finishSentAt = sentAt
     }
@@ -417,7 +419,7 @@ class WillSession(context: Context) {
                 finishSentAt?.let { clock.observe(e.finishedAtNs, it, clock.phoneNowNs()) }
                 endSentAt = null
         finishSentAt = null
-                val effort = EffortItem(e.exercise, e.approach, e.weightGrams, e.repetitions, e.begunAtNs, e.finishedAtNs)
+                val effort = EffortItem(e.exercise, e.approach, e.weightGrams, e.repetitions, e.begunAtNs, e.finishedAtNs, e.strain)
                 val add = { words: List<WordItem> ->
                     words.map { if (it.id == event.exerted.behestId) it.copy(efforts = it.efforts + effort) else it }
                 }
@@ -578,7 +580,7 @@ class WillSession(context: Context) {
         exercisesList.map { e ->
             ExerciseItem(e.name, e.approachesList.map { ApproachItem(it.weightGrams, it.repetitions, it.restSeconds) }, e.instruction)
         },
-        effortsList.map { EffortItem(it.exercise, it.approach, it.weightGrams, it.repetitions, it.begunAtNs, it.finishedAtNs) },
+        effortsList.map { EffortItem(it.exercise, it.approach, it.weightGrams, it.repetitions, it.begunAtNs, it.finishedAtNs, it.strain) },
         remarksList.map { RemarkItem(it.exercise, it.body, it.saidAtNs) },
     )
 

@@ -23,7 +23,8 @@ data class ExerciseItem(val name: String, val approaches: List<ApproachItem>, va
 
 /**
  * Сделанный подход тренировки: какой (номера с нуля), с каким весом и сколько повторов,
- * начат и закончен когда (наносекунды от эпохи, по часам сервера).
+ * начат и закончен когда (наносекунды от эпохи, по часам сервера) и как прошёл — [strain]
+ * знаков: ни одного — как надо, «!» — с нагрузкой, «!!» — тяжело.
  */
 data class EffortItem(
     val exercise: Int,
@@ -32,6 +33,7 @@ data class EffortItem(
     val repetitions: Int,
     val begunAtNs: Long,
     val finishedAtNs: Long,
+    val strain: Int = 0,
 )
 
 /** Заметка ученика к упражнению тренировки (номер с нуля): что сказал и когда, по часам сервера. */

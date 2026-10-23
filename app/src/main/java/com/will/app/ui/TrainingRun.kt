@@ -131,7 +131,8 @@ fun TrainingRun(
     }
 
     Column(Modifier.fillMaxSize()) {
-        val span = TrainingCourse.span(training, doing)
+        // На экране выполнения тренировка ещё идёт, сколько бы подходов ни было закончено.
+        val span = TrainingCourse.span(training, doing)?.copy(endNs = null)
         Header(
             title = "Выполнение",
             subtitle = training.body + (span?.let { " · " + trainingSpanText(it, nowNs) } ?: ""),
@@ -219,7 +220,7 @@ fun TrainingRun(
                 endedAt != null && doing != null -> {
                     Text("Отдых", fontSize = 13.sp, color = WillColors.Muted)
                     Text(spanText((nowNs - endedAt) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
-                    Text(captionOf(training, doing.exercise, doing.approach) + " — что сделано?", fontSize = 14.sp, color = WillColors.Muted)
+                    Text(captionOf(training, doing.exercise, doing.approach) + " — как прошёл?", fontSize = 14.sp, color = WillColors.Muted)
                 }
                 resting -> {
                     // Сначала обратный отсчёт до заданного, потом секундомер дальше от отметки.
@@ -248,7 +249,7 @@ fun TrainingRun(
                     confirming = true
                 }
             } else if (doing != null) {
-                BottomButton(text = "Сказать, что сделано", trouble = null) { confirming = true }
+                BottomButton(text = "Сказать, как прошёл", trouble = null) { confirming = true }
             } else {
                 BottomButton(
                     text = if (beginning) "Начинается…" else "Приступить",
@@ -266,20 +267,39 @@ fun TrainingRun(
         val draft = rememberSaveable(doing.behestId, doing.exercise, doing.approach, doing.begunAtNs, saver = ApproachDraft.Saver) {
             ApproachDraft(like?.weightGrams ?: 0, like?.repetitions ?: 10)
         }
-        // Подход уже закончен — окно не закрыть, не сказав, что сделано.
+        var strain by rememberSaveable(doing.behestId, doing.exercise, doing.approach, doing.begunAtNs) { mutableStateOf(0) }
+        // Подход уже закончен — окно не закрыть, не сказав, как он прошёл.
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Что сделано") },
+            title = { Text("Как прошёл подход") },
             text = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    WeightStepper(draft, Modifier.weight(1.3f))
-                    Text("×", fontSize = 16.sp, color = WillColors.Muted, modifier = Modifier.padding(horizontal = 4.dp))
-                    RepetitionsStepper(draft, Modifier.weight(1f))
+                Column {
+                    Text(captionOf(training, doing.exercise, doing.approach), fontSize = 13.sp, color = WillColors.Muted)
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        WeightStepper(draft, Modifier.weight(1.3f))
+                        Text("×", fontSize = 16.sp, color = WillColors.Muted, modifier = Modifier.padding(horizontal = 4.dp))
+                        RepetitionsStepper(draft, Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    // Не нажато ничего — подход прошёл как надо.
+                    Row {
+                        for ((marks, label) in listOf(1 to "! с нагрузкой", 2 to "!! тяжело")) {
+                            val chosen = strain == marks
+                            TextButton(onClick = { strain = if (chosen) 0 else marks }) {
+                                Text(
+                                    label,
+                                    color = if (chosen) WillColors.Accent else WillColors.Muted,
+                                    fontWeight = if (chosen) FontWeight.Medium else FontWeight.Normal,
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    session.finishApproach(training.id, draft.grams, draft.repetitions)
+                    session.finishApproach(training.id, draft.grams, draft.repetitions, strain)
                     confirming = false
                 }) { Text("Готово") }
             },
@@ -363,7 +383,7 @@ private fun RunRow(
             effort != null -> {
                 val changed = willed != null && (willed.weightGrams != effort.weightGrams || willed.repetitions != effort.repetitions)
                 val took = (effort.finishedAtNs - effort.begunAtNs) / NANOS
-                "${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}" to
+                "${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}${marksOf(effort)}" to
                     (if (changed || willed == null) WillColors.Accent else WillColors.Ink)
             }
             underwayFor != null -> "выполняется ${spanText(underwayFor)}" to WillColors.Accent
@@ -374,6 +394,8 @@ private fun RunRow(
         Text(line, fontSize = 15.sp, color = colour)
     }
 }
+
+private fun marksOf(effort: EffortItem) = if (effort.strain > 0) " " + "!".repeat(effort.strain) else ""
 
 @Composable
 private fun RemarkField(onSay: (String) -> Unit, key: String) {
@@ -441,7 +463,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                             else -> "${weightText(asked.weightGrams)} × ${asked.repetitions} → ${weightText(effort.weightGrams)} × $did"
                         }
                         val took = (effort.finishedAtNs - effort.begunAtNs) / NANOS
-                        "$head · ${spanText(took)}" to
+                        "$head · ${spanText(took)}${marksOf(effort)}" to
                             (if (head.endsWith("✓")) WillColors.Ink else WillColors.Accent)
                     }
                     underway != null && underway.exercise == e && underway.approach == a ->
