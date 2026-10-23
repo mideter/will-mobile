@@ -3,6 +3,9 @@ package com.will.app.ui
 import android.content.ClipboardManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -53,7 +56,8 @@ class AbodeScreenTest {
         transport.welcome("anna")
         compose.setContent {
             val state by session.state.collectAsState()
-            (state.view as? View.Abode)?.let { AbodeScreen(state, it, session) }
+            var tab by remember { mutableStateOf(AbodeTab.Deeds) }
+            (state.view as? View.Abode)?.let { AbodeScreen(state, it, session, tab) { tab = it } }
         }
     }
 
@@ -90,6 +94,7 @@ class AbodeScreenTest {
         abode("", ownRooms)
         compose.onNodeWithText("Моя Обитель").assertIsDisplayed()
         compose.onNodeWithText("Я — anna").assertIsDisplayed()
+        compose.onNodeWithText("Комнаты").performClick()
         val inner = compose.onNodeWithText("Внутренняя часть").fetchSemanticsNode().boundsInRoot.top
         val helm = compose.onNodeWithText("Кормчая").fetchSemanticsNode().boundsInRoot.top
         val word = compose.onNodeWithText("Слово").fetchSemanticsNode().boundsInRoot.top
@@ -125,10 +130,22 @@ class AbodeScreenTest {
     }
 
     @Test
-    fun `the helm counts the supplications awaiting an answer`() {
+    fun `the supplications are among the deeds, counted with what awaits one only from the rooms, and lead to the helm`() {
         transport.tell(serverEvent { supplications = supplications { suppliantNames += listOf("boris", "viktor") } })
+        abode("", ownRooms, owed = listOf("Понедельник" to "Послушание — gleb"))
+        compose.onAllNodesWithText("3").assertCountEquals(0)
+        compose.onNodeWithText("Комнаты").performClick()
+        compose.onNodeWithText("3").assertIsDisplayed()
+        compose.onNodeWithText("Дела").performClick()
+        compose.onNodeWithText("Просьбы").assertIsDisplayed()
+        compose.onNodeWithText("viktor").performClick()
+        assertEquals("Кормчая", lastTurn().room)
+    }
+
+    @Test
+    fun `with nothing awaiting, the deeds say so`() {
         abode("", ownRooms)
-        compose.onNodeWithText("Просьбы: 2").assertIsDisplayed()
+        compose.onNodeWithText("Дел нет").assertIsDisplayed()
     }
 
     @Test

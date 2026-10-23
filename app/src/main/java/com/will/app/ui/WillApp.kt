@@ -35,6 +35,7 @@ fun WillApp(session: WillSession) {
     val state by session.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     var screen by rememberSaveable { mutableStateOf(Screen.Main) }
+    var abodeTab by rememberSaveable { mutableStateOf(AbodeTab.Deeds) }
 
     LaunchedEffect(session) {
         session.notices.collect { snackbar.showSnackbar(it) }
@@ -67,7 +68,7 @@ fun WillApp(session: WillSession) {
                     Screen.Lineage -> LineageScreen(state, session, onBack = back)
                     Screen.Main -> when (view) {
                         null -> ConnectingScreen()
-                        is View.Abode -> AbodeScreen(state, view, session)
+                        is View.Abode -> AbodeScreen(state, view, session, abodeTab) { abodeTab = it }
                         is View.Room -> when (view.aspect) {
                             Aspect.Threshold -> GatesScreen(state, view, session)
                             Aspect.Dwellers -> HelmScreen(state, view, session)
