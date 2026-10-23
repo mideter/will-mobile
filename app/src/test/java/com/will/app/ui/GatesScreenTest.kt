@@ -67,7 +67,7 @@ class GatesScreenTest {
     @Test
     fun `at one's own gates one lets in who waits and bears the unborn`() {
         gates("", open = true, waiting = listOf("boris"), unbornMarks = listOf(4))
-        compose.onNodeWithText("Моя Обитель").assertIsDisplayed()
+        compose.onNodeWithText("‹ anna").assertIsDisplayed()
         compose.onNodeWithText("Впустить").performClick()
         assertEquals("boris", transport.sent.last { it.hasAdmit() }.admit.name)
         compose.onNodeWithText("#4").assertIsDisplayed()
@@ -96,7 +96,8 @@ class GatesScreenTest {
     fun `at another's gates a dweller goes in`() {
         dwellingIn("viktor")
         gates("viktor", open = false)
-        compose.onNodeWithText("Обитель viktor").assertIsDisplayed()
+        compose.onNodeWithText("Врата — viktor").assertIsDisplayed()
+        compose.onNodeWithText("‹ Врата — anna").assertIsDisplayed()
         compose.onNodeWithText("Врата закрыты: хозяина нет у Врат.").assertIsDisplayed()
         compose.onNodeWithText("Вы обитаете здесь — ближний.").assertIsDisplayed()
         compose.onNodeWithText("Войти").performClick()

@@ -104,8 +104,8 @@ class AbodeScreenTest {
     @Test
     fun `one's own abode shows one's name and its rooms by parts, the core before the cells`() {
         abode("", ownRooms)
-        compose.onNodeWithText("Моя Обитель").assertIsDisplayed()
-        compose.onNodeWithText("Я — anna").assertIsDisplayed()
+        compose.onNodeWithText("anna").assertIsDisplayed()
+        compose.onNodeWithText("это вы").assertIsDisplayed()
         compose.onNodeWithText("Комнаты").performClick()
         val inner = compose.onNodeWithText("Внутренняя часть").fetchSemanticsNode().boundsInRoot.top
         val helm = compose.onNodeWithText("Кормчая").fetchSemanticsNode().boundsInRoot.top
@@ -121,7 +121,7 @@ class AbodeScreenTest {
     @Test
     fun `one's name is copied by a touch on the title`() {
         abode("", ownRooms)
-        compose.onNodeWithText("Моя Обитель").performClick()
+        compose.onNodeWithText("anna").performClick()
         val clipboard = RuntimeEnvironment.getApplication().getSystemService(ClipboardManager::class.java)
         assertEquals("anna", clipboard.primaryClip?.getItemAt(0)?.text.toString())
     }
@@ -196,11 +196,10 @@ class AbodeScreenTest {
     @Test
     fun `another's abode shows only the rooms open to one, and back leads to its gates`() {
         abode("boris", listOf(room { name = "Врата"; part = RoomPart.OUTER; aspect = RoomAspect.THRESHOLD }))
-        compose.onNodeWithText("Обитель boris").assertIsDisplayed()
-        compose.onNodeWithText("Вы обитаете здесь").assertIsDisplayed()
+        compose.onNodeWithText("boris").assertIsDisplayed()
         compose.onAllNodesWithText("Слово").assertCountEquals(0)
         compose.onAllNodesWithText("Выполнить").assertCountEquals(0)
-        compose.onNodeWithText("←").performClick()
+        compose.onNodeWithText("‹ Врата").performClick()
         assertEquals("boris", lastTurn().abodeOf)
         assertEquals("Врата", lastTurn().room)
     }

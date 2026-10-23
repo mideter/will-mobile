@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,18 +33,23 @@ fun Header(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (onBack != null) {
-                TextButton(onClick = onBack) { Text("←", fontSize = 20.sp) }
-            }
+            // Заголовок всегда у края; путь назад — сама подпись: она говорит, где я, туда и ведёт.
+            val onClick = onBack ?: onTitleClick
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = if (onBack == null) 8.dp else 0.dp)
-                    .let { if (onTitleClick != null) it.clickable(onClick = onTitleClick) else it },
+                    .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+                    .padding(horizontal = 8.dp),
             ) {
                 Text(title, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) {
-                    Text(subtitle, fontSize = 13.sp, color = WillColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (onBack != null) "‹ $subtitle" else subtitle,
+                        fontSize = 13.sp,
+                        color = WillColors.Muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             Row(horizontalArrangement = Arrangement.End) { actions() }

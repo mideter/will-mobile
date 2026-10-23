@@ -48,8 +48,9 @@ fun AbodeScreen(
 
     Column(Modifier.fillMaxSize()) {
         Header(
-            title = if (own) "Моя Обитель" else "Обитель ${view.host}",
-            subtitle = if (own) "Я — ${state.ownName}" else "Вы обитаете здесь",
+            // Место зовётся именем хозяина; что это имя — моё, сказано только здесь.
+            title = if (own) state.ownName else view.host,
+            subtitle = if (own) "это вы" else "Врата",
             onBack = if (own) null else ({ session.back() }),
             onTitleClick = if (own) ({
                 clipboard.setText(AnnotatedString(state.ownName))

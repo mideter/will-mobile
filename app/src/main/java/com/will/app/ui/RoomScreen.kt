@@ -111,7 +111,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     Column(Modifier.fillMaxSize()) {
         Header(
             title = view.room,
-            subtitle = if (view.host.isEmpty()) "Моя Обитель" else "Обитель ${view.host}",
+            subtitle = view.host.ifEmpty { state.ownName },
             onBack = { session.back() },
         )
 
