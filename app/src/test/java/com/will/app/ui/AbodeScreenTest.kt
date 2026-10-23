@@ -126,8 +126,8 @@ class AbodeScreenTest {
             owed = listOf("Понедельник" to "Послушание — boris", "Среда" to "Послушание — viktor"),
             awaited = listOf("Пятница" to "Ведение — gleb"),
         )
-        compose.onNodeWithText("Ожидает внимания").assertIsDisplayed()
-        compose.onNodeWithText("Задано другим").assertIsDisplayed()
+        compose.onNodeWithText("Выполнить").assertIsDisplayed()
+        compose.onNodeWithText("Ожидаю").assertIsDisplayed()
         compose.onNodeWithText("boris · задание").assertIsDisplayed()
         compose.onNodeWithText("gleb · тренировка").assertIsDisplayed()
         compose.onNodeWithText("идёт подход").assertIsDisplayed()
@@ -161,7 +161,7 @@ class AbodeScreenTest {
         compose.onNodeWithText("Обитель boris").assertIsDisplayed()
         compose.onNodeWithText("Вы обитаете здесь").assertIsDisplayed()
         compose.onAllNodesWithText("Слово").assertCountEquals(0)
-        compose.onAllNodesWithText("Ожидает внимания").assertCountEquals(0)
+        compose.onAllNodesWithText("Выполнить").assertCountEquals(0)
         compose.onNodeWithText("←").performClick()
         assertEquals("boris", lastTurn().abodeOf)
         assertEquals("Врата", lastTurn().room)

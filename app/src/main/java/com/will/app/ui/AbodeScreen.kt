@@ -33,7 +33,7 @@ import com.will.app.WillState
 enum class AbodeTab { Deeds, Rooms }
 
 /**
- * Обитель. Своя — двумя вкладками: Дела — Просьбы, что ждёт меня и что я задал другим, каждое
+ * Обитель. Своя — двумя вкладками: Дела — Просьбы, что мне выполнить и чего я ожидаю от других, каждое
  * ведёт в свою комнату; Комнаты — по частям: во внешней — Врата, через них выходят; во
  * внутренней — Кормчая, где отвечают на Просьбы. Чужая: только комнаты, открытые моему роду;
  * назад — к её Вратам.
@@ -91,11 +91,11 @@ private fun Deeds(state: WillState, view: View.Abode, session: WillSession) {
             }
         }
         if (view.owed.isNotEmpty()) {
-            item { SectionTitle("Ожидает внимания") }
+            item { SectionTitle("Выполнить") }
             item { Group(view.owed) { waiting -> WaitingRow(waiting) { session.enter(waiting.room) } } }
         }
         if (view.awaited.isNotEmpty()) {
-            item { SectionTitle("Задано другим") }
+            item { SectionTitle("Ожидаю") }
             item { Group(view.awaited) { waiting -> WaitingRow(waiting) { session.enter(waiting.room) } } }
         }
         if (state.supplications.isEmpty() && view.owed.isEmpty() && view.awaited.isEmpty()) {
