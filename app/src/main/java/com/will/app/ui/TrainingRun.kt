@@ -163,7 +163,10 @@ fun TrainingRun(
                         val begun = effort?.begunAtNs ?: doing?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
                         val willedRest = TrainingCourse.restWilled(training, e, a)
                         when {
-                            begun != null -> RestRow(restTaken(TrainingCourse.restTakenBefore(training.efforts, begun), willedRest), WillColors.Muted)
+                            // Перед первым сделанным подходом отдыхать было не после чего: строки нет.
+                            begun != null -> TrainingCourse.restTakenBefore(training.efforts, begun)?.let {
+                                RestRow(restTaken(it, willedRest), WillColors.Muted)
+                            }
                             resting && selected == e to a -> RestRow(restTaken(rested, willedRest), WillColors.Accent)
                             willedRest > 0 -> RestRow("отдых ${restText(willedRest)}", WillColors.Muted)
                         }
@@ -303,9 +306,8 @@ internal fun captionOf(training: WordItem, exercise: Int, approach: Int): String
         (asked?.let { " · ${weightText(it.weightGrams)} × ${it.repetitions}" } ?: " · сверх заданного")
 }
 
-internal fun restTaken(seconds: Long?, willed: Int): String =
-    if (seconds == null) "отдохнувшим"
-    else "отдых ${spanText(seconds)}" + if (willed > 0) " (задано ${restText(willed)})" else ""
+internal fun restTaken(seconds: Long, willed: Int): String =
+    "отдых ${spanText(seconds)}" + if (willed > 0) " (задано ${restText(willed)})" else ""
 
 @Composable
 private fun RestRow(text: String, colour: Color) {
@@ -410,7 +412,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                 val begun = effort?.begunAtNs ?: underway?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
                 val willedRest = TrainingCourse.restWilled(training, e, a)
                 when {
-                    begun != null -> FeedRestLine(restTaken(TrainingCourse.restTakenBefore(training.efforts, begun), willedRest))
+                    begun != null -> TrainingCourse.restTakenBefore(training.efforts, begun)?.let { FeedRestLine(restTaken(it, willedRest)) }
                     asked != null && willedRest > 0 && !finished -> FeedRestLine("отдых ${restText(willedRest)}")
                 }
                 val (line, colour) = when {
