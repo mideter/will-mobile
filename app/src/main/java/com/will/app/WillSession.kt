@@ -60,7 +60,8 @@ import will.v1.turn
  *
  * Запросы: свои запросы нумеруются, ответ (`Reply`) узнаётся по номеру, а не по словам
  * уведомления; номер растёт на всё время жизни сессии. Задание и тренировку, отправленные
- * на выполнение и из редактора, ждут как `Pending` до ответа.
+ * на выполнение и из редактора, подход, к которому приступили, рассказ о подходе и заметку
+ * ждут как `Pending` до ответа.
  *
  * Путь: ходят путём мира — из Обители через её Врата, к Вратам той, куда идут, и внутрь;
  * «назад» — тем же путём. От своих Врат идут к чужим; у чужих входят, если там обитают.
@@ -91,6 +92,8 @@ class WillSession(context: Context) {
     private var fulfillingRequest: Long? = null
     private var fulfillingBehest: Long? = null
     private var beginningRequest: Long? = null
+    private var tellingRequest: Long? = null
+    private var remarkingRequest: Long? = null
 
     private var beginSentAt: Long? = null
     private var endSentAt: Long? = null
@@ -156,7 +159,14 @@ class WillSession(context: Context) {
     private fun onClosed(reason: String) {
         // Ответов на отправленное уже не будет: окна остаются открытыми.
         _state.update {
-            it.copy(connection = Connection.Reconnecting, willing = Reply.None, fulfilling = Reply.None, beginning = Reply.None)
+            it.copy(
+                connection = Connection.Reconnecting,
+                willing = Reply.None,
+                fulfilling = Reply.None,
+                beginning = Reply.None,
+                telling = Reply.None,
+                remarking = Reply.None,
+            )
         }
         beginSentAt = null
         endSentAt = null
@@ -165,6 +175,8 @@ class WillSession(context: Context) {
         fulfillingRequest = null
         fulfillingBehest = null
         beginningRequest = null
+        tellingRequest = null
+        remarkingRequest = null
         val delay = backoff.nextPauseMs()
         android.util.Log.w(TAG, "connection lost: $reason; again in $delay ms")
         // Сказать об этом — дело заставки: пока связи нет, она закрывает экран.
@@ -258,21 +270,30 @@ class WillSession(context: Context) {
     }
 
     fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int, strain: Int) {
+        if (_state.value.telling == Reply.Pending) return
         // Подход, законченный раньше, кончился не сейчас: по ответу часы не сверить.
         val ended = (_state.value.view as? View.Room)?.underways?.get(behestId)?.endedAtNs != null
         val sentAt = clock.phoneNowNs().takeIf { !ended }
-        val sent = send(clientEvent {
+        val asked = ask(clientEvent {
             finishApproach = finishApproach {
                 this.behestId = behestId; this.weightGrams = weightGrams; this.repetitions = repetitions; this.strain = strain
             }
-        })
-        if (sent && sentAt != null) finishSentAt = sentAt
+        }) ?: return
+        tellingRequest = asked
+        if (sentAt != null) finishSentAt = sentAt
+        _state.update { it.copy(telling = Reply.Pending) }
     }
 
     fun sayRemark(behestId: Long, exercise: Int, text: String) {
-        if (text.isBlank()) return
-        send(clientEvent { sayRemark = sayRemark { this.behestId = behestId; this.exercise = exercise; body = text.trim() } })
+        if (text.isBlank() || _state.value.remarking == Reply.Pending) return
+        val asked = ask(clientEvent {
+            sayRemark = sayRemark { this.behestId = behestId; this.exercise = exercise; body = text.trim() }
+        }) ?: return
+        remarkingRequest = asked
+        _state.update { it.copy(remarking = Reply.Pending) }
     }
+
+    fun remarkingSeen() = _state.update { it.copy(remarking = Reply.None) }
 
     fun train(title: String, exercises: List<ExerciseItem>) {
         val view = _state.value.view as? View.Room ?: return
@@ -494,6 +515,15 @@ class WillSession(context: Context) {
                     beginningRequest -> {
                         beginningRequest = null
                         _state.update { it.copy(beginning = Reply.None) }
+                    }
+                    tellingRequest -> {
+                        // Сказанное уже пришло подходом (`Exerted`): пульт закрывает он, а не ответ.
+                        tellingRequest = null
+                        _state.update { it.copy(telling = Reply.None) }
+                    }
+                    remarkingRequest -> {
+                        remarkingRequest = null
+                        _state.update { it.copy(remarking = outcome) }
                     }
                 }
                 if (reply.notice.isNotEmpty()) _notices.tryEmit(Notices.say(reply.code, reply.argsList, reply.notice))

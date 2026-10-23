@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.will.app.ApproachItem
 import com.will.app.Choice
+import com.will.app.Reply
 import com.will.app.TrainingCourse
 import com.will.app.EffortItem
 import com.will.app.UnderwayItem
@@ -75,7 +76,9 @@ private const val NANOS = 1_000_000_000L
  * отсчёт до заданного. Каждый подход сразу уходит Тренеру. Экран не гаснет, пока открыт;
  * таймеры считаются от меток времени. Погашенный экран ведёт [com.will.app.TrainingService]:
  * уведомление с таймером и вибрация в конце отдыха. Выбор [choice] — в сессии, его видит и оно. [beginning] — к подходу приступили,
- * сервер ещё не сказал, что он идёт. [finishing] — тренировка отправлена на завершение и ждёт
+ * сервер ещё не сказал, что он идёт. [telling] — рассказ о подходе отправлен: пульт закрывает
+ * пришедший подход, а оборвись связь — рассказ остаётся на пульте. [remarking] — так же с
+ * заметкой: поле закрывается, когда сервер её принял. [finishing] — тренировка отправлена на завершение и ждёт
  * ответа сервера; закрывает экран сам ответ.
  */
 @Composable
@@ -85,6 +88,8 @@ fun TrainingRun(
     choice: Choice,
     session: WillSession,
     beginning: Boolean,
+    telling: Boolean,
+    remarking: Reply,
     finishing: Boolean,
     onClose: () -> Unit,
 ) {
@@ -97,8 +102,15 @@ fun TrainingRun(
     var confirming by rememberSaveable { mutableStateOf(false) }
     // Подход закончен, а что сделано — не сказано: и после перезапуска сначала досказать.
     LaunchedEffect(endedAt) { if (endedAt != null) confirming = true }
+    LaunchedEffect(doing == null) { if (doing == null) confirming = false }
     var closing by rememberSaveable { mutableStateOf(false) }
     var remarkingOn by rememberSaveable { mutableStateOf<Int?>(null) }
+    LaunchedEffect(remarking) {
+        if (remarking == Reply.Granted) {
+            remarkingOn = null
+            session.remarkingSeen()
+        }
+    }
 
     // Часы сервера — метки подходов ставит он: раз в четверть секунды.
     var nowNs by remember { mutableLongStateOf(session.clock.nowNs()) }
@@ -154,7 +166,7 @@ fun TrainingRun(
                     }
                     InstructionLine(exercise.instruction)
                     if (remarkingOn == e) {
-                        RemarkField(onSay = { session.sayRemark(training.id, e, it); remarkingOn = null }, key = "${training.id}:$e")
+                        RemarkField(onSay = { session.sayRemark(training.id, e, it) }, sending = remarking == Reply.Pending, key = "${training.id}:$e")
                     }
                     val remarks = TrainingCourse.remarksByApproachesDone(training, e)
                     // Нажимается только следующий подход упражнения: подходы идут по порядку.
@@ -210,7 +222,7 @@ fun TrainingRun(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (confirming && doing != null) {
-                TellingPanel(training, doing, endedAt, nowNs, session) { confirming = false }
+                TellingPanel(training, doing, endedAt, nowNs, telling, session)
             } else {
                 val line = when {
                     going != null -> "Подход · " + placeOf(training, going.exercise, going.approach)
@@ -349,8 +361,8 @@ private fun TellingPanel(
     doing: UnderwayItem,
     endedAt: Long?,
     nowNs: Long,
+    telling: Boolean,
     session: WillSession,
-    onTold: () -> Unit,
 ) {
     // Сделанное — как задано, если не поправить; сверх заданного — как последний подход.
     val like = TrainingCourse.proposal(training, doing.exercise, doing.approach)
@@ -371,9 +383,8 @@ private fun TellingPanel(
     Spacer(Modifier.height(10.dp))
     StrainChoice(strain) { strain = it }
     Spacer(Modifier.height(10.dp))
-    BottomButton(text = "Готово", trouble = null) {
+    BottomButton(text = if (telling) "Отправляется…" else "Готово", trouble = null, busy = telling) {
         session.finishApproach(training.id, draft.grams, draft.repetitions, strain)
-        onTold()
     }
 }
 
@@ -415,13 +426,13 @@ private fun placeOf(training: WordItem, exercise: Int, approach: Int): String {
 private fun marksOf(effort: EffortItem) = if (effort.strain > 0) " " + "!".repeat(effort.strain) else ""
 
 @Composable
-private fun RemarkField(onSay: (String) -> Unit, key: String) {
+private fun RemarkField(onSay: (String) -> Unit, sending: Boolean, key: String) {
     var text by rememberSaveable(key) { mutableStateOf("") }
     // Сервер меряет речение байтами UTF-8, а не знаками.
     val fits = text.isNotBlank() && text.trim().toByteArray().size <= MAX_REMARK_BYTES
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    val say = { if (fits) { onSay(text.trim()); text = "" } }
+    val say = { if (fits && !sending) onSay(text.trim()) }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 28.dp, top = 2.dp)) {
         BasicTextField(
             value = text,
@@ -440,7 +451,7 @@ private fun RemarkField(onSay: (String) -> Unit, key: String) {
                 inner()
             },
         )
-        TextButton(onClick = say, enabled = fits) { Text("↑", fontSize = 18.sp) }
+        TextButton(onClick = say, enabled = fits && !sending) { Text("↑", fontSize = 18.sp) }
     }
 }
 
