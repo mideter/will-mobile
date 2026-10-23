@@ -202,7 +202,7 @@ class TrainingService : Service() {
         if (doing != null) {
             return builder
                 .setContentTitle(
-                    if (doing.endedAtNs != null) "Отдых · что сделано в подходе?" else "Подход · " + captionOf(t, doing.exercise, doing.approach),
+                    if (doing.endedAtNs != null) "Отдых · как прошёл подход?" else "Подход · " + captionOf(t, doing.exercise, doing.approach),
                 )
                 .setWhen(wallMs(doing.endedAtNs ?: doing.begunAtNs))
                 .setUsesChronometer(true)

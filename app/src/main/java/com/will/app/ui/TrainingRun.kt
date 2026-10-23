@@ -215,7 +215,8 @@ fun TrainingRun(
                 val line = when {
                     going != null -> "Подход · " + placeOf(training, going.exercise, going.approach)
                     resting -> "Отдых" + (selected?.let { (e, a) -> " · далее " + placeOf(training, e, a) } ?: "")
-                    else -> selected?.let { (e, a) -> "Далее " + placeOf(training, e, a) } ?: "Все заданные подходы сделаны"
+                    else -> selected?.let { (e, a) -> "Далее " + placeOf(training, e, a) }
+                        ?: "Все заданные подходы сделаны — можно добавить подход сверх заданного"
                 }
                 Text(line, fontSize = 14.sp, color = WillColors.Muted)
                 when {
@@ -238,12 +239,13 @@ fun TrainingRun(
                     }
                 } else if (doing != null) {
                     BottomButton(text = "Сказать, как прошёл", trouble = null) { confirming = true }
+                } else if (selected == null) {
+                    // Заданное сделано: главное действие — завершить.
+                    BottomButton(text = "Завершить тренировку", trouble = null) { closing = true }
                 } else {
-                    BottomButton(
-                        text = if (beginning) "Начинается…" else "Приступить",
-                        trouble = if (selected == null) "Завершите тренировку или добавьте подход" else null,
-                        busy = beginning,
-                    ) { selected?.let { (e, a) -> session.beginApproach(training.id, e, a) } }
+                    BottomButton(text = if (beginning) "Начинается…" else "Приступить", trouble = null, busy = beginning) {
+                        session.beginApproach(training.id, selected.first, selected.second)
+                    }
                     TextButton(onClick = { closing = true }) {
                         Text("завершить тренировку", fontSize = 13.sp, color = WillColors.Muted)
                     }
