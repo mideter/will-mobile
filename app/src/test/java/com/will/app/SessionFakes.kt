@@ -3,8 +3,10 @@ package com.will.app
 import will.v1.MessengerOuterClass.ClientEvent
 import will.v1.MessengerOuterClass.ServerEvent
 import will.v1.authOk
+import will.v1.historyEnd
 import will.v1.reply
 import will.v1.serverEvent
+import will.v1.turned
 
 /** Телефон для тестов: время идёт рукой ([pass]), и отложенное выполняется, когда его время пришло. */
 class FakePhone : Phone {
@@ -105,6 +107,13 @@ class FakeTransport : Transport {
     fun welcome(name: String = "anna") = tell(serverEvent { authOk = authOk { this.name = name } })
 
     fun answer(event: ClientEvent) = tell(serverEvent { reply = reply { requestId = event.requestId; granted = true } })
+
+    fun refuse(event: ClientEvent) = tell(serverEvent { reply = reply { requestId = event.requestId; granted = false } })
+
+    fun show(host: String, room: String) {
+        tell(serverEvent { turned = turned { abodeOf = host; this.room = room } })
+        tell(serverEvent { historyEnd = historyEnd {} })
+    }
 
     fun beats() = sent.filter { it.hasHeartbeat() }
 }
