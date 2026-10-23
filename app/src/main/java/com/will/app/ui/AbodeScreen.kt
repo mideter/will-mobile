@@ -1,6 +1,5 @@
 package com.will.app.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,13 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -134,22 +131,6 @@ private fun RowScope.Tab(title: String, count: Int, selected: Boolean, onClick: 
     ) {
         Text(title, fontSize = 15.sp, color = if (selected) WillColors.Accent else WillColors.Muted)
         if (count > 0) Text("$count", fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 6.dp))
-    }
-}
-
-@Composable
-private fun <T> Group(items: List<T>, row: @Composable (T) -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(WillColors.Row),
-    ) {
-        items.forEachIndexed { index, item ->
-            if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = WillColors.Divider)
-            row(item)
-        }
     }
 }
 

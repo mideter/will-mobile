@@ -1,17 +1,20 @@
 package com.will.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,4 +67,20 @@ fun SectionTitle(text: String) {
 @Composable
 fun Hint(text: String) {
     Text(text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 14.sp, color = WillColors.Muted)
+}
+
+@Composable
+fun <T> Group(items: List<T>, row: @Composable (T) -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(WillColors.Row),
+    ) {
+        items.forEachIndexed { index, item ->
+            if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = WillColors.Divider)
+            row(item)
+        }
+    }
 }

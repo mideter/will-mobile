@@ -4,6 +4,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -98,9 +100,11 @@ class HelmScreenTest {
     }
 
     @Test
-    fun `a dweller is regarded anew by his kind, and his own kind asks nothing`() {
+    fun `a dweller opened in place is regarded anew by another kind, the same kind asks nothing`() {
         helm(people = listOf(acquaintance("boris")))
-        compose.onNodeWithText("знакомый").performClick()
+        compose.onAllNodesWithText("друг").assertCountEquals(0)
+        compose.onNodeWithText("boris").performClick()
+        compose.onNode(hasText("знакомый") and hasClickAction() and !hasText("boris")).performClick()
         assertEquals(0, transport.sent.count { it.hasRegard() })
         compose.onNodeWithText("друг").performClick()
         val regard = transport.sent.last { it.hasRegard() }.regard
@@ -109,23 +113,24 @@ class HelmScreenTest {
     }
 
     @Test
-    fun `one asks to be trained only one in whose abode one dwells, and not one who asks or trains already`() {
+    fun `a dweller tells his kind and standing, and opened asks to be trained only where one dwells and none asks or trains already`() {
         val cases = listOf(
             Triple(acquaintance("boris"), true, null),
             Triple(acquaintance("viktor"), false, null),
-            Triple(acquaintance("gleb") { trainer = true }, true, "Ваш Тренер"),
-            Triple(acquaintance("dana") { asks = true }, true, "Просит вас стать Тренером"),
-            Triple(acquaintance("egor") { asked = true }, true, "Просьба отправлена, ждёт ответа"),
-            Triple(acquaintance("zoya") { novice = true }, true, "Ваш ученик"),
+            Triple(acquaintance("gleb") { trainer = true }, true, "знакомый · Тренер"),
+            Triple(acquaintance("dana") { asks = true }, true, "знакомый · просит"),
+            Triple(acquaintance("egor") { asked = true }, true, "знакомый · просьба отправлена"),
+            Triple(acquaintance("zoya") { novice = true }, true, "знакомый · ученик"),
         )
         val asks = mapOf("boris" to 1, "viktor" to 0, "gleb" to 0, "dana" to 0, "egor" to 0, "zoya" to 1)
         for ((dweller, dwelling, standing) in cases) {
             helm(people = listOf(dweller), dwellingIn = if (dwelling) listOf(dweller.name) else emptyList())
-            compose.onNodeWithText(dweller.name).assertIsDisplayed()
             standing?.let { compose.onNodeWithText(it).assertIsDisplayed() }
+            compose.onNodeWithText(dweller.name).performClick()
             compose.onAllNodesWithText("Просить стать Тренером").assertCountEquals(asks.getValue(dweller.name))
         }
         helm(people = listOf(acquaintance("boris")), dwellingIn = listOf("boris"))
+        compose.onNodeWithText("boris").performClick()
         compose.onNodeWithText("Просить стать Тренером").performClick()
         assertEquals("boris", transport.sent.last { it.hasSupplicate() }.supplicate.addresseeName)
     }
@@ -134,16 +139,16 @@ class HelmScreenTest {
     @Test
     fun `cells are moved between the parts, and the gates and the helm are not`() {
         helm()
-        compose.onNodeWithText("внутренняя часть").assertIsDisplayed()
-        compose.onAllNodesWithText("Врата").assertCountEquals(0)
-        compose.onNodeWithText("Во внешнюю").performClick()
+        compose.onNodeWithText("Врата").assertIsDisplayed()
+        compose.onAllNodesWithText("во внутреннюю").assertCountEquals(0)
+        compose.onNodeWithText("во внешнюю").performClick()
         val arranged = transport.sent.last { it.hasArrange() }.arrange
         assertEquals("Слово", arranged.room)
         assertEquals(RoomPart.OUTER, arranged.part)
 
         // Сервер говорит комнаты заново — Келья уже во внешней части.
         transport.tell(serverEvent { rooms = rooms { rooms += cell("Слово", outer = true); rooms += cores } })
-        compose.onNodeWithText("внешняя часть").assertIsDisplayed()
-        compose.onNodeWithText("Во внутреннюю").assertIsDisplayed()
+        compose.onNodeWithText("во внутреннюю").assertIsDisplayed()
+        compose.onAllNodesWithText("во внешнюю").assertCountEquals(0)
     }
 }
