@@ -455,6 +455,7 @@ class WillSession(
                 gathering = abode.copy(
                     owed = event.outstanding.owedList.map { it.toWaiting() },
                     awaited = event.outstanding.awaitedList.map { it.toWaiting() },
+                    unreviewed = event.outstanding.unreviewedList.map { it.toWaiting() },
                 )
             }
             ServerEvent.EventCase.WORD -> place(event.word.toItem())

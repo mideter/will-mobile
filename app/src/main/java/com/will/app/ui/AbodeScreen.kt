@@ -33,10 +33,10 @@ import com.will.app.WillState
 enum class AbodeTab { Deeds, Rooms }
 
 /**
- * Обитель. Своя — двумя вкладками: Дела — Просьбы, что мне выполнить и чего я ожидаю от других, каждое
- * ведёт в свою комнату; Комнаты — по частям: во внешней — Врата, через них выходят; во
- * внутренней — Кормчая, где отвечают на Просьбы. Чужая: только комнаты, открытые моему роду;
- * назад — к её Вратам.
+ * Обитель. Своя — двумя вкладками: Дела — Просьбы, что мне выполнить, что проверить и чего я
+ * ожидаю от других, каждое ведёт в свою комнату; Комнаты — по частям: во внешней — Врата, через
+ * них выходят; во внутренней — Кормчая, где отвечают на Просьбы. Чужая: только комнаты,
+ * открытые моему роду; назад — к её Вратам.
  */
 @Composable
 fun AbodeScreen(
@@ -68,7 +68,7 @@ fun AbodeScreen(
             HorizontalDivider(color = WillColors.Divider)
             Row(Modifier.fillMaxWidth()) {
                 // Из Комнат тихо сказано, сколько ждёт в Делах; на самих Делах число повторяло бы их.
-                val waiting = if (tab == AbodeTab.Rooms) view.owed.size + state.supplications.size else 0
+                val waiting = if (tab == AbodeTab.Rooms) view.owed.size + view.unreviewed.size + state.supplications.size else 0
                 Tab("Дела", waiting, tab == AbodeTab.Deeds) { onTab(AbodeTab.Deeds) }
                 Tab("Комнаты", 0, tab == AbodeTab.Rooms) { onTab(AbodeTab.Rooms) }
             }
@@ -94,11 +94,15 @@ private fun Deeds(state: WillState, view: View.Abode, session: WillSession) {
             item { SectionTitle("Выполнить") }
             item { Group(view.owed) { waiting -> WaitingRow(waiting) { session.enter(waiting.room) } } }
         }
+        if (view.unreviewed.isNotEmpty()) {
+            item { SectionTitle("Проверить") }
+            item { Group(view.unreviewed) { waiting -> WaitingRow(waiting) { session.enter(waiting.room) } } }
+        }
         if (view.awaited.isNotEmpty()) {
             item { SectionTitle("Ожидаю") }
             item { Group(view.awaited) { waiting -> WaitingRow(waiting) { session.enter(waiting.room) } } }
         }
-        if (state.supplications.isEmpty() && view.owed.isEmpty() && view.awaited.isEmpty()) {
+        if (state.supplications.isEmpty() && view.owed.isEmpty() && view.unreviewed.isEmpty() && view.awaited.isEmpty()) {
             item { Hint("Дел нет") }
         }
     }

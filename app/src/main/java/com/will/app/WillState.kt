@@ -79,12 +79,16 @@ data class Descent(val name: String, val father: String)
 sealed interface View {
     val host: String
 
-    /** Обитель. [owed] — что ожидает моего внимания, задания, где я Послушник; [awaited] — что я задал другим. */
+    /**
+     * Обитель. [owed] — что мне выполнить, задания, где я Послушник; [unreviewed] — что выполнено
+     * у меня как у Тренера, а я ещё не видел; [awaited] — чего я ожидаю от других.
+     */
     data class Abode(
         override val host: String,
         val rooms: List<RoomItem> = emptyList(),
         val owed: List<Waiting> = emptyList(),
         val awaited: List<Waiting> = emptyList(),
+        val unreviewed: List<Waiting> = emptyList(),
     ) : View
 
     /**

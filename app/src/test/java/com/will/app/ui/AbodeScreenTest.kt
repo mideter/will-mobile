@@ -68,7 +68,13 @@ class AbodeScreenTest {
         room { name = "Кормчая"; part = RoomPart.INNER; aspect = RoomAspect.DWELLERS },
     )
 
-    private fun abode(host: String, shown: List<Room>, owed: List<Pair<String, String>> = emptyList(), awaited: List<Pair<String, String>> = emptyList()) {
+    private fun abode(
+        host: String,
+        shown: List<Room>,
+        owed: List<Pair<String, String>> = emptyList(),
+        awaited: List<Pair<String, String>> = emptyList(),
+        unreviewed: List<Pair<String, String>> = emptyList(),
+    ) {
         transport.tell(serverEvent { turned = turned { abodeOf = host } })
         transport.tell(serverEvent { rooms = rooms { rooms += shown } })
         if (host.isEmpty()) {
@@ -76,6 +82,7 @@ class AbodeScreenTest {
                 outstanding = outstanding {
                     owed.forEachIndexed { i, (body, room) -> this.owed += waiting(10L + i, body, room, going = i == 0, ended = i == 1) }
                     awaited.forEachIndexed { i, (body, room) -> this.awaited += waiting(20L + i, body, room, training = true) }
+                    unreviewed.forEachIndexed { i, (body, room) -> this.unreviewed += waiting(30L + i, body, room) }
                 }
             })
         }
@@ -147,6 +154,26 @@ class AbodeScreenTest {
         compose.onNodeWithText("Просьбы").assertIsDisplayed()
         compose.onNodeWithText("viktor").performClick()
         assertEquals("Кормчая", lastTurn().room)
+    }
+
+    @Test
+    fun `what was done and not yet seen is to review, between what to fulfil and what one awaits, counted from the rooms, and leads to its room`() {
+        abode(
+            "", ownRooms,
+            owed = listOf("Понедельник" to "Послушание — boris"),
+            awaited = listOf("Пятница" to "Ведение — gleb"),
+            unreviewed = listOf("Среда" to "Ведение — viktor"),
+        )
+        val fulfil = compose.onNodeWithText("Выполнить").fetchSemanticsNode().boundsInRoot.top
+        val review = compose.onNodeWithText("Проверить").fetchSemanticsNode().boundsInRoot.top
+        val await = compose.onNodeWithText("Ожидаю").fetchSemanticsNode().boundsInRoot.top
+        assertEquals(listOf(fulfil, review, await), listOf(fulfil, review, await).sorted())
+        compose.onNodeWithText("viktor · задание").assertIsDisplayed()
+        compose.onNodeWithText("Комнаты").performClick()
+        compose.onNodeWithText("2").assertIsDisplayed()
+        compose.onNodeWithText("Дела").performClick()
+        compose.onNodeWithText("Среда").performClick()
+        assertEquals("Ведение — viktor", lastTurn().room)
     }
 
     @Test
