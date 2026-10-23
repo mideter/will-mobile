@@ -92,6 +92,7 @@ class WillSession(context: Context) {
     private var fulfillingRequest: Long? = null
     private var fulfillingBehest: Long? = null
     private var beginningRequest: Long? = null
+    private var returningRequest: Long? = null
     private var tellingRequest: Long? = null
     private var remarkingRequest: Long? = null
 
@@ -175,6 +176,7 @@ class WillSession(context: Context) {
         fulfillingRequest = null
         fulfillingBehest = null
         beginningRequest = null
+        returningRequest = null
         tellingRequest = null
         remarkingRequest = null
         val delay = backoff.nextPauseMs()
@@ -383,11 +385,16 @@ class WillSession(context: Context) {
                 _state.update {
                     it.copy(connection = Connection.Ready, ownName = event.authOk.name, unbornMark = null, loading = true)
                 }
-                // Проснувшись, всякий дома: вернуться можно только в свою комнату, где был.
-                gathering = View.Abode("")
-                send(clientEvent { historyRequest = historyRequest { limit = HISTORY_LIMIT } })
+                // Проснувшись, всякий дома: вернуться можно только в свою комнату, где был. Туда —
+                // сразу, мимо обзора Обители: на миг показанный, он закрыл бы открытое в комнате.
                 val (host, room) = target
-                if (host.isEmpty() && room.isNotEmpty()) look(host, room) else target = "" to ""
+                if (host.isEmpty() && room.isNotEmpty()) {
+                    returningRequest = ask(clientEvent { turn = turn { abodeOf = host; this.room = room } })
+                } else {
+                    target = "" to ""
+                    gathering = View.Abode("")
+                    send(clientEvent { historyRequest = historyRequest { limit = HISTORY_LIMIT } })
+                }
                 listDwellers()
                 listDwellings()
                 listSupplications()
@@ -515,6 +522,11 @@ class WillSession(context: Context) {
                     beginningRequest -> {
                         beginningRequest = null
                         _state.update { it.copy(beginning = Reply.None) }
+                    }
+                    returningRequest -> {
+                        returningRequest = null
+                        // Своей комнаты, где был, больше нет: проснувшийся — дома.
+                        if (!reply.granted) home()
                     }
                     tellingRequest -> {
                         // Сказанное уже пришло подходом (`Exerted`): пульт закрывает он, а не ответ.
