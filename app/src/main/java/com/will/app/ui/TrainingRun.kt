@@ -7,7 +7,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -133,11 +135,7 @@ fun TrainingRun(
     Column(Modifier.fillMaxSize()) {
         // На экране выполнения тренировка ещё идёт, сколько бы подходов ни было закончено.
         val span = TrainingCourse.span(training, doing)?.copy(endNs = null)
-        Header(
-            title = "Выполнение",
-            subtitle = training.body + (span?.let { " · " + trainingSpanText(it, nowNs) } ?: ""),
-            onBack = onClose,
-        )
+        Header(title = training.body, subtitle = span?.let { trainingSpanText(it, nowNs) }, onBack = onClose)
         LazyColumn(Modifier.weight(1f)) {
             itemsIndexed(training.exercises) { e, exercise ->
                 Column(
@@ -172,8 +170,9 @@ fun TrainingRun(
                             begun != null -> TrainingCourse.restTakenBefore(training.efforts, begun)?.let {
                                 RestRow(restTaken(it, willedRest), WillColors.Muted)
                             }
-                            resting && selected == e to a -> RestRow(restTaken(rested, willedRest), WillColors.Accent)
-                            willedRest > 0 -> RestRow("отдых ${restText(willedRest)}", WillColors.Muted)
+                            // Перед подходом, который будет первым, отдыхать не после чего: заданного отдыха не видно.
+                            willedRest > 0 && !(training.efforts.isEmpty() && doing == null && selected == e to a) ->
+                                RestRow("отдых ${restText(willedRest)}", WillColors.Muted)
                         }
                         RunRow(
                             number = a + 1,
@@ -188,7 +187,6 @@ fun TrainingRun(
                     val extra = e to TrainingCourse.approachCount(training, e)
                     if (doing == null && next == null) {
                         if (selected == extra) {
-                            if (resting) RestRow(restTaken(rested, TrainingCourse.restWilled(training, e, extra.second)), WillColors.Accent)
                             RunRow(
                                 number = extra.second + 1,
                                 willed = null,
@@ -206,104 +204,52 @@ fun TrainingRun(
             }
         }
 
-        // Пульт внизу: таймер и главное действие.
+        // Пульт внизу: что сейчас, таймер и главное действие; после подхода — рассказ о нём.
         Column(
-            Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 10.dp, 16.dp, 12.dp),
+            Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 12.dp, 16.dp, 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            when {
-                going != null -> {
-                    Text("Подход", fontSize = 13.sp, color = WillColors.Muted)
-                    Text(spanText((nowNs - going.begunAtNs) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium)
-                    Text(captionOf(training, going.exercise, going.approach), fontSize = 14.sp, color = WillColors.Muted)
+            if (confirming && doing != null) {
+                TellingPanel(training, doing, endedAt, nowNs, session) { confirming = false }
+            } else {
+                val line = when {
+                    going != null -> "Подход · " + placeOf(training, going.exercise, going.approach)
+                    resting -> "Отдых" + (selected?.let { (e, a) -> " · далее " + placeOf(training, e, a) } ?: "")
+                    else -> selected?.let { (e, a) -> "Далее " + placeOf(training, e, a) } ?: "Все заданные подходы сделаны"
                 }
-                endedAt != null && doing != null -> {
-                    Text("Отдых", fontSize = 13.sp, color = WillColors.Muted)
-                    Text(spanText((nowNs - endedAt) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
-                    Text(captionOf(training, doing.exercise, doing.approach) + " — как прошёл?", fontSize = 14.sp, color = WillColors.Muted)
-                }
-                resting -> {
-                    // Сначала обратный отсчёт до заданного, потом секундомер дальше от отметки.
-                    Text(
-                        if (clock.over && restWilled > 0) "Отдых · задано ${restText(restWilled)}" else "Отдых",
-                        fontSize = 13.sp,
-                        color = WillColors.Muted,
-                    )
-                    Text(
+                Text(line, fontSize = 14.sp, color = WillColors.Muted)
+                when {
+                    going != null -> Text(spanText((nowNs - going.begunAtNs) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium)
+                    resting -> Text(
                         spanText(clock.seconds),
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (clock.over) WillColors.Ink else WillColors.Accent,
                     )
-                    selected?.let { (e, a) -> Text("Далее: " + captionOf(training, e, a), fontSize = 14.sp, color = WillColors.Muted) }
                 }
-                else -> {
-                    selected?.let { (e, a) -> Text("Далее: " + captionOf(training, e, a), fontSize = 15.sp) }
-                        ?: Text("Все заданные подходы сделаны", fontSize = 15.sp, color = WillColors.Muted)
+                if (resting && clock.over && restWilled > 0) {
+                    Text("задано ${restText(restWilled)}", fontSize = 12.sp, color = WillColors.Muted)
                 }
-            }
-            Spacer(Modifier.height(8.dp))
-            if (going != null) {
-                BottomButton(text = "Завершить подход", trouble = null) {
-                    session.endApproach(training.id)
-                    confirming = true
-                }
-            } else if (doing != null) {
-                BottomButton(text = "Сказать, как прошёл", trouble = null) { confirming = true }
-            } else {
-                BottomButton(
-                    text = if (beginning) "Начинается…" else "Приступить",
-                    trouble = if (selected == null) "Завершите тренировку или добавьте подход" else null,
-                    busy = beginning,
-                ) { selected?.let { (e, a) -> session.beginApproach(training.id, e, a) } }
-                TextButton(onClick = { closing = true }) { Text("Завершить тренировку") }
-            }
-        }
-    }
-
-    if (confirming && doing != null) {
-        // Сделанное — как задано, если не поправить; сверх заданного — как последний подход.
-        val like = TrainingCourse.proposal(training, doing.exercise, doing.approach)
-        val draft = rememberSaveable(doing.behestId, doing.exercise, doing.approach, doing.begunAtNs, saver = ApproachDraft.Saver) {
-            ApproachDraft(like?.weightGrams ?: 0, like?.repetitions ?: 10)
-        }
-        var strain by rememberSaveable(doing.behestId, doing.exercise, doing.approach, doing.begunAtNs) { mutableStateOf(0) }
-        // Подход уже закончен — окно не закрыть, не сказав, как он прошёл.
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Как прошёл подход") },
-            text = {
-                Column {
-                    Text(captionOf(training, doing.exercise, doing.approach), fontSize = 13.sp, color = WillColors.Muted)
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        WeightStepper(draft, Modifier.weight(1.3f))
-                        Text("×", fontSize = 16.sp, color = WillColors.Muted, modifier = Modifier.padding(horizontal = 4.dp))
-                        RepetitionsStepper(draft, Modifier.weight(1f))
+                Spacer(Modifier.height(8.dp))
+                if (going != null) {
+                    BottomButton(text = "Завершить подход", trouble = null) {
+                        session.endApproach(training.id)
+                        confirming = true
                     }
-                    Spacer(Modifier.height(12.dp))
-                    // Не нажато ничего — подход прошёл как надо.
-                    Row {
-                        for ((marks, label) in listOf(1 to "! с нагрузкой", 2 to "!! тяжело")) {
-                            val chosen = strain == marks
-                            TextButton(onClick = { strain = if (chosen) 0 else marks }) {
-                                Text(
-                                    label,
-                                    color = if (chosen) WillColors.Accent else WillColors.Muted,
-                                    fontWeight = if (chosen) FontWeight.Medium else FontWeight.Normal,
-                                )
-                            }
-                        }
+                } else if (doing != null) {
+                    BottomButton(text = "Сказать, как прошёл", trouble = null) { confirming = true }
+                } else {
+                    BottomButton(
+                        text = if (beginning) "Начинается…" else "Приступить",
+                        trouble = if (selected == null) "Завершите тренировку или добавьте подход" else null,
+                        busy = beginning,
+                    ) { selected?.let { (e, a) -> session.beginApproach(training.id, e, a) } }
+                    TextButton(onClick = { closing = true }) {
+                        Text("завершить тренировку", fontSize = 13.sp, color = WillColors.Muted)
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    session.finishApproach(training.id, draft.grams, draft.repetitions, strain)
-                    confirming = false
-                }) { Text("Готово") }
-            },
-        )
+            }
+        }
     }
 
     if (closing) {
@@ -395,6 +341,75 @@ private fun RunRow(
     }
 }
 
+@Composable
+private fun TellingPanel(
+    training: WordItem,
+    doing: UnderwayItem,
+    endedAt: Long?,
+    nowNs: Long,
+    session: WillSession,
+    onTold: () -> Unit,
+) {
+    // Сделанное — как задано, если не поправить; сверх заданного — как последний подход.
+    val like = TrainingCourse.proposal(training, doing.exercise, doing.approach)
+    val draft = rememberSaveable(doing.behestId, doing.exercise, doing.approach, doing.begunAtNs, saver = ApproachDraft.Saver) {
+        ApproachDraft(like?.weightGrams ?: 0, like?.repetitions ?: 10)
+    }
+    var strain by rememberSaveable(doing.behestId, doing.exercise, doing.approach, doing.begunAtNs) { mutableStateOf(0) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Как прошёл " + placeOf(training, doing.exercise, doing.approach), fontSize = 14.sp, modifier = Modifier.weight(1f))
+        endedAt?.let { Text("отдых ${spanText((nowNs - it) / NANOS)}", fontSize = 14.sp, color = WillColors.Accent) }
+    }
+    Spacer(Modifier.height(10.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        WeightStepper(draft, Modifier.weight(1.5f))
+        Text("×", fontSize = 16.sp, color = WillColors.Muted, modifier = Modifier.padding(horizontal = 6.dp))
+        RepetitionsStepper(draft, Modifier.weight(1f))
+    }
+    Spacer(Modifier.height(10.dp))
+    StrainChoice(strain) { strain = it }
+    Spacer(Modifier.height(10.dp))
+    BottomButton(text = "Готово", trouble = null) {
+        session.finishApproach(training.id, draft.grams, draft.repetitions, strain)
+        onTold()
+    }
+}
+
+@Composable
+private fun StrainChoice(strain: Int, onChoose: (Int) -> Unit) {
+    // «Как надо» выбрано заранее: новичку довольно нажать «Готово».
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, WillColors.Divider, RoundedCornerShape(10.dp)),
+    ) {
+        for ((marks, label) in listOf(0 to "как надо", 1 to "! с нагрузкой", 2 to "!! тяжело")) {
+            val chosen = strain == marks
+            Box(
+                Modifier
+                    .weight(1f)
+                    .background(if (chosen) WillColors.Accent.copy(alpha = 0.12f) else WillColors.Background)
+                    .clickable { onChoose(marks) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    fontSize = 13.sp,
+                    color = if (chosen) WillColors.Accent else WillColors.Muted,
+                    fontWeight = if (chosen) FontWeight.Medium else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+private fun placeOf(training: WordItem, exercise: Int, approach: Int): String {
+    val name = training.exercises[exercise].name
+    return if (training.exercises.size > 1) "$name, подход ${approach + 1}" else "подход ${approach + 1}"
+}
+
 private fun marksOf(effort: EffortItem) = if (effort.strain > 0) " " + "!".repeat(effort.strain) else ""
 
 @Composable
@@ -431,6 +446,11 @@ private const val MAX_REMARK_BYTES = 4096
 
 @Composable
 fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) {
+    val first = if (training.efforts.isEmpty() && underway == null) {
+        TrainingCourse.nextApproach(training, TrainingCourse.focus(training, null, null))
+    } else {
+        null
+    }
     Column(Modifier.padding(top = 4.dp)) {
         // До завершения у тренировки нет конца, сколько бы подходов ни было закончено.
         TrainingCourse.span(training, underway)?.let { span ->
@@ -449,7 +469,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                 val willedRest = TrainingCourse.restWilled(training, e, a)
                 when {
                     begun != null -> TrainingCourse.restTakenBefore(training.efforts, begun)?.let { FeedRestLine(restTaken(it, willedRest)) }
-                    asked != null && willedRest > 0 && !finished -> FeedRestLine("отдых ${restText(willedRest)}")
+                    asked != null && willedRest > 0 && !finished && first != e to a -> FeedRestLine("отдых ${restText(willedRest)}")
                 }
                 val (line, colour) = when {
                     effort != null -> {
