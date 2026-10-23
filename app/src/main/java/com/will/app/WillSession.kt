@@ -104,8 +104,8 @@ class WillSession(
     private val _state = MutableStateFlow(WillState())
     val state: StateFlow<WillState> = _state
 
-    private val _notices = MutableSharedFlow<String>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    val notices: SharedFlow<String> = _notices
+    private val _notices = MutableSharedFlow<Notice>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val notices: SharedFlow<Notice> = _notices
 
     private var gathering: View? = null
 
@@ -190,6 +190,16 @@ class WillSession(
     // ── Действия ──────────────────────────────────────────────────────────────
 
     fun home() = look("", "")
+
+    fun leads(notice: Notice): Boolean {
+        // Только по своей Обители, стоя в ней: из чужой домой идут через Врата.
+        return notice.room != null && _state.value.view?.host?.isEmpty() == true
+    }
+
+    fun follow(notice: Notice) {
+        val room = notice.room ?: return
+        if (leads(notice)) look("", room)
+    }
 
     fun visit(host: String) = look(host, "")
 
@@ -334,8 +344,8 @@ class WillSession(
         listSupplications()
     }
 
-    fun tell(text: String) {
-        _notices.tryEmit(text)
+    fun tell(text: String, room: String? = null) {
+        _notices.tryEmit(Notice(text, room))
     }
 
     fun listDwellers() = send(clientEvent { listDwellers = listDwellers {} })
@@ -428,7 +438,7 @@ class WillSession(
                 listDwellings()
                 listSupplications()
             }
-            ServerEvent.EventCase.AUTH_REQUIRED -> _notices.tryEmit("Вход отклонён")
+            ServerEvent.EventCase.AUTH_REQUIRED -> tell("Вход отклонён")
             ServerEvent.EventCase.TURNED -> {
                 val turned = event.turned
                 gathering = if (turned.room.isEmpty()) {
@@ -539,7 +549,7 @@ class WillSession(
                 }
             }
             ServerEvent.EventCase.PROTOCOL_NOTICE -> event.protocolNotice.let {
-                Notices.say(it.code, it.argsList, it.message)?.let { said -> _notices.tryEmit(said) }
+                Notices.say(it.code, it.argsList, it.message)?.let { tell(it) }
             }
             ServerEvent.EventCase.REPLY -> {
                 // Ответ на свой запрос — по его номеру; что сказано о нём, говорит всплывающее поле.
@@ -576,10 +586,10 @@ class WillSession(
                         _state.update { it.copy(remarking = outcome) }
                     }
                 }
-                if (reply.notice.isNotEmpty()) Notices.say(reply.code, reply.argsList, reply.notice)?.let { _notices.tryEmit(it) }
+                if (reply.notice.isNotEmpty()) Notices.say(reply.code, reply.argsList, reply.notice)?.let { tell(it) }
             }
             ServerEvent.EventCase.DWELLING -> {
-                _notices.tryEmit("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
+                tell("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
                 listDwellings()
             }
             ServerEvent.EventCase.DWELLERS -> {
@@ -642,17 +652,17 @@ class WillSession(
             }
             ServerEvent.EventCase.SUPPLICATION_OFFER -> {
                 // Свои Дела и Кормчая показывают Просьбу сами.
-                if (!seesOwn(Aspect.Dwellers)) _notices.tryEmit("${event.supplicationOffer.suppliantName} просит вас стать его Тренером")
+                if (!seesOwn(Aspect.Dwellers)) tell("${event.supplicationOffer.suppliantName} просит вас стать его Тренером", HELM)
                 listSupplications()
             }
             ServerEvent.EventCase.TIE_FORMED -> {
                 // Принявшему Узы видны в его же Кормчей; о них говорится ученику.
-                if (event.tieFormed.asNovice) _notices.tryEmit("${event.tieFormed.counterpartName} — теперь ваш Тренер")
+                if (event.tieFormed.asNovice) tell("${event.tieFormed.counterpartName} — теперь ваш Тренер")
                 refreshIfHome()
             }
             ServerEvent.EventCase.STIRRED -> {
                 // Свои Дела сервер рассказывает заново сам.
-                if (!seesOwn()) _notices.tryEmit("${event.stirred.authorName} написал в комнате ${event.stirred.room}")
+                if (!seesOwn()) tell("${event.stirred.authorName} написал в комнате ${event.stirred.room}", event.stirred.room)
             }
             else -> Unit
         }
@@ -709,6 +719,7 @@ class WillSession(
         private const val CALM_PACE_MS = 30_000L
         const val CELL = "Слово"
         const val GATES = "Врата"
+        const val HELM = "Кормчая"
 
         fun kindName(kind: Kind): String = when (kind) {
             Kind.Acquaintance -> "знакомый"

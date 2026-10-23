@@ -6,6 +6,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import will.v1.MessengerOuterClass.NoticeCode
 import will.v1.MessengerOuterClass.RoomAspect
@@ -23,8 +25,9 @@ class WillSessionNoticesTest {
     private val transport = FakeTransport()
     private val session = session(phone, transport).apply { start() }
     private val heard = mutableListOf<String>()
+    private val notices = mutableListOf<Notice>()
     private val listening = CoroutineScope(Dispatchers.Unconfined).apply {
-        launch { session.notices.collect { heard += it } }
+        launch { session.notices.collect { heard += it.text; notices += it } }
     }
 
     init {
@@ -72,5 +75,30 @@ class WillSessionNoticesTest {
         transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_BEHEST_FULFILLED; message = "behest 9 fulfilled" } })
         transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_PASS_THROUGH_GATES; message = "one goes there only through gates" } })
         assertEquals(listOf("Туда идут через Врата"), heard)
+    }
+
+    @Test
+    fun `what was stirred leads to its room, standing in one's own abode only`() {
+        transport.show("", "Слово")
+        stir()
+        val stirred = notices.single()
+        assertTrue(session.leads(stirred))
+        session.follow(stirred)
+        val turn = transport.sent.last { it.hasTurn() }.turn
+        assertEquals("" to "Послушание — boris", turn.abodeOf to turn.room)
+
+        transport.show("gleb", "Слово")
+        val turns = transport.sent.count { it.hasTurn() }
+        assertFalse(session.leads(stirred))
+        session.follow(stirred)
+        assertEquals(turns, transport.sent.count { it.hasTurn() })
+    }
+
+    @Test
+    fun `a supplication leads to one's helm, a refusal nowhere`() {
+        transport.show("", "Слово")
+        offer()
+        transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_PASS_THROUGH_GATES; message = "" } })
+        assertEquals(listOf("Кормчая", null), notices.map { it.room })
     }
 }

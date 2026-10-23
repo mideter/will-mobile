@@ -13,6 +13,9 @@ enum class Reply { None, Pending, Granted }
 /** Комната в списке Обители: в какой она части и что отражает — переносят только Кельи ([Aspect.Words]). */
 data class RoomItem(val name: String, val outer: Boolean, val aspect: Aspect = Aspect.Words)
 
+/** Всплывающее: [text] — что сказано; [room] — комната своей Обители, куда оно ведёт, если ведёт. */
+data class Notice(val text: String, val room: String? = null)
+
 /**
  * Неисполненное Веление в обзоре хозяина: [word] — оно само; [counterpart] — другой в Узах: Тренер,
  * если велено мне, ученик, если велел я; [underway] — подход, если он идёт в тренировке.
