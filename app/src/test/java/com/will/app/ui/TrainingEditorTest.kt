@@ -38,7 +38,7 @@ import will.v1.turned
 import will.v1.word
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], qualifiers = "w411dp-h891dp")
 class TrainingEditorTest {
 
     @get:Rule
