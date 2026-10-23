@@ -34,13 +34,17 @@ data class EffortItem(
     val finishedAtNs: Long,
 )
 
+/** Заметка ученика к упражнению тренировки (номер с нуля): что сказал и когда, по часам сервера. */
+data class RemarkItem(val exercise: Int, val body: String, val saidAtNs: Long)
+
 /** Подход, который Послушник выполняет сейчас. */
 data class UnderwayItem(val behestId: Long, val exercise: Int, val approach: Int, val begunAtNs: Long)
 
 /**
  * Слово в ленте комнаты. У Дела [behestId] — номер Веления, которое оно исполняет. У
  * тренировки [exercises] — велённые упражнения, у Дела, исполнившего её, — сделанные;
- * [efforts] — подходы тренировки, сделанные по ходу.
+ * [efforts] — подходы тренировки, сделанные по ходу; [remarks] — заметки ученика к её
+ * упражнениям, в том порядке, в каком сказаны.
  */
 data class WordItem(
     val id: Long,
@@ -51,6 +55,7 @@ data class WordItem(
     val behestId: Long,
     val exercises: List<ExerciseItem> = emptyList(),
     val efforts: List<EffortItem> = emptyList(),
+    val remarks: List<RemarkItem> = emptyList(),
 )
 
 enum class Kind { Acquaintance, Neighbour, Friend }

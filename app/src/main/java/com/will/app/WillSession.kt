@@ -35,6 +35,7 @@ import will.v1.listDwellings
 import will.v1.listLineage
 import will.v1.listSupplications
 import will.v1.regard
+import will.v1.sayRemark
 import will.v1.rejectSupplication
 import will.v1.supplicate
 import will.v1.train
@@ -237,6 +238,11 @@ class WillSession(context: Context) {
         if (sent) finishSentAt = sentAt
     }
 
+    fun sayRemark(behestId: Long, exercise: Int, text: String) {
+        if (text.isBlank()) return
+        send(clientEvent { sayRemark = sayRemark { this.behestId = behestId; this.exercise = exercise; body = text.trim() } })
+    }
+
     fun train(title: String, exercises: List<ExerciseItem>) {
         val view = _state.value.view as? View.Room ?: return
         if (_state.value.willing == Reply.Pending) return
@@ -400,6 +406,18 @@ class WillSession(context: Context) {
                     s.copy(view = shown.copy(words = add(shown.words)))
                 }
             }
+            ServerEvent.EventCase.REMARKED -> {
+                val r = event.remarked.remark
+                val remark = RemarkItem(r.exercise, r.body, r.saidAtNs)
+                val add = { words: List<WordItem> ->
+                    words.map { if (it.id == event.remarked.behestId) it.copy(remarks = it.remarks + remark) else it }
+                }
+                (gathering as? View.Room)?.let { gathering = it.copy(words = add(it.words)) }
+                _state.update { s ->
+                    val shown = s.view as? View.Room ?: return@update s
+                    s.copy(view = shown.copy(words = add(shown.words)))
+                }
+            }
             ServerEvent.EventCase.HISTORY_END -> {
                 val shown = gathering
                 gathering = null
@@ -540,6 +558,7 @@ class WillSession(context: Context) {
             ExerciseItem(e.name, e.approachesList.map { ApproachItem(it.weightGrams, it.repetitions, it.restSeconds) }, e.instruction)
         },
         effortsList.map { EffortItem(it.exercise, it.approach, it.weightGrams, it.repetitions, it.begunAtNs, it.finishedAtNs) },
+        remarksList.map { RemarkItem(it.exercise, it.body, it.saidAtNs) },
     )
 
     private fun ExerciseItem.toWire() = exercise {

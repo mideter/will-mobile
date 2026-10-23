@@ -130,6 +130,7 @@ fun TrainingRun(
                 ) {
                     Text(exercise.name, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                     InstructionLine(exercise.instruction)
+                    RemarkLines(training.remarks.filter { it.exercise == e })
                     // Нажимается только следующий подход упражнения: подходы идут по порядку.
                     val next = TrainingCourse.nextWilledIn(training, e)
                     for (a in 0 until TrainingCourse.approachCount(training, e, doing)) {
@@ -167,6 +168,7 @@ fun TrainingRun(
                             TextButton(onClick = { session.choose(training.id, e, extra = e) }) { Text("+ подход сверх заданного") }
                         }
                     }
+                    RemarkField(onSay = { session.sayRemark(training.id, e, it) }, key = "${training.id}:$e")
                 }
             }
         }
@@ -333,11 +335,31 @@ private fun RunRow(
 }
 
 @Composable
+private fun RemarkField(onSay: (String) -> Unit, key: String) {
+    var text by rememberSaveable(key) { mutableStateOf("") }
+    // Сервер меряет речение байтами UTF-8, а не знаками.
+    val fits = text.isNotBlank() && text.trim().toByteArray().size <= MAX_REMARK_BYTES
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            placeholder = { Text("Заметка…") },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = { onSay(text); text = "" }, enabled = fits) { Text("Сказать") }
+    }
+}
+
+private const val MAX_REMARK_BYTES = 4096
+
+@Composable
 fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) {
     Column(Modifier.padding(top = 4.dp)) {
         training.exercises.forEachIndexed { e, exercise ->
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             InstructionLine(exercise.instruction)
+            RemarkLines(training.remarks.filter { it.exercise == e })
             for (a in 0 until TrainingCourse.approachCount(training, e, underway)) {
                 val asked = exercise.approaches.getOrNull(a)
                 val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }

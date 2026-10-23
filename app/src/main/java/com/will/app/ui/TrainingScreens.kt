@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.ApproachItem
 import com.will.app.ExerciseItem
+import com.will.app.RemarkItem
 
 fun weightText(grams: Int): String {
     if (grams == 0) return "свой вес"
@@ -70,6 +71,11 @@ fun weightText(grams: Int): String {
 @Composable
 internal fun InstructionLine(instruction: String) {
     if (instruction.isNotEmpty()) Text("«$instruction»", fontSize = 13.sp, color = WillColors.Muted, fontStyle = FontStyle.Italic)
+}
+
+@Composable
+internal fun RemarkLines(remarks: List<RemarkItem>) {
+    remarks.forEach { Text("— ${it.body}", fontSize = 13.sp, color = WillColors.Accent) }
 }
 
 @Composable
@@ -291,12 +297,13 @@ private fun PlainField(
     placeholder: String,
     fontSize: androidx.compose.ui.unit.TextUnit,
     modifier: Modifier = Modifier,
+    fontWeight: FontWeight = FontWeight.Medium,
 ) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
-        textStyle = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Medium, color = WillColors.Ink),
+        textStyle = TextStyle(fontSize = fontSize, fontWeight = fontWeight, color = WillColors.Ink),
         cursorBrush = SolidColor(WillColors.Accent),
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         modifier = modifier.fillMaxWidth(),
@@ -344,6 +351,7 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>,
             placeholder = "Указание — как выполнять",
             fontSize = 14.sp,
             modifier = Modifier.padding(start = 24.dp, top = 2.dp),
+            fontWeight = FontWeight.Normal,
         )
         Spacer(Modifier.height(4.dp))
         draft.approaches.forEachIndexed { index, approach ->
