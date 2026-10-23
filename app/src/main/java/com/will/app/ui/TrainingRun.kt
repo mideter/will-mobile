@@ -52,6 +52,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -71,8 +72,8 @@ private const val NANOS = 1_000_000_000L
 
 /**
  * Выполнение тренировки. Подходы упражнения идут по порядку, упражнения — в каком угодно:
- * выбираешь упражнение (первое с несделанными подходами выбрано само) и «Приступить» — идёт
- * таймер подхода; «Завершить подход» — подтверждаешь сделанное, и идёт отдых: обратный
+ * выбираешь упражнение (первое с несделанными подходами выбрано само) и «Приступить» — на
+ * пульте крупно что сделать, вес и повторы, с указанием Тренера, а мельче — сколько подход идёт; «Завершить подход» — подтверждаешь сделанное, и идёт отдых: обратный
  * отсчёт до заданного. Каждый подход сразу уходит Тренеру. Экран не гаснет, пока открыт;
  * таймеры считаются от меток времени. Погашенный экран ведёт [com.will.app.TrainingService]:
  * уведомление с таймером и вибрация в конце отдыха. Выбор [choice] — в сессии, его видит и оно. [beginning] — к подходу приступили,
@@ -224,15 +225,17 @@ fun TrainingRun(
             if (confirming && doing != null) {
                 TellingPanel(training, doing, endedAt, nowNs, choice, telling, session)
             } else {
+                // Что делать — видно ещё до подхода: на отдыхе ставят вес, а не вспоминают его.
                 val line = when {
-                    going != null -> "Подход · " + placeOf(training, going.exercise, going.approach)
-                    resting -> "Отдых" + (selected?.let { (e, a) -> " · далее " + placeOf(training, e, a) } ?: "")
-                    else -> selected?.let { (e, a) -> "Далее " + placeOf(training, e, a) }
+                    going != null -> placeOf(training, going.exercise, going.approach).replaceFirstChar { it.uppercase() }
+                    resting -> "Отдых" + (selected?.let { (e, a) -> " · далее " + placeOf(training, e, a) + targetOf(training, e, a) } ?: "")
+                    else -> selected?.let { (e, a) -> "Далее " + placeOf(training, e, a) + targetOf(training, e, a) }
                         ?: "Все заданные подходы сделаны — можно добавить подход сверх заданного"
                 }
-                Text(line, fontSize = 14.sp, color = WillColors.Muted)
+                Text(line, fontSize = 14.sp, color = WillColors.Muted, textAlign = TextAlign.Center)
                 when {
-                    going != null -> Text(spanText((nowNs - going.begunAtNs) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium)
+                    // В подходе главное — сколько сделать; сколько он длится, второстепенно.
+                    going != null -> GoingTarget(training, going, nowNs)
                     resting -> Text(
                         spanText(clock.seconds),
                         fontSize = 48.sp,
@@ -346,7 +349,9 @@ private fun RunRow(
                 "${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}${marksOf(effort)}" to
                     (if (changed || willed == null) WillColors.Accent else WillColors.Ink)
             }
-            underwayFor != null -> "выполняется ${spanText(underwayFor)}" to WillColors.Accent
+            underwayFor != null ->
+                (willed?.let { "${weightText(it.weightGrams)} × ${it.repetitions}" } ?: "сверх заданного") + " · идёт ${spanText(underwayFor)}" to
+                    WillColors.Accent
             willed != null -> "${weightText(willed.weightGrams)} × ${willed.repetitions}" to
                 (if (selected) WillColors.Ink else WillColors.Muted)
             else -> "сверх заданного" to WillColors.Accent
@@ -354,6 +359,21 @@ private fun RunRow(
         Text(line, fontSize = 15.sp, color = colour)
     }
 }
+
+@Composable
+private fun GoingTarget(training: WordItem, going: UnderwayItem, nowNs: Long) {
+    TrainingCourse.proposal(training, going.exercise, going.approach)?.let {
+        Text("${weightText(it.weightGrams)} × ${it.repetitions}", fontSize = 40.sp, fontWeight = FontWeight.Medium)
+    }
+    if (training.exercises[going.exercise].approaches.getOrNull(going.approach) == null) {
+        Text("сверх заданного", fontSize = 13.sp, color = WillColors.Accent)
+    }
+    InstructionLine(training.exercises[going.exercise].instruction)
+    Text("идёт ${spanText((nowNs - going.begunAtNs) / NANOS)}", fontSize = 16.sp, color = WillColors.Muted)
+}
+
+private fun targetOf(training: WordItem, exercise: Int, approach: Int): String =
+    TrainingCourse.proposal(training, exercise, approach)?.let { " · ${weightText(it.weightGrams)} × ${it.repetitions}" }.orEmpty()
 
 @Composable
 private fun TellingPanel(

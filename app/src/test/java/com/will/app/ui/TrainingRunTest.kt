@@ -71,7 +71,7 @@ class TrainingRunTest {
                 body = "Понедельник"
                 exercises += exercise {
                     name = "Присед"
-                    repeat(count) { approaches += approach { weightGrams = 40_000; repetitions = 5; restSeconds = 60 } }
+                    repeat(count) { i -> approaches += approach { weightGrams = 40_000; repetitions = 5 + i; restSeconds = 60 } }
                 }
             }
         })
@@ -119,9 +119,12 @@ class TrainingRunTest {
     @Test
     fun `an approach is begun, told, and the panel waits for the server before it closes`() {
         room(count = 2)
-        compose.onNodeWithText("Далее подход 1").assertIsDisplayed()
+        compose.onNodeWithText("Далее подход 1 · 40 кг × 5").assertIsDisplayed()
         begin(0)
-        compose.onNodeWithText("Подход · подход 1").assertIsDisplayed()
+        compose.onNodeWithText("Подход 1").assertIsDisplayed()
+        // В подходе цель видна: крупно на пульте и в строке подхода, с тем, сколько он идёт.
+        compose.onNodeWithText("40 кг × 5").assertIsDisplayed()
+        compose.onNodeWithText("40 кг × 5 · идёт", substring = true).assertIsDisplayed()
         end(0)
         compose.onNodeWithText("Как прошёл подход 1").assertIsDisplayed()
 
@@ -134,7 +137,7 @@ class TrainingRunTest {
 
         serveTelling(0, told)
         compose.onAllNodesWithText("Как прошёл подход 1").assertCountEquals(0)
-        compose.onNodeWithText("Отдых · далее подход 2").assertIsDisplayed()
+        compose.onNodeWithText("Отдых · далее подход 2 · 40 кг × 6").assertIsDisplayed()
     }
 
     @Test
