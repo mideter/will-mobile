@@ -451,12 +451,22 @@ class WillSession(
                 }
             }
             ServerEvent.EventCase.OUTSTANDING -> {
-                val abode = gathering as? View.Abode ?: return
-                gathering = abode.copy(
-                    owed = event.outstanding.owedList.map { it.toWaiting() },
-                    awaited = event.outstanding.awaitedList.map { it.toWaiting() },
-                    unreviewed = event.outstanding.unreviewedList.map { it.toWaiting() },
-                )
+                val told = { abode: View.Abode ->
+                    abode.copy(
+                        owed = event.outstanding.owedList.map { it.toWaiting() },
+                        awaited = event.outstanding.awaitedList.map { it.toWaiting() },
+                        unreviewed = event.outstanding.unreviewedList.map { it.toWaiting() },
+                    )
+                }
+                when (val gathered = gathering) {
+                    is View.Abode -> gathering = told(gathered)
+                    null -> _state.update { s ->
+                        // Узы изменились, пока смотрю на свою Обитель: обзор приходит заново.
+                        val shown = (s.view as? View.Abode)?.takeIf { it.host.isEmpty() } ?: return@update s
+                        s.copy(view = told(shown))
+                    }
+                    is View.Room -> Unit
+                }
             }
             ServerEvent.EventCase.WORD -> place(event.word.toItem())
             ServerEvent.EventCase.UNDERWAY -> {

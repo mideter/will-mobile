@@ -177,6 +177,17 @@ class AbodeScreenTest {
     }
 
     @Test
+    fun `the deeds are told anew while one looks at them`() {
+        abode("", ownRooms, awaited = listOf("Пятница" to "Ведение — gleb"))
+        compose.onNodeWithText("Ожидаю").assertIsDisplayed()
+        transport.tell(serverEvent {
+            outstanding = outstanding { unreviewed += waiting(20L, "Пятница", "Ведение — gleb", training = true) }
+        })
+        compose.onNodeWithText("Проверить").assertIsDisplayed()
+        compose.onAllNodesWithText("Ожидаю").assertCountEquals(0)
+    }
+
+    @Test
     fun `with nothing awaiting, the deeds say so`() {
         abode("", ownRooms)
         compose.onNodeWithText("Дел нет").assertIsDisplayed()
