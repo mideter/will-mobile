@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -152,9 +155,10 @@ fun TrainingRun(
         val span = TrainingCourse.span(training, doing)?.copy(endNs = null)
         Header(title = training.body, subtitle = span?.let { trainingSpanText(it, nowNs) }, onBack = onClose)
         val listState = rememberLazyListState()
-        // Начатый подход — на виду в списке: его номер у «▶» и указание к упражнению.
-        LaunchedEffect(going?.behestId, going?.exercise, going?.approach) {
-            going?.let { listState.animateScrollToItem(it.exercise) }
+        // Подход, что идёт или выбран следующим, — на виду в списке: его номер и указание к упражнению.
+        val inSight = going?.let { it.exercise to it.approach } ?: selected.takeIf { doing == null }
+        LaunchedEffect(inSight) {
+            inSight?.let { (e, _) -> listState.animateScrollToItem(e) }
         }
         LazyColumn(Modifier.weight(1f), state = listState) {
             itemsIndexed(training.exercises) { e, exercise ->
@@ -322,6 +326,7 @@ private fun RestRow(text: String, colour: Color) {
     Text(text, fontSize = 12.sp, color = colour, modifier = Modifier.padding(start = 48.dp, top = 4.dp))
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RunRow(
     number: Int,
@@ -331,9 +336,14 @@ private fun RunRow(
     selected: Boolean,
     onSelect: (() -> Unit)?,
 ) {
+    // Строка, к которой подходят, видна целиком: пульт под списком не закрывает её.
+    val inSight = underwayFor != null || selected
+    val sight = remember { BringIntoViewRequester() }
+    LaunchedEffect(inSight) { if (inSight) sight.bringIntoView() }
     Row(
         Modifier
             .fillMaxWidth()
+            .bringIntoViewRequester(sight)
             .padding(vertical = 2.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(if (selected) WillColors.Background else WillColors.Row)
