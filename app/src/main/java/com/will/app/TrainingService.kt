@@ -201,8 +201,10 @@ class TrainingService : Service() {
         val doing = underway
         if (doing != null) {
             return builder
-                .setContentTitle("Подход · " + captionOf(t, doing.exercise, doing.approach))
-                .setWhen(wallMs(doing.begunAtNs))
+                .setContentTitle(
+                    if (doing.endedAtNs != null) "Отдых · что сделано в подходе?" else "Подход · " + captionOf(t, doing.exercise, doing.approach),
+                )
+                .setWhen(wallMs(doing.endedAtNs ?: doing.begunAtNs))
                 .setUsesChronometer(true)
                 .setShowWhen(true)
                 .build()

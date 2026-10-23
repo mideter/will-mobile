@@ -37,8 +37,8 @@ data class EffortItem(
 /** Заметка ученика к упражнению тренировки (номер с нуля): что сказал и когда, по часам сервера. */
 data class RemarkItem(val exercise: Int, val body: String, val saidAtNs: Long)
 
-/** Подход, который Послушник выполняет сейчас. */
-data class UnderwayItem(val behestId: Long, val exercise: Int, val approach: Int, val begunAtNs: Long)
+/** Подход, который Послушник выполняет сейчас; [endedAtNs] — закончен, и ещё не сказано, что сделано. */
+data class UnderwayItem(val behestId: Long, val exercise: Int, val approach: Int, val begunAtNs: Long, val endedAtNs: Long? = null)
 
 /**
  * Слово в ленте комнаты. У Дела [behestId] — номер Веления, которое оно исполняет. У

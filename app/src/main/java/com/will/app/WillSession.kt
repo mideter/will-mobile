@@ -24,6 +24,7 @@ import will.v1.arrange
 import will.v1.beginApproach
 import will.v1.bear
 import will.v1.chooseFather
+import will.v1.endApproach
 import will.v1.chatMessage
 import will.v1.clientEvent
 import will.v1.exercise
@@ -87,6 +88,7 @@ class WillSession(context: Context) {
     private var beginningRequest: Long? = null
 
     private var beginSentAt: Long? = null
+    private var endSentAt: Long? = null
     private var finishSentAt: Long? = null
 
     private val _state = MutableStateFlow(WillState())
@@ -145,6 +147,7 @@ class WillSession(context: Context) {
             it.copy(connection = Connection.Reconnecting, willing = Reply.None, fulfilling = Reply.None, beginning = Reply.None)
         }
         beginSentAt = null
+        endSentAt = null
         finishSentAt = null
         willingRequest = null
         fulfillingRequest = null
@@ -230,12 +233,19 @@ class WillSession(context: Context) {
 
     fun stopWorkout() = _state.update { it.copy(workout = null) }
 
-    fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) {
+    fun endApproach(behestId: Long) {
         val sentAt = clock.phoneNowNs()
+        if (send(clientEvent { endApproach = endApproach { this.behestId = behestId } })) endSentAt = sentAt
+    }
+
+    fun finishApproach(behestId: Long, weightGrams: Int, repetitions: Int) {
+        // Подход, законченный раньше, кончился не сейчас: по ответу часы не сверить.
+        val ended = (_state.value.view as? View.Room)?.underways?.get(behestId)?.endedAtNs != null
+        val sentAt = clock.phoneNowNs().takeIf { !ended }
         val sent = send(clientEvent {
             finishApproach = finishApproach { this.behestId = behestId; this.weightGrams = weightGrams; this.repetitions = repetitions }
         })
-        if (sent) finishSentAt = sentAt
+        if (sent && sentAt != null) finishSentAt = sentAt
     }
 
     fun sayRemark(behestId: Long, exercise: Int, text: String) {
@@ -372,10 +382,20 @@ class WillSession(context: Context) {
             ServerEvent.EventCase.WORD -> place(event.word.toItem())
             ServerEvent.EventCase.UNDERWAY -> {
                 val u = event.underway
-                val doing = if (u.doing) UnderwayItem(u.behestId, u.exercise, u.approach, u.begunAtNs) else null
-                // Ответ на своё «Приступить»: сервер отметил начало, когда принял его.
-                if (doing != null) beginSentAt?.let { clock.observe(doing.begunAtNs, it, clock.phoneNowNs()) }
-                beginSentAt = null
+                val doing = if (u.doing) {
+                    UnderwayItem(u.behestId, u.exercise, u.approach, u.begunAtNs, u.endedAtNs.takeIf { it != 0L })
+                } else {
+                    null
+                }
+                // Ответ на своё «Приступить» или «Завершить подход»: сервер отметил миг, когда принял его.
+                val ended = doing?.endedAtNs
+                if (ended != null) {
+                    endSentAt?.let { clock.observe(ended, it, clock.phoneNowNs()) }
+                    endSentAt = null
+                } else if (doing != null) {
+                    beginSentAt?.let { clock.observe(doing.begunAtNs, it, clock.phoneNowNs()) }
+                    beginSentAt = null
+                }
                 // Сервер называет тренировку и тогда, когда в ней подход завершён.
                 fun Map<Long, UnderwayItem>.told() = if (doing != null) this + (u.behestId to doing) else this - u.behestId
                 (gathering as? View.Room)?.let { gathering = it.copy(underways = it.underways.told()) }
@@ -395,7 +415,8 @@ class WillSession(context: Context) {
                 val e = event.exerted.effort
                 // Ответ на своё «Завершить подход»: сервер отметил конец, когда принял его.
                 finishSentAt?.let { clock.observe(e.finishedAtNs, it, clock.phoneNowNs()) }
-                finishSentAt = null
+                endSentAt = null
+        finishSentAt = null
                 val effort = EffortItem(e.exercise, e.approach, e.weightGrams, e.repetitions, e.begunAtNs, e.finishedAtNs)
                 val add = { words: List<WordItem> ->
                     words.map { if (it.id == event.exerted.behestId) it.copy(efforts = it.efforts + effort) else it }

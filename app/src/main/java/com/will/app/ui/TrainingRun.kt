@@ -88,9 +88,13 @@ fun TrainingRun(
 ) {
     BackHandler(onBack = onClose)
     val doing = underway?.takeIf { it.behestId == training.id }
+    val going = doing?.takeIf { it.endedAtNs == null }
+    val endedAt = doing?.endedAtNs
     // Выбирают упражнение: выбор держится его, пока подходы не кончатся (см. TrainingCourse).
     val selected = TrainingCourse.selected(training, doing, choice)
     var confirming by rememberSaveable { mutableStateOf(false) }
+    // Подход закончен, а что сделано — не сказано: и после перезапуска сначала досказать.
+    LaunchedEffect(endedAt) { if (endedAt != null) confirming = true }
     var closing by rememberSaveable { mutableStateOf(false) }
     var remarkingOn by rememberSaveable { mutableStateOf<Int?>(null) }
 
@@ -174,7 +178,7 @@ fun TrainingRun(
                             number = a + 1,
                             willed = exercise.approaches.getOrNull(a),
                             effort = effort,
-                            underwayFor = doing?.takeIf { it.exercise == e && it.approach == a }?.let { (nowNs - it.begunAtNs) / NANOS },
+                            underwayFor = going?.takeIf { it.exercise == e && it.approach == a }?.let { (nowNs - it.begunAtNs) / NANOS },
                             selected = doing == null && selected == e to a,
                             onSelect = if (doing == null && a == next) ({ session.choose(training.id, e) }) else null,
                         )
@@ -207,10 +211,15 @@ fun TrainingRun(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when {
-                doing != null -> {
+                going != null -> {
                     Text("Подход", fontSize = 13.sp, color = WillColors.Muted)
-                    Text(spanText((nowNs - doing.begunAtNs) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium)
-                    Text(captionOf(training, doing.exercise, doing.approach), fontSize = 14.sp, color = WillColors.Muted)
+                    Text(spanText((nowNs - going.begunAtNs) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium)
+                    Text(captionOf(training, going.exercise, going.approach), fontSize = 14.sp, color = WillColors.Muted)
+                }
+                endedAt != null && doing != null -> {
+                    Text("Отдых", fontSize = 13.sp, color = WillColors.Muted)
+                    Text(spanText((nowNs - endedAt) / NANOS), fontSize = 48.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
+                    Text(captionOf(training, doing.exercise, doing.approach) + " — что сделано?", fontSize = 14.sp, color = WillColors.Muted)
                 }
                 resting -> {
                     // Сначала обратный отсчёт до заданного, потом секундомер дальше от отметки.
@@ -233,8 +242,13 @@ fun TrainingRun(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (doing != null) {
-                BottomButton(text = "Завершить подход", trouble = null) { confirming = true }
+            if (going != null) {
+                BottomButton(text = "Завершить подход", trouble = null) {
+                    session.endApproach(training.id)
+                    confirming = true
+                }
+            } else if (doing != null) {
+                BottomButton(text = "Сказать, что сделано", trouble = null) { confirming = true }
             } else {
                 BottomButton(
                     text = if (beginning) "Начинается…" else "Приступить",
@@ -249,11 +263,12 @@ fun TrainingRun(
     if (confirming && doing != null) {
         // Сделанное — как задано, если не поправить; сверх заданного — как последний подход.
         val like = TrainingCourse.proposal(training, doing.exercise, doing.approach)
-        val draft = rememberSaveable(doing, saver = ApproachDraft.Saver) {
+        val draft = rememberSaveable(doing.behestId, doing.exercise, doing.approach, doing.begunAtNs, saver = ApproachDraft.Saver) {
             ApproachDraft(like?.weightGrams ?: 0, like?.repetitions ?: 10)
         }
+        // Подход уже закончен — окно не закрыть, не сказав, что сделано.
         AlertDialog(
-            onDismissRequest = { confirming = false },
+            onDismissRequest = {},
             title = { Text("Что сделано") },
             text = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -268,7 +283,6 @@ fun TrainingRun(
                     confirming = false
                 }) { Text("Готово") }
             },
-            dismissButton = { TextButton(onClick = { confirming = false }) { Text("Ещё не закончил") } },
         )
     }
 
@@ -431,7 +445,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                             (if (head.endsWith("✓")) WillColors.Ink else WillColors.Accent)
                     }
                     underway != null && underway.exercise == e && underway.approach == a ->
-                        "▶ выполняется…" to WillColors.Accent
+                        (if (underway.endedAtNs != null) "закончен, ждёт отчёта" else "▶ выполняется…") to WillColors.Accent
                     asked != null -> ("${weightText(asked.weightGrams)} × ${asked.repetitions}" +
                         if (finished) " — не сделан" else "") to WillColors.Muted
                     else -> "+ сверх заданного…" to WillColors.Accent

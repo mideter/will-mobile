@@ -24,6 +24,7 @@ object Notices {
             NoticeCode.NOTICE_STAND_AT_GATES -> "Это делают, стоя во Вратах"
             NoticeCode.NOTICE_ONLY_HOST_ACTS -> "Здесь действует только хозяин"
             NoticeCode.NOTICE_PASS_THROUGH_GATES -> "Туда идут через Врата"
+            NoticeCode.NOTICE_TELL_WHAT_WAS_DONE -> "Сначала скажите, что сделано в подходе"
             NoticeCode.NOTICE_FATHER_BY_FLESH_NEIGHBOUR -> "Отец по плоти — всегда не ниже ближнего"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_FRIEND -> "Отец по духу — всегда друг"
             NoticeCode.NOTICE_HEAR_ONLY_DWELLER -> "Он ещё не принял вас в свою Обитель"
