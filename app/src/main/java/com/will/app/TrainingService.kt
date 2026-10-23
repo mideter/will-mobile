@@ -23,7 +23,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import com.will.app.ui.captionOf
+import com.will.app.ui.approachLine
 import com.will.app.ui.restText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -215,7 +215,7 @@ class TrainingService : Service() {
         if (doing != null) {
             return builder
                 .setContentTitle(
-                    if (doing.endedAtNs != null) "Отдых · как прошёл подход?" else "Подход · " + captionOf(t, doing.exercise, doing.approach),
+                    if (doing.endedAtNs != null) "Отдых · как прошёл подход?" else approachLine(t, doing.exercise, doing.approach),
                 )
                 .setWhen(wallMs(doing.endedAtNs ?: doing.begunAtNs))
                 .setUsesChronometer(true)
@@ -225,7 +225,7 @@ class TrainingService : Service() {
 
         val selected = TrainingCourse.selected(t, null, state.choice)
             ?: return builder.setContentTitle("Заданные подходы сделаны").setContentText(t.body).build()
-        val next = "Далее: " + captionOf(t, selected.first, selected.second)
+        val next = approachLine(t, selected.first, selected.second)
         if (state.beginning == Reply.Pending) {
             return builder.setContentTitle("Начинается…").setContentText(next).build()
         }

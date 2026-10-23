@@ -119,12 +119,13 @@ class TrainingRunTest {
     @Test
     fun `an approach is begun, told, and the panel waits for the server before it closes`() {
         room(count = 2)
-        compose.onNodeWithText("Далее подход 1 · 40 кг × 5").assertIsDisplayed()
+        // Перед подходом — что в нём сделать, без «далее»: над «Приступить» и так ясно, что впереди.
+        compose.onAllNodesWithText("40 кг × 5").assertCountEquals(2)
         begin(0)
-        compose.onNodeWithText("Подход 1").assertIsDisplayed()
-        // В подходе цель видна: крупно на пульте и в строке подхода.
-        compose.onNodeWithText("40 кг  ×  5").assertIsDisplayed()
-        compose.onNodeWithText("40 кг × 5").assertIsDisplayed()
+        // В подходе крупно — время; что делать — тихо под ним и в строке подхода, без номера.
+        compose.onNodeWithText("0:00").assertIsDisplayed()
+        compose.onAllNodesWithText("40 кг × 5").assertCountEquals(2)
+        compose.onAllNodesWithText("Подход 1").assertCountEquals(0)
         end(0)
         compose.onNodeWithText("Как прошёл подход 1").assertIsDisplayed()
 
@@ -137,7 +138,7 @@ class TrainingRunTest {
 
         serveTelling(0, told)
         compose.onAllNodesWithText("Как прошёл подход 1").assertCountEquals(0)
-        compose.onNodeWithText("Отдых · далее подход 2 · 40 кг × 6").assertIsDisplayed()
+        compose.onAllNodesWithText("40 кг × 6").assertCountEquals(2)
     }
 
     @Test

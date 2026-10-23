@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -53,9 +54,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,7 +75,7 @@ private const val NANOS = 1_000_000_000L
 /**
  * Выполнение тренировки. Подходы упражнения идут по порядку, упражнения — в каком угодно:
  * выбираешь упражнение (первое с несделанными подходами выбрано само) и «Приступить» — на
- * пульте крупно что сделать, вес и повторы, с указанием Тренера, а мельче — сколько подход идёт; «Завершить подход» — подтверждаешь сделанное, и идёт отдых: обратный
+ * пульте крупно идёт время подхода, а под ним тихо — что в нём сделать, на случай если забыл; «Завершить подход» — подтверждаешь сделанное, и идёт отдых: обратный
  * отсчёт до заданного. Каждый подход сразу уходит Тренеру. Экран не гаснет, пока открыт;
  * таймеры считаются от меток времени. Погашенный экран ведёт [com.will.app.TrainingService]:
  * уведомление с таймером и вибрация в конце отдыха. Выбор [choice] — в сессии, его видит и оно. [beginning] — к подходу приступили,
@@ -153,7 +151,12 @@ fun TrainingRun(
         // На экране выполнения тренировка ещё идёт, сколько бы подходов ни было закончено.
         val span = TrainingCourse.span(training, doing)?.copy(endNs = null)
         Header(title = training.body, subtitle = span?.let { trainingSpanText(it, nowNs) }, onBack = onClose)
-        LazyColumn(Modifier.weight(1f)) {
+        val listState = rememberLazyListState()
+        // Начатый подход — на виду в списке: его номер у «▶» и указание к упражнению.
+        LaunchedEffect(going?.behestId, going?.exercise, going?.approach) {
+            going?.let { listState.animateScrollToItem(it.exercise) }
+        }
+        LazyColumn(Modifier.weight(1f), state = listState) {
             itemsIndexed(training.exercises) { e, exercise ->
                 Column(
                     Modifier
@@ -229,27 +232,26 @@ fun TrainingRun(
             if (confirming && doing != null) {
                 TellingPanel(training, doing, endedAt, nowNs, choice, telling, session)
             } else {
-                // Что делать — видно ещё до подхода: на отдыхе ставят вес, а не вспоминают его.
-                val line = when {
-                    going != null -> placeOf(training, going.exercise, going.approach).replaceFirstChar { it.uppercase() }
-                    resting -> "Отдых" + (selected?.let { (e, a) -> " · далее " + placeOf(training, e, a) + targetOf(training, e, a) } ?: "")
-                    else -> selected?.let { (e, a) -> "Далее " + placeOf(training, e, a) + targetOf(training, e, a) }
-                        ?: "Все заданные подходы сделаны — можно добавить подход сверх заданного"
-                }
-                Text(line, fontSize = 14.sp, color = WillColors.Muted, textAlign = TextAlign.Center)
+                // Главное на пульте — время: свидетельство, что усилие идёт и учтено; что делать —
+                // тихой строкой под ним, на случай если забыл. Номер подхода — в списке, у «▶».
                 when {
-                    // В подходе главное — сколько сделать; сколько он длится, второстепенно.
-                    going != null -> GoingTarget(training, going, nowNs)
-                    resting -> Text(
-                        spanText(clock.seconds),
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (clock.over) WillColors.Ink else WillColors.Accent,
-                        style = LocalTextStyle.current.copy(fontFeatureSettings = STEADY_DIGITS),
+                    going != null -> {
+                        BigTime(spanText((nowNs - going.begunAtNs) / NANOS), WillColors.Ink)
+                        QuietLine(approachLine(training, going.exercise, going.approach))
+                    }
+                    resting -> {
+                        BigTime(spanText(clock.seconds), if (clock.over) WillColors.Ink else WillColors.Accent)
+                        QuietLine(
+                            listOfNotNull(
+                                selected?.let { (e, a) -> approachLine(training, e, a) },
+                                restWilled.takeIf { clock.over && it > 0 }?.let { "задано ${restText(it)}" },
+                            ).joinToString(" · "),
+                        )
+                    }
+                    else -> QuietLine(
+                        selected?.let { (e, a) -> approachLine(training, e, a) }
+                            ?: "Все заданные подходы сделаны — можно добавить подход сверх заданного",
                     )
-                }
-                if (resting && clock.over && restWilled > 0) {
-                    Text("задано ${restText(restWilled)}", fontSize = 12.sp, color = WillColors.Muted)
                 }
                 Spacer(Modifier.height(8.dp))
                 if (going != null) {
@@ -301,11 +303,14 @@ fun TrainingRun(
     }
 }
 
-internal fun captionOf(training: WordItem, exercise: Int, approach: Int): String {
-    val name = training.exercises[exercise].name
+internal fun approachLine(training: WordItem, exercise: Int, approach: Int): String {
+    // Что за подход и что в нём делать — без номера: его видно в списке.
     val asked = training.exercises[exercise].approaches.getOrNull(approach)
-    return "$name · подход ${approach + 1}" +
-        (asked?.let { " · ${weightText(it.weightGrams)} × ${it.repetitions}" } ?: " · сверх заданного")
+    return listOfNotNull(
+        training.exercises[exercise].name.takeIf { training.exercises.size > 1 },
+        "сверх заданного".takeIf { asked == null },
+        TrainingCourse.proposal(training, exercise, approach)?.let { "${weightText(it.weightGrams)} × ${it.repetitions}" },
+    ).joinToString(" · ")
 }
 
 internal fun restTaken(seconds: Long, willed: Int): String =
@@ -366,38 +371,22 @@ private fun RunRow(
 }
 
 @Composable
-private fun GoingTarget(training: WordItem, going: UnderwayItem, nowNs: Long) {
-    TrainingCourse.proposal(training, going.exercise, going.approach)?.let { Text(targetLine(it), fontWeight = FontWeight.Medium) }
-    if (training.exercises[going.exercise].approaches.getOrNull(going.approach) == null) {
-        Text("сверх заданного", fontSize = 13.sp, color = WillColors.Accent)
-    }
-    InstructionLine(training.exercises[going.exercise].instruction)
+private fun BigTime(text: String, colour: Color) {
     Text(
-        spanText((nowNs - going.begunAtNs) / NANOS),
-        fontSize = 22.sp,
-        color = WillColors.Accent,
+        text,
+        fontSize = 48.sp,
+        fontWeight = FontWeight.Medium,
+        color = colour,
         style = LocalTextStyle.current.copy(fontFeatureSettings = STEADY_DIGITS),
     )
 }
 
-private fun targetLine(target: ApproachItem) = buildAnnotatedString {
-    // Крупно — числа: их и запоминают; единицы и знак лишь поясняют.
-    val number = SpanStyle(fontSize = 44.sp, color = WillColors.Ink)
-    val unit = SpanStyle(fontSize = 20.sp, color = WillColors.Muted)
-    if (target.weightGrams == 0) {
-        withStyle(unit) { append("свой вес") }
-    } else {
-        withStyle(number) { append(weightText(target.weightGrams).removeSuffix(" кг")) }
-        withStyle(unit) { append(" кг") }
-    }
-    withStyle(unit) { append("  ×  ") }
-    withStyle(number) { append("${target.repetitions}") }
+@Composable
+private fun QuietLine(text: String) {
+    if (text.isNotEmpty()) Text(text, fontSize = 16.sp, color = WillColors.Muted, textAlign = TextAlign.Center)
 }
 
 private const val STEADY_DIGITS = "tnum"
-
-private fun targetOf(training: WordItem, exercise: Int, approach: Int): String =
-    TrainingCourse.proposal(training, exercise, approach)?.let { " · ${weightText(it.weightGrams)} × ${it.repetitions}" }.orEmpty()
 
 @Composable
 private fun TellingPanel(
