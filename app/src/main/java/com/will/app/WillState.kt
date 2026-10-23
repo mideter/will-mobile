@@ -13,8 +13,8 @@ enum class Reply { None, Pending, Granted }
 /** Комната в списке Обители: в какой она части и что отражает — переносят только Кельи ([Aspect.Words]). */
 data class RoomItem(val name: String, val outer: Boolean, val aspect: Aspect = Aspect.Words)
 
-/** Неисполненное Веление в обзоре хозяина. */
-data class Waiting(val room: String, val behestId: Long, val body: String)
+/** Неисполненное Веление в обзоре хозяина: [word] — оно само; [underway] — подход, если он идёт в тренировке. */
+data class Waiting(val room: String, val word: WordItem, val underway: UnderwayItem? = null)
 
 /** Подход: вес в граммах (0 — свой вес), повторы и отдых перед ним, в секундах. */
 data class ApproachItem(val weightGrams: Int, val repetitions: Int, val restSeconds: Int = 0)

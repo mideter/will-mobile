@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import will.v1.MessengerOuterClass.ClientEvent
+import will.v1.MessengerOuterClass.OutstandingBehest
+import will.v1.MessengerOuterClass.Underway
 import will.v1.MessengerOuterClass.DwellerKind
 import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.MessengerOuterClass.RoomPart
@@ -376,6 +378,11 @@ class WillSession(context: Context) {
     }
 
     private fun underwayIn(view: View?, except: Long? = null): Workout? {
+        // Обзор своей Обители знает подходы всех её тренировок, где я Послушник.
+        if (view is View.Abode && view.host.isEmpty()) {
+            val owed = view.owed.firstOrNull { it.underway != null && it.word.id != except } ?: return null
+            return Workout("", owed.room, owed.word.id)
+        }
         // Своя тренировка — заданная мне в своей Обители; в Ведении подходы чужие, их не ведут.
         val room = (view as? View.Room)?.takeIf { it.host.isEmpty() } ?: return null
         val id = room.underways.keys.firstOrNull { id -> id != except && room.words.any { it.id == id && !it.mine } }
@@ -464,18 +471,14 @@ class WillSession(context: Context) {
             ServerEvent.EventCase.OUTSTANDING -> {
                 val abode = gathering as? View.Abode ?: return
                 gathering = abode.copy(
-                    owed = event.outstanding.owedList.map { Waiting(it.room, it.behest.id, it.behest.body) },
-                    awaited = event.outstanding.awaitedList.map { Waiting(it.room, it.behest.id, it.behest.body) },
+                    owed = event.outstanding.owedList.map { it.toWaiting() },
+                    awaited = event.outstanding.awaitedList.map { it.toWaiting() },
                 )
             }
             ServerEvent.EventCase.WORD -> place(event.word.toItem())
             ServerEvent.EventCase.UNDERWAY -> {
                 val u = event.underway
-                val doing = if (u.doing) {
-                    UnderwayItem(u.behestId, u.exercise, u.approach, u.begunAtNs, u.endedAtNs.takeIf { it != 0L })
-                } else {
-                    null
-                }
+                val doing = u.toItem()
                 // Ответ на своё «Приступить» или «Завершить подход»: сервер отметил миг, когда принял его.
                 val ended = doing?.endedAtNs
                 if (ended != null) {
@@ -677,6 +680,11 @@ class WillSession(context: Context) {
         val view = _state.value.view
         if (view is View.Abode && view.host.isEmpty()) home()
     }
+
+    private fun Underway.toItem() =
+        if (doing) UnderwayItem(behestId, exercise, approach, begunAtNs, endedAtNs.takeIf { it != 0L }) else null
+
+    private fun OutstandingBehest.toWaiting() = Waiting(room, behest.toItem(), underway.toItem())
 
     private fun Word.toItem() = WordItem(
         id, name, body, isMine, kind, behestId,

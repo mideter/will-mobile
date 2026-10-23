@@ -89,8 +89,11 @@ private fun WaitingCard(waiting: Waiting, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        Text(waiting.body, fontSize = 15.sp)
+        Text(waiting.word.body, fontSize = 15.sp)
         Text(waiting.room, fontSize = 12.sp, color = WillColors.Muted)
+        waiting.underway?.let {
+            Text(if (it.endedAtNs == null) "идёт подход" else "подход закончен — как прошёл?", fontSize = 12.sp, color = WillColors.Accent)
+        }
     }
 }
 
