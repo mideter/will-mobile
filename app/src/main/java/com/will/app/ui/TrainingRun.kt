@@ -129,6 +129,7 @@ fun TrainingRun(
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 ) {
                     Text(exercise.name, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    InstructionLine(exercise.instruction)
                     // Нажимается только следующий подход упражнения: подходы идут по порядку.
                     val next = TrainingCourse.nextWilledIn(training, e)
                     for (a in 0 until TrainingCourse.approachCount(training, e, doing)) {
@@ -336,6 +337,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
     Column(Modifier.padding(top = 4.dp)) {
         training.exercises.forEachIndexed { e, exercise ->
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            InstructionLine(exercise.instruction)
             for (a in 0 until TrainingCourse.approachCount(training, e, underway)) {
                 val asked = exercise.approaches.getOrNull(a)
                 val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }

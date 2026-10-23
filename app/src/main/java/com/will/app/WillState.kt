@@ -19,7 +19,7 @@ data class Waiting(val room: String, val behestId: Long, val body: String)
 /** Подход: вес в граммах (0 — свой вес), повторы и отдых перед ним, в секундах. */
 data class ApproachItem(val weightGrams: Int, val repetitions: Int, val restSeconds: Int = 0)
 
-data class ExerciseItem(val name: String, val approaches: List<ApproachItem>)
+data class ExerciseItem(val name: String, val approaches: List<ApproachItem>, val instruction: String = "")
 
 /**
  * Сделанный подход тренировки: какой (номера с нуля), с каким весом и сколько повторов,

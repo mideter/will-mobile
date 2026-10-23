@@ -537,13 +537,14 @@ class WillSession(context: Context) {
     private fun Word.toItem() = WordItem(
         id, name, body, isMine, kind, behestId,
         exercisesList.map { e ->
-            ExerciseItem(e.name, e.approachesList.map { ApproachItem(it.weightGrams, it.repetitions, it.restSeconds) })
+            ExerciseItem(e.name, e.approachesList.map { ApproachItem(it.weightGrams, it.repetitions, it.restSeconds) }, e.instruction)
         },
         effortsList.map { EffortItem(it.exercise, it.approach, it.weightGrams, it.repetitions, it.begunAtNs, it.finishedAtNs) },
     )
 
     private fun ExerciseItem.toWire() = exercise {
         name = this@toWire.name
+        instruction = this@toWire.instruction
         approaches.addAll(this@toWire.approaches.map { a ->
             approach { weightGrams = a.weightGrams; repetitions = a.repetitions; restSeconds = a.restSeconds }
         })

@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -67,10 +68,16 @@ fun weightText(grams: Int): String {
 }
 
 @Composable
+internal fun InstructionLine(instruction: String) {
+    if (instruction.isNotEmpty()) Text("«$instruction»", fontSize = 13.sp, color = WillColors.Muted, fontStyle = FontStyle.Italic)
+}
+
+@Composable
 fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = null) {
     Column(Modifier.padding(top = 4.dp)) {
         exercises.forEachIndexed { e, exercise ->
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            InstructionLine(exercise.instruction)
             exercise.approaches.forEachIndexed { a, approach ->
                 val asked = willed?.getOrNull(e)?.approaches?.getOrNull(a)
                 val differs = willed != null && asked != approach
@@ -98,6 +105,7 @@ fun ComparedExercisesView(willed: List<ExerciseItem>, done: List<ExerciseItem>) 
         willed.forEach { exercise ->
             val did = unmatched.firstOrNull { it.name == exercise.name }?.also { unmatched.remove(it) }
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            InstructionLine(exercise.instruction)
             val count = maxOf(exercise.approaches.size, did?.approaches?.size ?: 0)
             for (a in 0 until count) {
                 ComparedApproach(a + 1, exercise.approaches.getOrNull(a), did?.approaches?.getOrNull(a))
@@ -129,6 +137,7 @@ private fun ComparedApproach(number: Int, asked: ApproachItem?, did: ApproachIte
 }
 
 
+private const val MAX_INSTRUCTION_BYTES = 1000
 private const val WEIGHT_STEP = 2_500
 private const val MAX_GRAMS = 1_000_000
 private const val MAX_REPETITIONS = 10_000
@@ -167,20 +176,22 @@ internal class ApproachDraft(grams: Int, repetitions: Int, rest: Int = DEFAULT_R
     }
 }
 
-private class ExerciseDraft(name: String, approaches: List<ApproachDraft>) {
+private class ExerciseDraft(name: String, approaches: List<ApproachDraft>, instruction: String = "") {
     var name by mutableStateOf(name)
+    var instruction by mutableStateOf(instruction)
     val approaches: SnapshotStateList<ApproachDraft> = mutableStateListOf<ApproachDraft>().apply { addAll(approaches) }
 }
 
 private val ExerciseDraftsSaver = Saver<SnapshotStateList<ExerciseDraft>, ArrayList<Any>>(
     save = { drafts ->
         drafts.flatMapTo(ArrayList()) { draft ->
-            listOf(draft.name, draft.approaches.flatMap { listOf(it.grams, it.repetitions, it.rest) }.toIntArray())
+            listOf(draft.name, draft.instruction, draft.approaches.flatMap { listOf(it.grams, it.repetitions, it.rest) }.toIntArray())
         }
     },
     restore = { saved ->
-        saved.chunked(2).map { (name, numbers) ->
-            ExerciseDraft(name as String, (numbers as IntArray).toList().chunked(3).map { (g, r, s) -> ApproachDraft(g, r, s) })
+        saved.chunked(3).map { (name, instruction, numbers) ->
+            val approaches = (numbers as IntArray).toList().chunked(3).map { (g, r, s) -> ApproachDraft(g, r, s) }
+            ExerciseDraft(name as String, approaches, instruction as String)
         }.toMutableStateList()
     },
 )
@@ -199,11 +210,13 @@ private fun troubleOf(drafts: List<ExerciseDraft>): String? {
     if (drafts.isEmpty()) return "Добавьте упражнение"
     if (drafts.any { it.name.isBlank() }) return "У каждого упражнения должно быть название"
     if (drafts.any { it.approaches.isEmpty() }) return "У каждого упражнения — хотя бы один подход"
+    // Сервер меряет указание байтами UTF-8, а не знаками.
+    if (drafts.any { it.instruction.trim().toByteArray().size > MAX_INSTRUCTION_BYTES }) return "Указание слишком длинное"
     return null
 }
 
 private fun exercisesOf(drafts: List<ExerciseDraft>): List<ExerciseItem> =
-    drafts.map { draft -> ExerciseItem(draft.name.trim(), draft.approaches.map { it.item }) }
+    drafts.map { draft -> ExerciseItem(draft.name.trim(), draft.approaches.map { it.item }, draft.instruction.trim()) }
 
 /**
  * Редактор тренировки: Тренер составляет её — заголовок, упражнения карточками, подходы:
@@ -325,6 +338,13 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>,
                 like.forEach { SuggestionChip(onClick = { draft.name = it }, label = { Text(it, fontSize = 13.sp) }) }
             }
         }
+        PlainField(
+            value = draft.instruction,
+            onValueChange = { draft.instruction = it },
+            placeholder = "Указание — как выполнять",
+            fontSize = 14.sp,
+            modifier = Modifier.padding(start = 24.dp, top = 2.dp),
+        )
         Spacer(Modifier.height(4.dp))
         draft.approaches.forEachIndexed { index, approach ->
             ApproachRow(index + 1, approach, onRemove = if (draft.approaches.size > 1) ({ draft.approaches.removeAt(index) }) else null)
