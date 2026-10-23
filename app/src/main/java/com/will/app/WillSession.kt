@@ -653,7 +653,7 @@ class WillSession(context: Context) {
             }
             ServerEvent.EventCase.TIE_FORMED -> {
                 val other = event.tieFormed.counterpartName
-                _notices.tryEmit(if (event.tieFormed.asNovice) "$other — теперь ваш Тренер" else "Вы — теперь Тренер $other")
+                _notices.tryEmit(if (event.tieFormed.asNovice) "$other — теперь ваш Тренер" else "Вы стали Тренером $other")
                 refreshIfHome()
             }
             ServerEvent.EventCase.STIRRED -> {

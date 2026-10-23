@@ -70,6 +70,7 @@ object Notices {
             NoticeCode.NOTICE_TRAINING_WILLED -> "Тренировка задана"
             NoticeCode.NOTICE_BORN -> "Родился ${arg(0)}"
             NoticeCode.NOTICE_SUPPLICATION_REJECTED -> "Просьба ${arg(0)} отклонена"
+            NoticeCode.NOTICE_SUPPLICATION_DECLINED -> "Просьба к ${arg(0)} отклонена"
             // Без кода — по словам сервера.
             NoticeCode.NOTICE_UNSPECIFIED, NoticeCode.UNRECOGNIZED -> ru(message)
         }
