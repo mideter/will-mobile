@@ -666,7 +666,7 @@ class WillSession(
     private fun Underway.toItem() =
         if (doing) UnderwayItem(behestId, exercise, approach, begunAtNs, endedAtNs.takeIf { it != 0L }) else null
 
-    private fun OutstandingBehest.toWaiting() = Waiting(room, behest.toItem(), underway.toItem())
+    private fun OutstandingBehest.toWaiting() = Waiting(room, behest.toItem(), counterpart, underway.toItem())
 
     private fun Word.toItem() = WordItem(
         id, name, body, isMine, kind, behestId,

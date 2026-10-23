@@ -151,9 +151,10 @@ private fun <T> Group(items: List<T>, row: @Composable (T) -> Unit) {
 
 @Composable
 private fun WaitingRow(waiting: Waiting, onClick: () -> Unit) {
+    val what = if (waiting.word.exercises.isEmpty()) "задание" else "тренировка"
     Line(waiting.word.body, {
         Row {
-            Text(waiting.room, fontSize = 13.sp, color = WillColors.Muted)
+            Text("${waiting.counterpart} · $what", fontSize = 13.sp, color = WillColors.Muted)
             waiting.underway?.let {
                 Text(" · ", fontSize = 13.sp, color = WillColors.Muted)
                 Text(

@@ -28,6 +28,7 @@ import will.v1.MessengerOuterClass.Room
 import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.Word
+import will.v1.exercise
 import will.v1.historyEnd
 import will.v1.outstanding
 import will.v1.outstandingBehest
@@ -74,16 +75,20 @@ class AbodeScreenTest {
             transport.tell(serverEvent {
                 outstanding = outstanding {
                     owed.forEachIndexed { i, (body, room) -> this.owed += waiting(10L + i, body, room, going = i == 0, ended = i == 1) }
-                    awaited.forEachIndexed { i, (body, room) -> this.awaited += waiting(20L + i, body, room) }
+                    awaited.forEachIndexed { i, (body, room) -> this.awaited += waiting(20L + i, body, room, training = true) }
                 }
             })
         }
         transport.tell(serverEvent { historyEnd = historyEnd {} })
     }
 
-    private fun waiting(id: Long, body: String, room: String, going: Boolean = false, ended: Boolean = false) = outstandingBehest {
+    private fun waiting(id: Long, body: String, room: String, going: Boolean = false, ended: Boolean = false, training: Boolean = false) = outstandingBehest {
         this.room = room
-        behest = word { this.id = id; kind = Word.Kind.BEHEST; this.body = body }
+        counterpart = room.substringAfter("— ")
+        behest = word {
+            this.id = id; kind = Word.Kind.BEHEST; this.body = body
+            if (training) exercises += exercise { name = "Присед" }
+        }
         if (going || ended) underway = underway { behestId = id; doing = true; begunAtNs = 1; endedAtNs = if (ended) 2 else 0 }
     }
 
@@ -115,7 +120,7 @@ class AbodeScreenTest {
     }
 
     @Test
-    fun `what awaits one and what one set for others are shown, with the approach going or ended, and lead to their rooms`() {
+    fun `what awaits one and what one set for others are shown, whose and what, with the approach going or ended, and lead to their rooms`() {
         abode(
             "", ownRooms,
             owed = listOf("Понедельник" to "Послушание — boris", "Среда" to "Послушание — viktor"),
@@ -123,6 +128,8 @@ class AbodeScreenTest {
         )
         compose.onNodeWithText("Ожидает внимания").assertIsDisplayed()
         compose.onNodeWithText("Задано другим").assertIsDisplayed()
+        compose.onNodeWithText("boris · задание").assertIsDisplayed()
+        compose.onNodeWithText("gleb · тренировка").assertIsDisplayed()
         compose.onNodeWithText("идёт подход").assertIsDisplayed()
         compose.onNodeWithText("подход закончен — как прошёл?").assertIsDisplayed()
         compose.onNodeWithText("Пятница").performClick()
