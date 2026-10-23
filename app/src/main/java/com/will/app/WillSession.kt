@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +31,7 @@ import will.v1.clientEvent
 import will.v1.exercise
 import will.v1.finishApproach
 import will.v1.fulfil
+import will.v1.heartbeat
 import will.v1.historyRequest
 import will.v1.listDwellers
 import will.v1.listDwellings
@@ -51,7 +53,9 @@ import will.v1.turn
  *
  * Связь: появилась сеть — переподключаемся сразу, не дожидаясь конца паузы. Соединение
  * живёт в сети, по которой открыто: пропала она или телефон перешёл на другую — соединение
- * оборвано, не дожидаясь, пока это заметит пинг. Пока связи нет, отправить нельзя, и
+ * оборвано, не дожидаясь, пока это заметит пинг. Связь жива, пока слышен сервер: сердце
+ * ([heart]) бьётся к нему — во время тренировки часто, иначе спокойно, — и, не услышав
+ * ответа, сессия рвёт соединение сама. Пока связи нет, отправить нельзя, и
  * говорить об этом незачем: экран закрывает заставка. После входа возвращаемся только в
  * свою комнату, где был экран, — проснувшись, всякий дома.
  *
@@ -114,6 +118,9 @@ class WillSession(context: Context) {
         private set
 
     private val reconnect = Runnable { connect() }
+
+    private val heart = Heart()
+    private val beating = Runnable { beat() }
 
     private val backoff = Backoff()
 
@@ -181,6 +188,7 @@ class WillSession(context: Context) {
         returningRequest = null
         tellingRequest = null
         remarkingRequest = null
+        mainHandler.removeCallbacks(beating)
         val delay = backoff.nextPauseMs()
         android.util.Log.w(TAG, "connection lost: $reason; again in $delay ms")
         // Сказать об этом — дело заставки: пока связи нет, она закрывает экран.
@@ -264,6 +272,7 @@ class WillSession(context: Context) {
         beginSentAt = sentAt
         _state.update { it.copy(beginning = Reply.Pending, workout = workout) }
         TrainingService.start(appContext)
+        beat()
     }
 
     fun stopWorkout() = _state.update { s -> s.copy(workout = underwayIn(s.view, except = s.workout?.behestId)) }
@@ -363,6 +372,7 @@ class WillSession(context: Context) {
         val workout = underwayIn(_state.value.view) ?: return
         _state.update { it.copy(workout = workout) }
         TrainingService.start(appContext)
+        beat()
     }
 
     private fun underwayIn(view: View?, except: Long? = null): Workout? {
@@ -371,6 +381,15 @@ class WillSession(context: Context) {
         val id = room.underways.keys.firstOrNull { id -> id != except && room.words.any { it.id == id && !it.mine } }
             ?: return null
         return Workout("", room.room, id)
+    }
+
+    private fun beat() {
+        mainHandler.removeCallbacks(beating)
+        if (_state.value.connection != Connection.Ready) return
+        val pace = if (_state.value.workout != null) TRAINING_PACE_MS else CALM_PACE_MS
+        val pulse = heart.pulse(SystemClock.uptimeMillis(), pace) ?: return abandon("сервер не слышен")
+        if (pulse.beat) ask(clientEvent { heartbeat = heartbeat {} })
+        mainHandler.postDelayed(beating, pulse.nextInMs)
     }
 
     private fun look(host: String, room: String) {
@@ -388,20 +407,24 @@ class WillSession(context: Context) {
     // ── События сервера ───────────────────────────────────────────────────────
 
     private fun onEvent(event: ServerEvent) {
+        heart.hear()
         when (event.eventCase) {
             ServerEvent.EventCase.AUTH_OK -> {
                 backoff.reset()
+                heart.wake()
                 // Сервер говорит своё время, принимая тело: часы сверяются сразу при входе.
                 val sent = bindSentAt
                 bindSentAt = null
                 if (sent != null && event.authOk.serverTimeNs != 0L) clock.observe(event.authOk.serverTimeNs, sent, clock.phoneNowNs())
                 if (event.authOk.unborn) {
                     _state.update { it.copy(connection = Connection.Ready, ownName = "", unbornMark = event.authOk.mark) }
+                    beat()
                     return
                 }
                 _state.update {
                     it.copy(connection = Connection.Ready, ownName = event.authOk.name, unbornMark = null, loading = true)
                 }
+                beat()
                 // Проснувшись, всякий дома: вернуться можно только в свою комнату, где был. Туда —
                 // сразу, мимо обзора Обители: на миг показанный, он закрыл бы открытое в комнате.
                 val (host, room) = target
@@ -675,6 +698,8 @@ class WillSession(context: Context) {
     companion object {
         private const val TAG = "WillSession"
         private const val HISTORY_LIMIT = 200
+        private const val TRAINING_PACE_MS = 500L
+        private const val CALM_PACE_MS = 30_000L
         const val CELL = "Слово"
         const val GATES = "Врата"
 
