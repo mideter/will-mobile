@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import com.will.app.ApproachItem
 import com.will.app.ExerciseItem
 import com.will.app.RemarkItem
+import com.will.app.TrainingCourse
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -78,10 +79,18 @@ internal fun InstructionLine(instruction: String) {
 
 @Composable
 internal fun RemarkRow(remark: RemarkItem, start: androidx.compose.ui.unit.Dp) {
-    Row(Modifier.fillMaxWidth().padding(start = start, top = 2.dp, bottom = 2.dp)) {
-        Text(remark.body, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.weight(1f))
-        Text(clockText(remark.saidAtNs), fontSize = 12.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 8.dp))
-    }
+    Text(remark.body, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(start = start, top = 2.dp, bottom = 2.dp))
+}
+
+fun trainingSpanText(span: TrainingCourse.Span, nowNs: Long?): String {
+    val start = clockText(span.startNs)
+    val end = span.endNs ?: return if (nowNs == null) "начата $start" else "начата $start · идёт ${minutesText(nowNs - span.startNs)}"
+    return "$start–${clockText(end)} · ${minutesText(end - span.startNs)}"
+}
+
+private fun minutesText(ns: Long): String {
+    val minutes = ns / 60_000_000_000L
+    return if (minutes == 0L) "меньше минуты" else if (minutes < 60) "$minutes мин" else "${minutes / 60} ч ${(minutes % 60).toString().padStart(2, '0')} мин"
 }
 
 fun clockText(serverNs: Long): String =

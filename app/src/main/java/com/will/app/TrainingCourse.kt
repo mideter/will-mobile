@@ -26,6 +26,9 @@ data class Choice(val behestId: Long = 0, val exercise: Int? = null, val extra: 
  *
  * Заметка встаёт в ход упражнения там, где её сказали: после стольких его подходов, сколько
  * их было закончено к тому мигу; сказанная до первого — над ним.
+ *
+ * Тренировка идёт с начала первого подхода до конца последнего: ни задание, ни заметка её не
+ * начинают, а завершают её, может быть, и на другой день. Пока подход идёт, конца нет.
  */
 object TrainingCourse {
 
@@ -97,6 +100,15 @@ object TrainingCourse {
         val finished = training.efforts.filter { it.exercise == exercise }.map { it.finishedAtNs }
         return training.remarks.filter { it.exercise == exercise }
             .groupBy { remark -> finished.count { it <= remark.saidAtNs } }
+    }
+
+    data class Span(val startNs: Long, val endNs: Long?)
+
+    fun span(training: WordItem, underway: UnderwayItem?): Span? {
+        val doing = underway?.takeIf { it.behestId == training.id }
+        val start = (training.efforts.map { it.begunAtNs } + listOfNotNull(doing?.begunAtNs)).minOrNull() ?: return null
+        val end = if (doing != null) null else training.efforts.maxOf { it.finishedAtNs }
+        return Span(start, end)
     }
 
     fun proposal(training: WordItem, exercise: Int, approach: Int): ApproachItem? =

@@ -18,6 +18,16 @@ class TrainingCourseTest {
         EffortItem(exercise, approach, 100_000, reps, at * NS, (at + 30) * NS)
 
     @Test
+    fun `a training goes from the first approach begun to the last finished, without end while one is underway`() {
+        assertNull(TrainingCourse.span(training(), null))
+        val t = training(done(1, 0, at = 10), done(0, 0, at = 100))
+        assertEquals(TrainingCourse.Span(10 * NS, 130 * NS), TrainingCourse.span(t, null))
+        val doing = UnderwayItem(1, 0, 1, 200 * NS)
+        assertEquals(TrainingCourse.Span(10 * NS, null), TrainingCourse.span(t, doing))
+        assertEquals(TrainingCourse.Span(200 * NS, null), TrainingCourse.span(training(), doing))
+    }
+
+    @Test
     fun `a remark stands after the approaches finished before it was said`() {
         val t = training(done(1, 0, at = 0), done(1, 1, at = 100))
             .copy(remarks = listOf(RemarkItem(1, "колено", -1 * NS), RemarkItem(1, "тяжело", 50 * NS), RemarkItem(0, "жим", 10 * NS)))

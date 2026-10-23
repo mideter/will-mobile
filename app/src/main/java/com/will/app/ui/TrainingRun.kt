@@ -127,7 +127,12 @@ fun TrainingRun(
     }
 
     Column(Modifier.fillMaxSize()) {
-        Header(title = "Выполнение", subtitle = training.body, onBack = onClose)
+        val span = TrainingCourse.span(training, doing)
+        Header(
+            title = "Выполнение",
+            subtitle = training.body + (span?.let { " · " + trainingSpanText(it, nowNs) } ?: ""),
+            onBack = onClose,
+        )
         LazyColumn(Modifier.weight(1f)) {
             itemsIndexed(training.exercises) { e, exercise ->
                 Column(
@@ -389,6 +394,10 @@ private const val MAX_REMARK_BYTES = 4096
 @Composable
 fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) {
     Column(Modifier.padding(top = 4.dp)) {
+        // До завершения у тренировки нет конца, сколько бы подходов ни было закончено.
+        TrainingCourse.span(training, underway)?.let { span ->
+            Text(trainingSpanText(if (finished) span else span.copy(endNs = null), null), fontSize = 12.sp, color = WillColors.Muted)
+        }
         training.exercises.forEachIndexed { e, exercise ->
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             InstructionLine(exercise.instruction)
