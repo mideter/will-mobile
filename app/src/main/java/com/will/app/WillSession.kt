@@ -68,7 +68,9 @@ import will.v1.turn
  * Рождают, стоя в своих Вратах, — рождённый станет чадом по плоти. Переносят Кельи, стоя в
  * своей Кормчей. Отец по духу отказаться не может. Приступить к подходу из уведомления,
  * стоя в другом месте, — значит сначала дойти до комнаты Уз; с первым подходом тренировку
- * ведёт [TrainingService], пока её не завершат или не забросят.
+ * ведёт [TrainingService], пока её не завершат или не забросят. Подход, идущий в своей
+ * тренировке, ведут, где бы и когда к нему ни приступили: увидев его в своей комнате, — и
+ * после перезапуска, и когда завершили другую тренировку.
  *
  * Слова: новое слово идёт в собираемый вид или, живое, в тот, на который смотрят. Обзор
  * своей Обители меняется от Уз — его перечитывают, если он перед глазами. Своё
@@ -264,7 +266,7 @@ class WillSession(context: Context) {
         TrainingService.start(appContext)
     }
 
-    fun stopWorkout() = _state.update { it.copy(workout = null) }
+    fun stopWorkout() = _state.update { s -> s.copy(workout = underwayIn(s.view, except = s.workout?.behestId)) }
 
     fun endApproach(behestId: Long) {
         val sentAt = clock.phoneNowNs()
@@ -354,6 +356,21 @@ class WillSession(context: Context) {
             if (room != GATES) look(host, GATES)
         }
         look(host, room)
+    }
+
+    private fun leadUnderway() {
+        if (_state.value.workout != null) return
+        val workout = underwayIn(_state.value.view) ?: return
+        _state.update { it.copy(workout = workout) }
+        TrainingService.start(appContext)
+    }
+
+    private fun underwayIn(view: View?, except: Long? = null): Workout? {
+        // Своя тренировка — заданная мне в своей Обители; в Ведении подходы чужие, их не ведут.
+        val room = (view as? View.Room)?.takeIf { it.host.isEmpty() } ?: return null
+        val id = room.underways.keys.firstOrNull { id -> id != except && room.words.any { it.id == id && !it.mine } }
+            ?: return null
+        return Workout("", room.room, id)
     }
 
     private fun look(host: String, room: String) {
@@ -459,6 +476,7 @@ class WillSession(context: Context) {
                     val shown = begun.view as? View.Room ?: return@update begun
                     begun.copy(view = shown.copy(underways = shown.underways.told()))
                 }
+                leadUnderway()
             }
             ServerEvent.EventCase.EXERTED -> {
                 val e = event.exerted.effort
@@ -492,6 +510,7 @@ class WillSession(context: Context) {
                 val shown = gathering
                 gathering = null
                 _state.update { it.copy(view = shown ?: it.view, loading = false) }
+                leadUnderway()
             }
             ServerEvent.EventCase.RECEIPT_ACK -> {
                 if (event.receiptAck.hasWord()) {
