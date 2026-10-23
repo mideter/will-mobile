@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +53,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -241,6 +245,7 @@ fun TrainingRun(
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (clock.over) WillColors.Ink else WillColors.Accent,
+                        style = LocalTextStyle.current.copy(fontFeatureSettings = STEADY_DIGITS),
                     )
                 }
                 if (resting && clock.over && restWilled > 0) {
@@ -349,9 +354,9 @@ private fun RunRow(
                 "${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}${marksOf(effort)}" to
                     (if (changed || willed == null) WillColors.Accent else WillColors.Ink)
             }
+            // Сколько подход идёт, говорит пульт; строке довольно, что идёт он.
             underwayFor != null ->
-                (willed?.let { "${weightText(it.weightGrams)} × ${it.repetitions}" } ?: "сверх заданного") + " · идёт ${spanText(underwayFor)}" to
-                    WillColors.Accent
+                (willed?.let { "${weightText(it.weightGrams)} × ${it.repetitions}" } ?: "сверх заданного") to WillColors.Accent
             willed != null -> "${weightText(willed.weightGrams)} × ${willed.repetitions}" to
                 (if (selected) WillColors.Ink else WillColors.Muted)
             else -> "сверх заданного" to WillColors.Accent
@@ -362,15 +367,34 @@ private fun RunRow(
 
 @Composable
 private fun GoingTarget(training: WordItem, going: UnderwayItem, nowNs: Long) {
-    TrainingCourse.proposal(training, going.exercise, going.approach)?.let {
-        Text("${weightText(it.weightGrams)} × ${it.repetitions}", fontSize = 40.sp, fontWeight = FontWeight.Medium)
-    }
+    TrainingCourse.proposal(training, going.exercise, going.approach)?.let { Text(targetLine(it), fontWeight = FontWeight.Medium) }
     if (training.exercises[going.exercise].approaches.getOrNull(going.approach) == null) {
         Text("сверх заданного", fontSize = 13.sp, color = WillColors.Accent)
     }
     InstructionLine(training.exercises[going.exercise].instruction)
-    Text("идёт ${spanText((nowNs - going.begunAtNs) / NANOS)}", fontSize = 16.sp, color = WillColors.Muted)
+    Text(
+        spanText((nowNs - going.begunAtNs) / NANOS),
+        fontSize = 22.sp,
+        color = WillColors.Accent,
+        style = LocalTextStyle.current.copy(fontFeatureSettings = STEADY_DIGITS),
+    )
 }
+
+private fun targetLine(target: ApproachItem) = buildAnnotatedString {
+    // Крупно — числа: их и запоминают; единицы и знак лишь поясняют.
+    val number = SpanStyle(fontSize = 44.sp, color = WillColors.Ink)
+    val unit = SpanStyle(fontSize = 20.sp, color = WillColors.Muted)
+    if (target.weightGrams == 0) {
+        withStyle(unit) { append("свой вес") }
+    } else {
+        withStyle(number) { append(weightText(target.weightGrams).removeSuffix(" кг")) }
+        withStyle(unit) { append(" кг") }
+    }
+    withStyle(unit) { append("  ×  ") }
+    withStyle(number) { append("${target.repetitions}") }
+}
+
+private const val STEADY_DIGITS = "tnum"
 
 private fun targetOf(training: WordItem, exercise: Int, approach: Int): String =
     TrainingCourse.proposal(training, exercise, approach)?.let { " · ${weightText(it.weightGrams)} × ${it.repetitions}" }.orEmpty()
@@ -396,7 +420,12 @@ private fun TellingPanel(
         // Тот же отсчёт, что и на пульте отдыха после рассказа: до заданного, потом — сколько всего.
         endedAt?.let {
             val clock = TrainingCourse.restClock(TrainingCourse.restWilledAfter(training, doing, choice), (nowNs - it) / NANOS)
-            Text("отдых ${spanText(clock.seconds)}", fontSize = 14.sp, color = if (clock.over) WillColors.Ink else WillColors.Accent)
+            Text(
+                "отдых ${spanText(clock.seconds)}",
+                fontSize = 14.sp,
+                color = if (clock.over) WillColors.Ink else WillColors.Accent,
+                style = LocalTextStyle.current.copy(fontFeatureSettings = STEADY_DIGITS),
+            )
         }
     }
     Spacer(Modifier.height(10.dp))

@@ -122,9 +122,9 @@ class TrainingRunTest {
         compose.onNodeWithText("Далее подход 1 · 40 кг × 5").assertIsDisplayed()
         begin(0)
         compose.onNodeWithText("Подход 1").assertIsDisplayed()
-        // В подходе цель видна: крупно на пульте и в строке подхода, с тем, сколько он идёт.
+        // В подходе цель видна: крупно на пульте и в строке подхода.
+        compose.onNodeWithText("40 кг  ×  5").assertIsDisplayed()
         compose.onNodeWithText("40 кг × 5").assertIsDisplayed()
-        compose.onNodeWithText("40 кг × 5 · идёт", substring = true).assertIsDisplayed()
         end(0)
         compose.onNodeWithText("Как прошёл подход 1").assertIsDisplayed()
 
