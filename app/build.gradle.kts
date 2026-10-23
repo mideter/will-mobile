@@ -30,6 +30,11 @@ android {
         compose = true
     }
 
+    // Screens are tried on the JVM, under Robolectric, with the resources of the app.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     // The release key lives outside the repository: WILL_STORE_FILE, WILL_STORE_PASSWORD,
     // WILL_KEY_ALIAS, WILL_KEY_PASSWORD in ~/.gradle/gradle.properties. Without them the
     // release is built unsigned. Keep the key: an update signed by another one cannot
@@ -134,6 +139,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation(platform("androidx.compose:compose-bom:2024.10.01"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     compileOnly("org.apache.tomcat:annotations-api:6.0.53")
 }
 
