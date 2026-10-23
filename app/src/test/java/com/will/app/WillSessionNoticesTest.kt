@@ -11,6 +11,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import will.v1.MessengerOuterClass.NoticeCode
 import will.v1.MessengerOuterClass.RoomAspect
+import will.v1.MessengerOuterClass.Word
+import will.v1.exercise
 import will.v1.historyEnd
 import will.v1.protocolNotice
 import will.v1.serverEvent
@@ -18,6 +20,7 @@ import will.v1.stirred
 import will.v1.supplicationOffer
 import will.v1.tieFormed
 import will.v1.turned
+import will.v1.word
 
 class WillSessionNoticesTest {
 
@@ -37,7 +40,8 @@ class WillSessionNoticesTest {
     @After
     fun stop() = listening.cancel()
 
-    private fun stir() = transport.tell(serverEvent { stirred = stirred { room = "Послушание — boris"; authorName = "boris" } })
+    private fun stir(said: Word = word { kind = Word.Kind.BEHEST; body = "Присед" }) =
+        transport.tell(serverEvent { stirred = stirred { room = "Послушание — boris"; authorName = "boris"; word = said } })
 
     private fun offer() = transport.tell(serverEvent { supplicationOffer = supplicationOffer { suppliantName = "gleb" } })
 
@@ -51,7 +55,7 @@ class WillSessionNoticesTest {
         transport.show("", "Слово")
         stir()
         offer()
-        assertEquals(listOf("boris написал в комнате Послушание — boris", "gleb просит вас стать его Тренером"), heard)
+        assertEquals(listOf("boris · новое задание", "gleb · Просьба стать Тренером"), heard)
     }
 
     @Test
@@ -100,5 +104,14 @@ class WillSessionNoticesTest {
         offer()
         transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_PASS_THROUGH_GATES; message = "" } })
         assertEquals(listOf("Кормчая", null), notices.map { it.room })
+    }
+
+    @Test
+    fun `what was stirred is said by whom and what, a training, a task or a deed`() {
+        transport.show("", "Слово")
+        stir(word { kind = Word.Kind.BEHEST; body = "Ноги"; exercises += exercise { name = "Присед" } })
+        stir(word { kind = Word.Kind.BEHEST; body = "Пробежать 5 км" })
+        stir(word { kind = Word.Kind.DEED; body = "совершено" })
+        assertEquals(listOf("boris · новая тренировка", "boris · новое задание", "boris · выполнено"), heard)
     }
 }

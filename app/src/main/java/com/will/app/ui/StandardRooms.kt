@@ -138,7 +138,7 @@ private fun OthersGates(state: WillState, view: View.Room, session: WillSession)
             if (view.gatesOpen) {
                 "Хозяин видит вас: ждите, пока впустит."
             } else {
-                "Можно ждать здесь: когда хозяин подойдёт к Вратам, он увидит вас."
+                "Можно ждать здесь: подойдя к Вратам, хозяин увидит вас."
             },
         )
     }
@@ -184,7 +184,7 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(suppliant, fontSize = 16.sp)
-                            Text("Просит вас стать его Тренером", fontSize = 13.sp, color = WillColors.Muted)
+                            Text("Просит вас стать Тренером", fontSize = 13.sp, color = WillColors.Muted)
                         }
                         TextButton(onClick = { session.accept(suppliant) }) { Text("Принять") }
                         TextButton(onClick = { session.reject(suppliant) }) { Text("Отклонить", color = WillColors.Muted) }
@@ -214,7 +214,7 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
                     val standings = dweller.standings
                     if (Standing.Trainer in standings) Text("Ваш Тренер", fontSize = 13.sp, color = WillColors.Accent)
                     if (Standing.Novice in standings) Text("Ваш ученик", fontSize = 13.sp, color = WillColors.Accent)
-                    if (Standing.Asks in standings) Text("Просит вас стать его Тренером", fontSize = 13.sp, color = WillColors.Accent)
+                    if (Standing.Asks in standings) Text("Просит вас стать Тренером", fontSize = 13.sp, color = WillColors.Accent)
                     if (Standing.Asked in standings) {
                         Text("Просьба отправлена, ждёт ответа", fontSize = 13.sp, color = WillColors.Muted)
                     }

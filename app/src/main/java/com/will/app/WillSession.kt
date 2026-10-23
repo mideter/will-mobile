@@ -652,7 +652,7 @@ class WillSession(
             }
             ServerEvent.EventCase.SUPPLICATION_OFFER -> {
                 // Свои Дела и Кормчая показывают Просьбу сами.
-                if (!seesOwn(Aspect.Dwellers)) tell("${event.supplicationOffer.suppliantName} просит вас стать его Тренером", HELM)
+                if (!seesOwn(Aspect.Dwellers)) tell("${event.supplicationOffer.suppliantName} · Просьба стать Тренером", HELM)
                 listSupplications()
             }
             ServerEvent.EventCase.TIE_FORMED -> {
@@ -662,7 +662,15 @@ class WillSession(
             }
             ServerEvent.EventCase.STIRRED -> {
                 // Свои Дела сервер рассказывает заново сам.
-                if (!seesOwn()) tell("${event.stirred.authorName} написал в комнате ${event.stirred.room}", event.stirred.room)
+                if (!seesOwn()) {
+                    val word = event.stirred.word
+                    val what = when {
+                        word.kind == Word.Kind.DEED -> "выполнено"
+                        word.exercisesCount > 0 -> "новая тренировка"
+                        else -> "новое задание"
+                    }
+                    tell("${event.stirred.authorName} · $what", event.stirred.room)
+                }
             }
             else -> Unit
         }

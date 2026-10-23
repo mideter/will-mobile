@@ -14,10 +14,10 @@ object Notices {
         fun arg(i: Int) = args.getOrElse(i) { "" }
         return when (code) {
             // Чего не позволяет мир.
-            NoticeCode.NOTICE_ALREADY_DWELLS -> "Он уже обитает у вас"
-            NoticeCode.NOTICE_NOT_AT_GATES -> "Его уже нет у Врат"
+            NoticeCode.NOTICE_ALREADY_DWELLS -> "Уже обитает у вас"
+            NoticeCode.NOTICE_NOT_AT_GATES -> "Уже не у Врат"
             NoticeCode.NOTICE_NO_SUCH_UNBORN -> "Такого нерождённого нет"
-            NoticeCode.NOTICE_DOES_NOT_DWELL -> "Он не обитает у вас"
+            NoticeCode.NOTICE_DOES_NOT_DWELL -> "Не обитает у вас"
             NoticeCode.NOTICE_DOES_NOT_ENTER_ROOM -> "Вам не открыта эта комната"
             NoticeCode.NOTICE_STAND_IN_CELL -> "Это делают в Слове, Ведении или Послушании"
             NoticeCode.NOTICE_STAND_AT_HELM -> "Это делают в Кормчей"
@@ -27,9 +27,9 @@ object Notices {
             NoticeCode.NOTICE_TELL_WHAT_WAS_DONE -> "Сначала скажите, что сделано в подходе"
             NoticeCode.NOTICE_FATHER_BY_FLESH_NEIGHBOUR -> "Отец по плоти — всегда не ниже ближнего"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_FRIEND -> "Отец по духу — всегда друг"
-            NoticeCode.NOTICE_HEAR_ONLY_DWELLER -> "Он ещё не принял вас в свою Обитель"
+            NoticeCode.NOTICE_HEAR_ONLY_DWELLER -> "Просить можно только того, у кого вы обитаете"
             NoticeCode.NOTICE_ALREADY_TIED -> "Вы уже связаны"
-            NoticeCode.NOTICE_TIE_ONLY_MUTUAL_DWELLERS -> "Тренером можно стать только тому, кто принял вас, а вы — его"
+            NoticeCode.NOTICE_TIE_ONLY_MUTUAL_DWELLERS -> "Узы — только когда вы обитаете друг у друга"
             NoticeCode.NOTICE_UNKNOWN_SUPPLICATION -> "Такой просьбы нет"
             NoticeCode.NOTICE_WILL_ONLY_IN_CONTEMPLATED_TIE -> "Задавать можно, находясь в комнате ученика"
             NoticeCode.NOTICE_ONLY_TESTATOR_WILLS -> "Задаёт только Тренер"

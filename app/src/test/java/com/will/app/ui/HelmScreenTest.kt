@@ -114,7 +114,7 @@ class HelmScreenTest {
             Triple(acquaintance("boris"), true, null),
             Triple(acquaintance("viktor"), false, null),
             Triple(acquaintance("gleb") { trainer = true }, true, "Ваш Тренер"),
-            Triple(acquaintance("dana") { asks = true }, true, "Просит вас стать его Тренером"),
+            Triple(acquaintance("dana") { asks = true }, true, "Просит вас стать Тренером"),
             Triple(acquaintance("egor") { asked = true }, true, "Просьба отправлена, ждёт ответа"),
             Triple(acquaintance("zoya") { novice = true }, true, "Ваш ученик"),
         )

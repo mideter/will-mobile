@@ -107,7 +107,7 @@ class GatesScreenTest {
     @Test
     fun `one who has come waits, sees the host come to the gates, and once let in goes in`() {
         gates("viktor", open = false)
-        compose.onNodeWithText("Можно ждать здесь: когда хозяин подойдёт к Вратам, он увидит вас.").assertIsDisplayed()
+        compose.onNodeWithText("Можно ждать здесь: подойдя к Вратам, хозяин увидит вас.").assertIsDisplayed()
         compose.onAllNodesWithText("Войти").assertCountEquals(0)
         transport.tell(serverEvent { threshold = threshold { open = true } })
         compose.onNodeWithText("Врата открыты: хозяин у Врат.").assertIsDisplayed()

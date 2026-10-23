@@ -39,7 +39,7 @@ fun UnbornScreen(mark: Long) {
         Spacer(Modifier.height(24.dp))
         Text(
             "Получить что-то можно, только если кто-то, кто уже здесь, поделится с вами. " +
-                "Назовите ему этот номер — он знает, что с ним делать.",
+                "Назовите этот номер — этого достаточно.",
             textAlign = TextAlign.Center,
             color = WillColors.Muted,
         )
