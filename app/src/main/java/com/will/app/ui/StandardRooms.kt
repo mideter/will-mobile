@@ -187,14 +187,14 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
             if (state.supplications.isNotEmpty()) {
                 item { SectionTitle("Просьбы") }
                 item {
-                    Group(state.supplications) { suppliant ->
+                    Group(state.supplications, WillColors.SupplicationRow) { suppliant ->
                         Row(
                             Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
                                 Text(suppliant, fontSize = 16.sp)
-                                Text("Просит вас стать Тренером", fontSize = 13.sp, color = WillColors.Muted)
+                                Text("Просит вас стать Тренером", fontSize = 13.sp, color = WillColors.Supplication)
                             }
                             TextButton(onClick = { session.accept(suppliant) }) { Text("Принять") }
                             TextButton(onClick = { session.reject(suppliant) }) { Text("Отклонить", color = WillColors.Muted) }

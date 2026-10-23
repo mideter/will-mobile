@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,13 +71,13 @@ fun Hint(text: String) {
 }
 
 @Composable
-fun <T> Group(items: List<T>, row: @Composable (T) -> Unit) {
+fun <T> Group(items: List<T>, background: Color = WillColors.Row, row: @Composable (T) -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(WillColors.Row),
+            .background(background),
     ) {
         items.forEachIndexed { index, item ->
             if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = WillColors.Divider)

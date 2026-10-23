@@ -15,20 +15,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Notice
 
-/** Всплывающее — светлая скруглённая карточка, как группы обзора; если ведёт куда-то — со «›». */
+/** Всплывающее — светлая скруглённая карточка, как группы обзора; если ведёт куда-то — со «›». Просьба — красная. */
 @Composable
 fun NoticeCard(notice: Notice, leads: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(12.dp)
+    val asks = notice.suppliant != null
     Row(
         modifier
             .fillMaxWidth()
             .shadow(6.dp, shape)
-            .background(WillColors.Background, shape)
+            .background(if (asks) WillColors.SupplicationRow else WillColors.Background, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(notice.text, fontSize = 15.sp, color = WillColors.Ink, modifier = Modifier.weight(1f))
+        Text(notice.text, fontSize = 15.sp, color = if (asks) WillColors.Supplication else WillColors.Ink, modifier = Modifier.weight(1f))
         if (leads) Text("›", fontSize = 18.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 8.dp))
     }
 }

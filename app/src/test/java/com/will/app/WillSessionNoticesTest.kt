@@ -104,6 +104,7 @@ class WillSessionNoticesTest {
         offer()
         transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_PASS_THROUGH_GATES; message = "" } })
         assertEquals(listOf("Кормчая", null), notices.map { it.room })
+        assertEquals(listOf("gleb", null), notices.map { it.suppliant })
     }
 
     @Test

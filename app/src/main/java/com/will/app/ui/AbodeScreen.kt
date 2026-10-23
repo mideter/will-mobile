@@ -80,8 +80,8 @@ private fun Deeds(state: WillState, view: View.Abode, session: WillSession) {
         if (state.supplications.isNotEmpty()) {
             item { SectionTitle("Просьбы") }
             item {
-                Group(state.supplications) { suppliant ->
-                    Line(suppliant, { Text("Просит вас стать Тренером", fontSize = 13.sp, color = WillColors.Muted) }) {
+                Group(state.supplications, WillColors.SupplicationRow) { suppliant ->
+                    Line(suppliant, { Text("Просит вас стать Тренером", fontSize = 13.sp, color = WillColors.Supplication) }) {
                         helm?.let { session.enter(it) }
                     }
                 }

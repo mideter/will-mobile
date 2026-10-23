@@ -5,7 +5,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-/** Цвета прежнего экрана (`res/values/colors.xml`): светлая сдержанная палитра. */
+/**
+ * Цвета прежнего экрана (`res/values/colors.xml`): светлая сдержанная палитра. Красный — только
+ * Просьба ([Supplication]): человек смирил себя и ждёт ответа. Ни для чего больше, даже для
+ * ошибок, чтобы красный значил одно — «тебя ждут».
+ */
 object WillColors {
     val Background = Color(0xFFFFFFFF)
     val Ink = Color(0xFF1A1A1A)
@@ -14,6 +18,8 @@ object WillColors {
     val Accent = Color(0xFF3B82F6)
     val Divider = Color(0xFFECECEC)
     val Composer = Color(0xFFFAFAFA)
+    val Supplication = Color(0xFF9E1B32)
+    val SupplicationRow = Color(0xFFFBECEE)
 }
 
 @Composable

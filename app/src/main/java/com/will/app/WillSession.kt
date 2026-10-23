@@ -652,7 +652,8 @@ class WillSession(
             }
             ServerEvent.EventCase.SUPPLICATION_OFFER -> {
                 // Свои Дела и Кормчая показывают Просьбу сами.
-                if (!seesOwn(Aspect.Dwellers)) tell("${event.supplicationOffer.suppliantName} · Просьба стать Тренером", HELM)
+                val suppliant = event.supplicationOffer.suppliantName
+                if (!seesOwn(Aspect.Dwellers)) _notices.tryEmit(Notice("$suppliant · Просьба стать Тренером", HELM, suppliant))
                 listSupplications()
             }
             ServerEvent.EventCase.TIE_FORMED -> {
