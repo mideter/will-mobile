@@ -539,7 +539,7 @@ class WillSession(
                 }
             }
             ServerEvent.EventCase.PROTOCOL_NOTICE -> event.protocolNotice.let {
-                _notices.tryEmit(Notices.say(it.code, it.argsList, it.message))
+                Notices.say(it.code, it.argsList, it.message)?.let { said -> _notices.tryEmit(said) }
             }
             ServerEvent.EventCase.REPLY -> {
                 // Ответ на свой запрос — по его номеру; что сказано о нём, говорит всплывающее поле.
@@ -576,7 +576,7 @@ class WillSession(
                         _state.update { it.copy(remarking = outcome) }
                     }
                 }
-                if (reply.notice.isNotEmpty()) _notices.tryEmit(Notices.say(reply.code, reply.argsList, reply.notice))
+                if (reply.notice.isNotEmpty()) Notices.say(reply.code, reply.argsList, reply.notice)?.let { _notices.tryEmit(it) }
             }
             ServerEvent.EventCase.DWELLING -> {
                 _notices.tryEmit("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
@@ -641,17 +641,18 @@ class WillSession(
                 s.copy(supplications = event.supplications.suppliantNamesList)
             }
             ServerEvent.EventCase.SUPPLICATION_OFFER -> {
-                _notices.tryEmit("${event.supplicationOffer.suppliantName} просит вас стать его Тренером")
+                // Свои Дела и Кормчая показывают Просьбу сами.
+                if (!seesOwn(Aspect.Dwellers)) _notices.tryEmit("${event.supplicationOffer.suppliantName} просит вас стать его Тренером")
                 listSupplications()
             }
             ServerEvent.EventCase.TIE_FORMED -> {
-                val other = event.tieFormed.counterpartName
-                _notices.tryEmit(if (event.tieFormed.asNovice) "$other — теперь ваш Тренер" else "Вы стали Тренером $other")
+                // Принявшему Узы видны в его же Кормчей; о них говорится ученику.
+                if (event.tieFormed.asNovice) _notices.tryEmit("${event.tieFormed.counterpartName} — теперь ваш Тренер")
                 refreshIfHome()
             }
             ServerEvent.EventCase.STIRRED -> {
-                _notices.tryEmit("${event.stirred.authorName} написал в комнате ${event.stirred.room}")
-                refreshIfHome()
+                // Свои Дела сервер рассказывает заново сам.
+                if (!seesOwn()) _notices.tryEmit("${event.stirred.authorName} написал в комнате ${event.stirred.room}")
             }
             else -> Unit
         }
@@ -667,6 +668,12 @@ class WillSession(
                 s.copy(view = shown.copy(words = shown.words + word))
             }
         }
+    }
+
+    private fun seesOwn(room: Aspect? = null): Boolean = when (val view = _state.value.view) {
+        is View.Abode -> view.host.isEmpty()
+        is View.Room -> room != null && view.host.isEmpty() && view.aspect == room
+        null -> false
     }
 
     private fun refreshIfHome() {

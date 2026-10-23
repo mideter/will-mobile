@@ -4,13 +4,13 @@ import will.v1.MessengerOuterClass.NoticeCode
 
 /**
  * Уведомления сервера по-русски. Сервер говорит кодом ([NoticeCode]), а имена и номера
- * в уведомлении — отдельно ([say]); перевод — по коду, на каждый код свой. Без кода
- * (сбой, не ставший отказом мира) — по английским словам сервера ([ru]), незнакомое —
- * как есть.
+ * в уведомлении — отдельно ([say]); перевод — по коду, на каждый код свой. Сделанное мной
+ * не говорится: его показывает сам экран. Без кода (сбой, не ставший отказом мира) — по
+ * английским словам сервера ([ru]), незнакомое — как есть.
  */
 object Notices {
 
-    fun say(code: NoticeCode, args: List<String>, message: String): String {
+    fun say(code: NoticeCode, args: List<String>, message: String): String? {
         fun arg(i: Int) = args.getOrElse(i) { "" }
         return when (code) {
             // Чего не позволяет мир.
@@ -60,16 +60,17 @@ object Notices {
             NoticeCode.NOTICE_UNKNOWN_TRAINING -> "Такой тренировки нет"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_CLOSED -> "Отец по духу пока не открыт"
             NoticeCode.NOTICE_AWAITS_BIRTH -> "Вы ещё не рождены: ждите"
-            // Что сделано.
-            NoticeCode.NOTICE_SUPPLICATION_SENT -> "Просьба отправлена"
-            NoticeCode.NOTICE_BEHEST_FULFILLED -> "Задание выполнено"
-            NoticeCode.NOTICE_ADMITTED -> "${arg(0)} принят знакомым"
-            NoticeCode.NOTICE_REGARDED -> "Статус ${arg(0)} изменён"
-            NoticeCode.NOTICE_ARRANGED_OUTER -> "«${arg(0)}» — во внешней части"
-            NoticeCode.NOTICE_ARRANGED_INNER -> "«${arg(0)}» — во внутренней части"
-            NoticeCode.NOTICE_TRAINING_WILLED -> "Тренировка задана"
-            NoticeCode.NOTICE_BORN -> "Родился ${arg(0)}"
-            NoticeCode.NOTICE_SUPPLICATION_REJECTED -> "Просьба ${arg(0)} отклонена"
+            // Что сделано мной — видно на экране, поэтому не говорится.
+            NoticeCode.NOTICE_SUPPLICATION_SENT,
+            NoticeCode.NOTICE_BEHEST_FULFILLED,
+            NoticeCode.NOTICE_ADMITTED,
+            NoticeCode.NOTICE_REGARDED,
+            NoticeCode.NOTICE_ARRANGED_OUTER,
+            NoticeCode.NOTICE_ARRANGED_INNER,
+            NoticeCode.NOTICE_TRAINING_WILLED,
+            NoticeCode.NOTICE_BORN,
+            NoticeCode.NOTICE_SUPPLICATION_REJECTED -> null
+            // Что сделано другим.
             NoticeCode.NOTICE_SUPPLICATION_DECLINED -> "Просьба к ${arg(0)} отклонена"
             // Без кода — по словам сервера.
             NoticeCode.NOTICE_UNSPECIFIED, NoticeCode.UNRECOGNIZED -> ru(message)
