@@ -23,6 +23,9 @@ data class Choice(val behestId: Long = 0, val exercise: Int? = null, val extra: 
  * заданный не вышел, — обратный отсчёт, потом секундомер дальше от отметки; без заданного —
  * секундомер с нуля. Подтверждение предлагает заданное, а сверх заданного — как последний
  * сделанный подход.
+ *
+ * Заметка встаёт в ход упражнения там, где её сказали: после стольких его подходов, сколько
+ * их было закончено к тому мигу; сказанная до первого — над ним.
  */
 object TrainingCourse {
 
@@ -88,6 +91,12 @@ object TrainingCourse {
         val before = efforts.filter { it.begunAtNs < begunAtNs && it.finishedAtNs <= begunAtNs }.maxByOrNull { it.finishedAtNs }
             ?: return null
         return (begunAtNs - before.finishedAtNs) / 1_000_000_000L
+    }
+
+    fun remarksByApproachesDone(training: WordItem, exercise: Int): Map<Int, List<RemarkItem>> {
+        val finished = training.efforts.filter { it.exercise == exercise }.map { it.finishedAtNs }
+        return training.remarks.filter { it.exercise == exercise }
+            .groupBy { remark -> finished.count { it <= remark.saidAtNs } }
     }
 
     fun proposal(training: WordItem, exercise: Int, approach: Int): ApproachItem? =

@@ -7,18 +7,17 @@ import org.junit.Test
 
 class BackoffTest {
 
-    /** Без разброса: середина каждой паузы. */
-    private fun plain() = Backoff(spread = 0.0)
+    private fun withoutSpread() = Backoff(spread = 0.0)
 
     @Test
     fun `each pause is twice the one before, up to the limit`() {
-        val backoff = plain()
+        val backoff = withoutSpread()
         assertEquals(listOf(1_000L, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000), List(7) { backoff.nextPauseMs() })
     }
 
     @Test
     fun `after a good connection it starts short again`() {
-        val backoff = plain()
+        val backoff = withoutSpread()
         repeat(10) { backoff.nextPauseMs() }
         backoff.reset()
         assertEquals(1_000L, backoff.nextPauseMs())

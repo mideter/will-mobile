@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
@@ -39,7 +41,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,6 +92,7 @@ fun TrainingRun(
     val selected = TrainingCourse.selected(training, doing, choice)
     var confirming by rememberSaveable { mutableStateOf(false) }
     var closing by rememberSaveable { mutableStateOf(false) }
+    var remarkingOn by rememberSaveable { mutableStateOf<Int?>(null) }
 
     // Часы сервера — метки подходов ставит он: раз в четверть секунды.
     var nowNs by remember { mutableLongStateOf(session.clock.nowNs()) }
@@ -128,12 +138,22 @@ fun TrainingRun(
                         .background(WillColors.Row)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 ) {
-                    Text(exercise.name, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(exercise.name, fontSize = 18.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { remarkingOn = if (remarkingOn == e) null else e }) {
+                            Text("заметка", fontSize = 13.sp, color = WillColors.Muted)
+                        }
+                    }
                     InstructionLine(exercise.instruction)
-                    RemarkLines(training.remarks.filter { it.exercise == e })
+                    if (remarkingOn == e) {
+                        RemarkField(onSay = { session.sayRemark(training.id, e, it); remarkingOn = null }, key = "${training.id}:$e")
+                    }
+                    val remarks = TrainingCourse.remarksByApproachesDone(training, e)
                     // Нажимается только следующий подход упражнения: подходы идут по порядку.
                     val next = TrainingCourse.nextWilledIn(training, e)
-                    for (a in 0 until TrainingCourse.approachCount(training, e, doing)) {
+                    val count = TrainingCourse.approachCount(training, e, doing)
+                    for (a in 0 until count) {
+                        remarks[a]?.forEach { RemarkRow(it, start = 28.dp) }
                         val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                         val begun = effort?.begunAtNs ?: doing?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
                         val willedRest = TrainingCourse.restWilled(training, e, a)
@@ -168,7 +188,7 @@ fun TrainingRun(
                             TextButton(onClick = { session.choose(training.id, e, extra = e) }) { Text("+ подход сверх заданного") }
                         }
                     }
-                    RemarkField(onSay = { session.sayRemark(training.id, e, it) }, key = "${training.id}:$e")
+                    remarks.filterKeys { it >= count }.values.flatten().forEach { RemarkRow(it, start = 28.dp) }
                 }
             }
         }
@@ -339,15 +359,28 @@ private fun RemarkField(onSay: (String) -> Unit, key: String) {
     var text by rememberSaveable(key) { mutableStateOf("") }
     // Сервер меряет речение байтами UTF-8, а не знаками.
     val fits = text.isNotBlank() && text.trim().toByteArray().size <= MAX_REMARK_BYTES
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-        OutlinedTextField(
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    val say = { if (fits) { onSay(text.trim()); text = "" } }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 28.dp, top = 2.dp)) {
+        BasicTextField(
             value = text,
             onValueChange = { text = it },
-            placeholder = { Text("Заметка…") },
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            modifier = Modifier.weight(1f),
+            textStyle = TextStyle(fontSize = 14.sp, color = WillColors.Ink),
+            cursorBrush = SolidColor(WillColors.Accent),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { say() }),
+            singleLine = true,
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focus)
+                .drawBehind { drawLine(WillColors.Divider, Offset(0f, size.height + 4.dp.toPx()), Offset(size.width, size.height + 4.dp.toPx()), 1.dp.toPx()) },
+            decorationBox = { inner ->
+                if (text.isEmpty()) Text("Что сказать о подходах…", fontSize = 14.sp, color = WillColors.Muted)
+                inner()
+            },
         )
-        TextButton(onClick = { onSay(text); text = "" }, enabled = fits) { Text("Сказать") }
+        TextButton(onClick = say, enabled = fits) { Text("↑", fontSize = 18.sp) }
     }
 }
 
@@ -359,8 +392,10 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
         training.exercises.forEachIndexed { e, exercise ->
             Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             InstructionLine(exercise.instruction)
-            RemarkLines(training.remarks.filter { it.exercise == e })
-            for (a in 0 until TrainingCourse.approachCount(training, e, underway)) {
+            val remarks = TrainingCourse.remarksByApproachesDone(training, e)
+            val count = TrainingCourse.approachCount(training, e, underway)
+            for (a in 0 until count) {
+                remarks[a]?.forEach { RemarkRow(it, start = 12.dp) }
                 val asked = exercise.approaches.getOrNull(a)
                 val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                 val begun = effort?.begunAtNs ?: underway?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
@@ -392,6 +427,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                 }
                 Text("${a + 1}. $line", fontSize = 14.sp, color = colour, modifier = Modifier.padding(start = 12.dp))
             }
+            remarks.filterKeys { it >= count }.values.flatten().forEach { RemarkRow(it, start = 12.dp) }
         }
     }
 }

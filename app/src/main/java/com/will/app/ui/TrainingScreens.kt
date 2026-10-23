@@ -59,6 +59,9 @@ import androidx.compose.ui.unit.sp
 import com.will.app.ApproachItem
 import com.will.app.ExerciseItem
 import com.will.app.RemarkItem
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 fun weightText(grams: Int): String {
     if (grams == 0) return "свой вес"
@@ -74,9 +77,15 @@ internal fun InstructionLine(instruction: String) {
 }
 
 @Composable
-internal fun RemarkLines(remarks: List<RemarkItem>) {
-    remarks.forEach { Text("— ${it.body}", fontSize = 13.sp, color = WillColors.Accent) }
+internal fun RemarkRow(remark: RemarkItem, start: androidx.compose.ui.unit.Dp) {
+    Row(Modifier.fillMaxWidth().padding(start = start, top = 2.dp, bottom = 2.dp)) {
+        Text(remark.body, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.weight(1f))
+        Text(clockText(remark.saidAtNs), fontSize = 12.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 8.dp))
+    }
 }
+
+fun clockText(serverNs: Long): String =
+    Instant.ofEpochMilli(serverNs / 1_000_000).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
 
 @Composable
 fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = null) {

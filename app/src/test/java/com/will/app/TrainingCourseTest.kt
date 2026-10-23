@@ -14,9 +14,19 @@ class TrainingCourseTest {
     private fun training(vararg efforts: EffortItem) =
         WordItem(1, "trainer", "Вторник", false, Word.Kind.BEHEST, 0, listOf(press, squat, pull), efforts.toList())
 
-    /** Подход сделан: секунда начала — [at], длится 30 с. */
     private fun done(exercise: Int, approach: Int, at: Long, reps: Int = 5) =
         EffortItem(exercise, approach, 100_000, reps, at * NS, (at + 30) * NS)
+
+    @Test
+    fun `a remark stands after the approaches finished before it was said`() {
+        val t = training(done(1, 0, at = 0), done(1, 1, at = 100))
+            .copy(remarks = listOf(RemarkItem(1, "колено", -1 * NS), RemarkItem(1, "тяжело", 50 * NS), RemarkItem(0, "жим", 10 * NS)))
+        val placed = TrainingCourse.remarksByApproachesDone(t, 1)
+        assertEquals(listOf("колено"), placed[0]?.map { it.body })
+        assertEquals(listOf("тяжело"), placed[1]?.map { it.body })
+        assertNull(placed[2])
+        assertEquals(listOf("жим"), TrainingCourse.remarksByApproachesDone(t, 0)[0]?.map { it.body })
+    }
 
     @Test
     fun `at the start the first approach of the first exercise is proposed`() {
