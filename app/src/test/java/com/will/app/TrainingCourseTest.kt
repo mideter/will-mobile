@@ -39,6 +39,15 @@ class TrainingCourseTest {
     }
 
     @Test
+    fun `while an approach is told, the rest counts toward the one chosen after it`() {
+        val ended = UnderwayItem(1, 0, 0, 0, 30 * NS)
+        assertEquals(120, TrainingCourse.restWilledAfter(training(), ended, Choice(1, 0)))
+        // Последний подход упражнения: дальше — первое упражнение с несделанными, его отдых.
+        val last = UnderwayItem(1, 2, 0, 0, 30 * NS)
+        assertEquals(90, TrainingCourse.restWilledAfter(training(), last, Choice(1, 2)))
+    }
+
+    @Test
     fun `at the start the first approach of the first exercise is proposed`() {
         val t = training()
         assertEquals(0 to 0, TrainingCourse.nextApproach(t, TrainingCourse.focus(t, null, null)))

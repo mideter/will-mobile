@@ -84,6 +84,15 @@ object TrainingCourse {
         return (approaches.getOrNull(approach) ?: approaches.lastOrNull())?.restSeconds ?: 0
     }
 
+    fun restWilledAfter(training: WordItem, doing: UnderwayItem, choice: Choice): Int {
+        // Отдых уже идёт, пока о подходе рассказывают: он перед тем, что выберется, когда рассказ дойдёт.
+        val told = training.copy(
+            efforts = training.efforts + EffortItem(doing.exercise, doing.approach, 0, 0, doing.begunAtNs, doing.endedAtNs ?: doing.begunAtNs),
+        )
+        val (exercise, approach) = selected(told, null, choice) ?: return 0
+        return restWilled(told, exercise, approach)
+    }
+
     /** Таймер отдыха: [seconds] — сколько осталось или, когда [over], сколько отдыхает всего. */
     data class RestClock(val seconds: Long, val over: Boolean)
 

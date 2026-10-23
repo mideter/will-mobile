@@ -222,7 +222,7 @@ fun TrainingRun(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (confirming && doing != null) {
-                TellingPanel(training, doing, endedAt, nowNs, telling, session)
+                TellingPanel(training, doing, endedAt, nowNs, choice, telling, session)
             } else {
                 val line = when {
                     going != null -> "Подход · " + placeOf(training, going.exercise, going.approach)
@@ -361,6 +361,7 @@ private fun TellingPanel(
     doing: UnderwayItem,
     endedAt: Long?,
     nowNs: Long,
+    choice: Choice,
     telling: Boolean,
     session: WillSession,
 ) {
@@ -372,7 +373,11 @@ private fun TellingPanel(
     var strain by rememberSaveable(doing.behestId, doing.exercise, doing.approach, doing.begunAtNs) { mutableStateOf(0) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("Как прошёл " + placeOf(training, doing.exercise, doing.approach), fontSize = 14.sp, modifier = Modifier.weight(1f))
-        endedAt?.let { Text("отдых ${spanText((nowNs - it) / NANOS)}", fontSize = 14.sp, color = WillColors.Accent) }
+        // Тот же отсчёт, что и на пульте отдыха после рассказа: до заданного, потом — сколько всего.
+        endedAt?.let {
+            val clock = TrainingCourse.restClock(TrainingCourse.restWilledAfter(training, doing, choice), (nowNs - it) / NANOS)
+            Text("отдых ${spanText(clock.seconds)}", fontSize = 14.sp, color = if (clock.over) WillColors.Ink else WillColors.Accent)
+        }
     }
     Spacer(Modifier.height(10.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
