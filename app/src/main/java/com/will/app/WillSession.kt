@@ -49,9 +49,11 @@ import will.v1.turn
  * Вид меняется только по слову сервера (`Turned` … `HistoryEnd`): пока новый вид идёт,
  * на экране остаётся прежний. Сессия одна на всё приложение: поворот экрана её не рвёт.
  *
- * Связь: появилась сеть — переподключаемся сразу, не дожидаясь конца паузы. Пока связи нет,
- * отправить нельзя, и говорить об этом незачем: экран закрывает заставка. После входа
- * возвращаемся только в свою комнату, где был экран, — проснувшись, всякий дома.
+ * Связь: появилась сеть — переподключаемся сразу, не дожидаясь конца паузы. Соединение
+ * живёт в сети, по которой открыто: пропала она или телефон перешёл на другую — соединение
+ * оборвано, не дожидаясь, пока это заметит пинг. Пока связи нет, отправить нельзя, и
+ * говорить об этом незачем: экран закрывает заставка. После входа возвращаемся только в
+ * свою комнату, где был экран, — проснувшись, всякий дома.
  *
  * Часы: метки времени тренировки сравнивают с «сейчас» только по часам сервера ([clock]).
  * Они сверяются при входе (`AuthOk`) и по ответам на «Приступить» и «Завершить подход».
@@ -76,6 +78,9 @@ class WillSession(context: Context) {
     private val appContext = context.applicationContext
     private val bridge = WillBridge(if (WillBridge.TLS) serverCertificate(context) else null)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
+
+    private var connectedOn: Network? = null
 
     val clock = ServerClock()
 
@@ -117,20 +122,27 @@ class WillSession(context: Context) {
     }
 
     private fun watchNetwork() {
-        val connectivity = appContext.getSystemService(ConnectivityManager::class.java) ?: return
+        val connectivity = connectivity ?: return
         connectivity.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 mainHandler.post {
+                    // Перешли на другую сеть: прежнее соединение осталось в старой и мертво.
+                    if (network != connectedOn) abandon("сеть сменилась")
                     if (_state.value.connection != Connection.Reconnecting) return@post
                     backoff.reset()
                     connect()
                 }
+            }
+
+            override fun onLost(network: Network) {
+                mainHandler.post { if (network == connectedOn) abandon("сеть пропала") }
             }
         })
     }
 
     private fun connect() {
         mainHandler.removeCallbacks(reconnect)
+        connectedOn = connectivity?.activeNetwork
         bindSentAt = clock.phoneNowNs()
         bridge.connect(
             WillBridge.HOST,
@@ -158,6 +170,13 @@ class WillSession(context: Context) {
         // Сказать об этом — дело заставки: пока связи нет, она закрывает экран.
         mainHandler.removeCallbacks(reconnect)
         mainHandler.postDelayed(reconnect, delay)
+    }
+
+    private fun abandon(reason: String) {
+        if (_state.value.connection == Connection.Reconnecting) return
+        // Прежнее соединение больше не скажет, что закрылось: закрываем его сами.
+        bridge.disconnect()
+        onClosed(reason)
     }
 
     // ── Действия ──────────────────────────────────────────────────────────────
