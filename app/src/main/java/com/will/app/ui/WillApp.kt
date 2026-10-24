@@ -32,9 +32,6 @@ import com.will.app.WillSession
 
 private const val NOTICE_MILLIS = 3_000L
 
-/** [Main] — вид из сессии (Обитель или комната). */
-private enum class Screen { Main, Lineage }
-
 /**
  * Корень приложения: вид из состояния сессии, «назад» — тем путём, каким пришли. Уведомления сервера — во
  * всплывающем поле; связь не уведомление: без неё экран закрывает заставка ([Veil]).
@@ -44,7 +41,6 @@ fun WillApp(session: WillSession) {
     val state by session.state.collectAsState()
     var notice by remember { mutableStateOf<Notice?>(null) }
     var lastNotice by remember { mutableStateOf<Notice?>(null) }
-    var screen by rememberSaveable { mutableStateOf(Screen.Main) }
     var abodeTab by rememberSaveable { mutableStateOf(AbodeTab.Deeds) }
 
     LaunchedEffect(session) {
@@ -89,26 +85,21 @@ fun WillApp(session: WillSession) {
     }
 
     val view = state.view
-    BackHandler(enabled = screen != Screen.Main) { screen = Screen.Main }
-    BackHandler(enabled = screen == Screen.Main && (view is View.Room || (view != null && view.host.isNotEmpty()))) {
+    BackHandler(enabled = view is View.Room || (view != null && view.host.isNotEmpty())) {
         session.back()
     }
 
-    val back = { screen = Screen.Main }
     Box(Modifier.fillMaxSize()) {
         Scaffold { padding ->
             Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
                 Box(Modifier.weight(1f)) {
-                    when (screen) {
-                        Screen.Lineage -> LineageScreen(state, session, onBack = back)
-                        Screen.Main -> when (view) {
-                            null -> ConnectingScreen()
-                            is View.Abode -> AbodeScreen(state, view, session, abodeTab) { abodeTab = it }
-                            is View.Room -> when (view.aspect) {
-                                Aspect.Threshold -> GatesScreen(state, view, session)
-                                Aspect.Dwellers -> HelmScreen(state, view, session)
-                                Aspect.Words -> RoomScreen(state, view, session)
-                            }
+                    when (view) {
+                        null -> ConnectingScreen()
+                        is View.Abode -> AbodeScreen(state, view, session, abodeTab) { abodeTab = it }
+                        is View.Room -> when (view.aspect) {
+                            Aspect.Threshold -> GatesScreen(state, view, session)
+                            Aspect.Dwellers -> HelmScreen(state, view, session)
+                            Aspect.Words -> RoomScreen(state, view, session)
                         }
                     }
                 }

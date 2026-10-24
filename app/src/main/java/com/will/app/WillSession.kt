@@ -20,7 +20,6 @@ import will.v1.approach
 import will.v1.arrange
 import will.v1.beginApproach
 import will.v1.bear
-import will.v1.chooseFather
 import will.v1.endApproach
 import will.v1.chatMessage
 import will.v1.clientEvent
@@ -31,7 +30,6 @@ import will.v1.heartbeat
 import will.v1.historyRequest
 import will.v1.listDwellers
 import will.v1.listDwellings
-import will.v1.listLineage
 import will.v1.listSupplications
 import will.v1.regard
 import will.v1.sayRemark
@@ -208,10 +206,6 @@ class WillSession(
     fun gates(host: String) = look(host.trim(), GATES)
 
     fun bear(mark: Long) = send(clientEvent { bear = bear { this.mark = mark } })
-
-    fun chooseFather(name: String) = send(clientEvent { chooseFather = chooseFather { this.name = name.trim() } })
-
-    fun listLineage() = send(clientEvent { listLineage = listLineage {} })
 
     fun back(): Boolean {
         val view = _state.value.view ?: return false
@@ -640,9 +634,6 @@ class WillSession(
                         s.copy(view = shown.copy(unborn = marks))
                     }
                 }
-            }
-            ServerEvent.EventCase.LINEAGE -> _state.update { s ->
-                s.copy(lineage = event.lineage.descentsList.map { Descent(it.name, it.fatherName) })
             }
             ServerEvent.EventCase.DWELLINGS -> _state.update { s ->
                 s.copy(dwellings = event.dwellings.dwellingsList.map { Person(it.hostName, it.kind.toKind()) })

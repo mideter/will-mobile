@@ -87,9 +87,6 @@ data class Person(val name: String, val kind: Kind, val standings: Set<Standing>
 
 enum class Aspect { Words, Threshold, Dwellers }
 
-/** Чадо по духу и его отец — звено духовной линии. */
-data class Descent(val name: String, val father: String)
-
 /** Что перед глазами: Обитель (своя, когда [host] пуст) или комната в ней. */
 sealed interface View {
     val host: String
@@ -155,7 +152,6 @@ data class WillState(
     val dwellings: List<Person> = emptyList(),
     val supplications: List<String> = emptyList(),
     val unbornMark: Long? = null,
-    val lineage: List<Descent> = emptyList(),
     val willing: Reply = Reply.None,
     val fulfilling: Reply = Reply.None,
     val beginning: Reply = Reply.None,
