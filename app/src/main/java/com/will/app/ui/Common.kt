@@ -50,9 +50,7 @@ fun Header(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(WillColors.Row)
-                    .border(1.dp, WillColors.Outline, RoundedCornerShape(12.dp))
+                    .plaque()
                     .let { if (onClick != null) it.clickable(onClick = onClick) else it }
                     .padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
@@ -131,3 +129,6 @@ fun Modifier.keptInSight(): Modifier {
     LaunchedEffect(cut) { if (cut) sight.bringIntoView() }
     return bringIntoViewRequester(sight).onGloballyPositioned { cut = it.boundsInRoot().height < it.size.height }
 }
+
+fun Modifier.plaque(): Modifier =
+    clip(RoundedCornerShape(12.dp)).background(WillColors.Row).border(1.dp, WillColors.Outline, RoundedCornerShape(12.dp))

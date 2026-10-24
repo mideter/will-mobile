@@ -3,6 +3,7 @@ package com.will.app.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,8 +19,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,10 +33,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Reply
@@ -147,16 +149,36 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
             }
         }
 
-        if (trainer) {
-            TextButton(onClick = { composing = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                Text("+ Тренировка")
-            }
-        }
+        // Внизу — плашки, как вкладки Обители: в Ведении ещё и «+ Тренировка» рядом с полем.
         if (view.writable) {
-            Composer(
-                hint = if (trainer) "Задать…" else "Написать…",
-                onSend = session::say,
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                if (trainer) {
+                    Row(
+                        Modifier
+                            .plaque()
+                            .clickable { composing = true }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                    ) {
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(color = WillColors.Accent)) { append("+ ") }
+                                append("Тренировка")
+                            },
+                            fontSize = 15.sp,
+                            color = WillColors.Ink,
+                        )
+                    }
+                }
+                Composer(
+                    hint = if (trainer) "Задать…" else "Написать…",
+                    onSend = session::say,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 
@@ -260,35 +282,33 @@ private fun ReportField(sending: Boolean, onReport: (String) -> Unit) {
 }
 
 @Composable
-private fun Composer(hint: String, onSend: (String) -> Unit) {
+private fun Composer(hint: String, onSend: (String) -> Unit, modifier: Modifier = Modifier) {
     var text by remember { mutableStateOf("") }
-    Row(
-        Modifier.fillMaxWidth().background(WillColors.Composer).padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TextField(
+    val send = {
+        if (text.isNotBlank()) {
+            onSend(text)
+            text = ""
+        }
+    }
+    Row(modifier.plaque().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        BasicTextField(
             value = text,
             onValueChange = { text = it },
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(hint) },
-            maxLines = 4,
+            textStyle = TextStyle(fontSize = 15.sp, color = WillColors.Ink),
+            cursorBrush = SolidColor(WillColors.Accent),
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = WillColors.Composer,
-                unfocusedContainerColor = WillColors.Composer,
-                focusedIndicatorColor = WillColors.Composer,
-                unfocusedIndicatorColor = WillColors.Composer,
-            ),
-            shape = RoundedCornerShape(0.dp),
-        )
-        TextButton(
-            onClick = {
-                if (text.isNotBlank()) {
-                    onSend(text)
-                    text = ""
-                }
+            maxLines = 4,
+            modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            decorationBox = { inner ->
+                if (text.isEmpty()) Text(hint, fontSize = 15.sp, color = WillColors.Muted)
+                inner()
             },
-            enabled = text.isNotBlank(),
-        ) { Text("→", fontSize = 20.sp) }
+        )
+        Text(
+            "→",
+            fontSize = 20.sp,
+            color = if (text.isNotBlank()) WillColors.Accent else WillColors.Muted,
+            modifier = Modifier.clickable(enabled = text.isNotBlank(), onClick = send).padding(horizontal = 14.dp, vertical = 8.dp),
+        )
     }
 }
