@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,16 +22,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,14 +43,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -63,9 +61,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.will.app.ApproachItem
 import com.will.app.Choice
+import com.will.app.EffortItem
 import com.will.app.Reply
 import com.will.app.TrainingCourse
-import com.will.app.EffortItem
 import com.will.app.UnderwayItem
 import com.will.app.WillSession
 import com.will.app.WordItem
@@ -236,7 +234,11 @@ fun TrainingRun(
             Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 12.dp, 16.dp, 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (confirming && doing != null) {
+            if (closing) {
+                ClosingPanel(training.efforts.size, finishing, onClose = { remark -> session.fulfil(training.id, remark) }) {
+                    closing = false
+                }
+            } else if (confirming && doing != null) {
                 TellingPanel(training, doing, endedAt, nowNs, choice, telling, session)
             } else {
                 // Главное на пульте — время: свидетельство, что усилие идёт и учтено; что делать —
@@ -283,31 +285,33 @@ fun TrainingRun(
         }
     }
 
-    if (closing) {
-        var remark by rememberSaveable { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { closing = false },
-            title = { Text("Завершить тренировку") },
-            text = {
-                Column {
-                    Text("Сделано подходов: ${training.efforts.size}", color = WillColors.Muted)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = remark,
-                        onValueChange = { remark = it },
-                        placeholder = { Text("Замечание (необязательно)") },
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { session.fulfil(training.id, remark) }, enabled = !finishing) {
-                    Text(if (finishing) "Отправляется…" else "Завершить")
-                }
-            },
-            dismissButton = { TextButton(onClick = { closing = false }) { Text("Отмена") } },
-        )
+    // Завершают на месте, в самом пульте; «назад» — передумать.
+    BackHandler(enabled = closing) { closing = false }
+}
+
+@Composable
+private fun ClosingPanel(done: Int, finishing: Boolean, onClose: (String) -> Unit, onCancel: () -> Unit) {
+    var remark by rememberSaveable { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    QuietLine("Сделано подходов: $done")
+    BasicTextField(
+        value = remark,
+        onValueChange = { remark = it },
+        textStyle = TextStyle(fontSize = 15.sp, color = WillColors.Ink),
+        cursorBrush = SolidColor(WillColors.Accent),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+        maxLines = 4,
+        modifier = Modifier.fillMaxWidth().keptInSight().padding(vertical = 10.dp).focusRequester(focus),
+        decorationBox = { inner ->
+            if (remark.isEmpty()) Text("Замечание, если есть что сказать", fontSize = 15.sp, color = WillColors.Muted)
+            inner()
+        },
+    )
+    BottomButton(text = if (finishing) "Отправляется…" else "Завершить тренировку", trouble = null, busy = finishing) {
+        onClose(remark)
     }
+    TextButton(onClick = onCancel) { Text("отмена", fontSize = 13.sp, color = WillColors.Muted) }
 }
 
 internal fun approachLine(training: WordItem, exercise: Int, approach: Int): String {

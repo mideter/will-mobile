@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,10 +19,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
@@ -411,7 +413,7 @@ private fun RestStepper(approach: ApproachDraft, modifier: Modifier) {
         text = restText(approach.rest),
         onMinus = { approach.rest = (approach.rest - REST_STEP).coerceAtLeast(0) },
         onPlus = { approach.rest = (approach.rest + REST_STEP).coerceAtMost(MAX_REST) },
-        exact = ExactInput("Отдых", "секунды или мм:сс; пусто — без отдыха", if (approach.rest == 0) "" else restText(approach.rest), KeyboardType.Text) {
+        exact = ExactInput("мм:сс", if (approach.rest == 0) "" else restText(approach.rest), KeyboardType.Text) {
             secondsOf(it)?.let { s -> approach.rest = s; true } ?: false
         },
         modifier = modifier,
@@ -424,7 +426,7 @@ internal fun WeightStepper(approach: ApproachDraft, modifier: Modifier) {
         text = weightText(approach.grams),
         onMinus = { approach.grams = (approach.grams - WEIGHT_STEP).coerceAtLeast(0) },
         onPlus = { approach.grams = (approach.grams + WEIGHT_STEP).coerceAtMost(MAX_GRAMS) },
-        exact = ExactInput("Вес, кг", "пусто — свой вес", kilogramsText(approach.grams), KeyboardType.Decimal) {
+        exact = ExactInput("свой вес", kilogramsText(approach.grams), KeyboardType.Decimal) {
             gramsOf(it)?.let { grams -> approach.grams = grams; true } ?: false
         },
         modifier = modifier,
@@ -437,16 +439,15 @@ internal fun RepetitionsStepper(approach: ApproachDraft, modifier: Modifier) {
         text = "${approach.repetitions}",
         onMinus = { approach.repetitions = (approach.repetitions - 1).coerceAtLeast(1) },
         onPlus = { approach.repetitions = (approach.repetitions + 1).coerceAtMost(MAX_REPETITIONS) },
-        exact = ExactInput("Повторы", "не меньше одного", "${approach.repetitions}", KeyboardType.Number) {
+        exact = ExactInput("1", "${approach.repetitions}", KeyboardType.Number) {
             it.trim().toIntOrNull()?.takeIf { r -> r in 1..MAX_REPETITIONS }?.let { r -> approach.repetitions = r; true } ?: false
         },
         modifier = modifier,
     )
 }
 
-/** Точный ввод числа: заголовок, подсказка, начальное значение; [accept] — принять, если верно. */
+/** Точный ввод числа на месте: [hint] — что видно в пустом поле; [accept] — принять, если верно. */
 private class ExactInput(
-    val title: String,
     val hint: String,
     val initial: String,
     val keyboard: KeyboardType,
@@ -463,44 +464,57 @@ private fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit, exact
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StepButton("−", onMinus)
-        Text(
-            text,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.weight(1f).clickable { typing = true }.padding(vertical = 10.dp),
-        )
+        if (typing) {
+            ExactField(exact) { typing = false }
+        } else {
+            Text(
+                text,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.weight(1f).clickable { typing = true }.padding(vertical = 10.dp),
+            )
+        }
         StepButton("+", onPlus)
     }
-    if (typing) {
-        // Поле сразу в фокусе, прежнее значение выделено — его можно сразу перебить.
-        var value by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-            mutableStateOf(TextFieldValue(exact.initial, selection = TextRange(0, exact.initial.length)))
-        }
-        var wrong by rememberSaveable { mutableStateOf(false) }
-        val focus = remember { FocusRequester() }
-        LaunchedEffect(Unit) { focus.requestFocus() }
-        AlertDialog(
-            onDismissRequest = { typing = false },
-            title = { Text(exact.title) },
-            text = {
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { value = it; wrong = false },
-                    modifier = Modifier.focusRequester(focus),
-                    singleLine = true,
-                    isError = wrong,
-                    supportingText = { Text(if (wrong) "Не похоже на число" else exact.hint) },
-                    keyboardOptions = KeyboardOptions(keyboardType = exact.keyboard),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { if (exact.accept(value.text)) typing = false else wrong = true }) { Text("Готово") }
-            },
-            dismissButton = { TextButton(onClick = { typing = false }) { Text("Отмена") } },
-        )
+}
+
+@Composable
+private fun RowScope.ExactField(exact: ExactInput, onDone: () -> Unit) {
+    // Число само становится полем: прежнее выделено — его сразу перебивают; неверное не
+    // принимается, и остаётся прежнее.
+    var value by remember { mutableStateOf(TextFieldValue(exact.initial, selection = TextRange(0, exact.initial.length))) }
+    val focus = remember { FocusRequester() }
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    val done = {
+        exact.accept(value.text)
+        onDone()
     }
+    BasicTextField(
+        value = value,
+        onValueChange = { value = it },
+        textStyle = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium, color = WillColors.Ink, textAlign = TextAlign.Center),
+        cursorBrush = SolidColor(WillColors.Accent),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = exact.keyboard, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { done() }),
+        modifier = Modifier
+            .weight(1f)
+            .padding(vertical = 10.dp)
+            .focusRequester(focus)
+            .onFocusChanged {
+                if (focused && !it.isFocused) done()
+                focused = it.isFocused
+            },
+        decorationBox = { inner ->
+            Box(contentAlignment = Alignment.Center) {
+                if (value.text.isEmpty()) Text(exact.hint, fontSize = 16.sp, color = WillColors.Muted)
+                inner()
+            }
+        },
+    )
 }
 
 @Composable

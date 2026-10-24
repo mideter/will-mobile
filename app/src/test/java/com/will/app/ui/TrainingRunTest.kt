@@ -199,4 +199,20 @@ class TrainingRunTest {
         compose.onNodeWithText("Завершить тренировку").assertIsDisplayed()
         compose.onAllNodesWithText("Приступить").assertCountEquals(0)
     }
+
+    @Test
+    fun `the training is finished in the panel itself, with a remark, and back undoes the intent`() {
+        room(count = 1)
+        compose.onNodeWithText("завершить тренировку").performClick()
+        compose.onNodeWithText("Сделано подходов: 0").assertIsDisplayed()
+        compose.onNodeWithText("отмена").performClick()
+        compose.onNodeWithText("Приступить").assertIsDisplayed()
+
+        compose.onNodeWithText("завершить тренировку").performClick()
+        compose.onNodeWithText("Замечание, если есть что сказать").performTextInput("Устал")
+        compose.onNodeWithText("Завершить тренировку").performClick()
+        val asked = last { it.hasFulfil() }
+        assertEquals(id, asked.fulfil.behestId)
+        assertEquals("Устал", asked.fulfil.report)
+    }
 }

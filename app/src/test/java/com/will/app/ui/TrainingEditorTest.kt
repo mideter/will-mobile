@@ -17,6 +17,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performTextInput
 import com.will.app.FakePhone
 import com.will.app.FakeTransport
@@ -146,5 +149,19 @@ class TrainingEditorTest {
         field(1).performTextInput("при")
         compose.onNodeWithText("Присед").performClick()
         field(1).assert(hasText("Присед"))
+    }
+
+    @Test
+    fun `a number is typed in place, and what is not a number is not taken`() {
+        field(0).performTextInput("Среда")
+        field(1).performTextInput("Жим")
+        compose.onAllNodesWithText("10")[0].performClick()
+        compose.onAllNodes(hasSetTextAction()).onLast().performTextReplacement("12")
+        compose.onAllNodes(hasSetTextAction()).onLast().performImeAction()
+        compose.onAllNodesWithText("12")[0].performClick()
+        compose.onAllNodes(hasSetTextAction()).onLast().performTextReplacement("x")
+        compose.onAllNodes(hasSetTextAction()).onLast().performImeAction()
+        ask().performClick()
+        assertEquals(12, trained().train.exercisesList.single().approachesList.single().repetitions)
     }
 }
