@@ -444,12 +444,12 @@ class WillSession(
                 gathering = if (turned.room.isEmpty()) {
                     View.Abode(turned.abodeOf)
                 } else {
-                    View.Room(turned.abodeOf, turned.room, turned.aspect.toAspect(), turned.writable)
+                    View.Room(turned.abodeOf, turned.room, turned.aspect.toAspect(), turned.writable, testator = turned.testator)
                 }
                 _state.update { it.copy(loading = true) }
             }
             ServerEvent.EventCase.ROOMS -> {
-                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.aspect.toAspect()) }
+                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.aspect.toAspect(), it.testator) }
                 when (val gathered = gathering) {
                     is View.Abode -> gathering = gathered.copy(rooms = rooms)
                     is View.Room -> gathering = gathered.copy(rooms = rooms)

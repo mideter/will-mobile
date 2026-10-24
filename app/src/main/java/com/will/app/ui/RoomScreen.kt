@@ -91,7 +91,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     val sendingFulfil = state.fulfilling == Reply.Pending
     if (composing) {
         TrainingEditor(
-            heading = view.room,
+            heading = view.said,
             names = names,
             sending = state.willing == Reply.Pending,
             onDone = session::train,
@@ -105,7 +105,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { training ->
         TrainingRun(
             training, view.underways[training.id], state.choice, session,
-            room = view.room,
+            room = view.said,
             beginning = state.beginning == Reply.Pending,
             telling = state.telling == Reply.Pending,
             remarking = state.remarking,
@@ -121,7 +121,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
 
     Column(Modifier.fillMaxSize()) {
         Header(
-            title = view.room,
+            title = view.said,
             subtitle = view.host.ifEmpty { state.ownName },
             onBack = { session.back() },
         )

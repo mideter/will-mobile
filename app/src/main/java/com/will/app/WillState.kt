@@ -11,7 +11,16 @@ enum class Connection { Connecting, Ready, Reconnecting }
 enum class Reply { None, Pending, Granted }
 
 /** Комната в списке Обители: в какой она части и что отражает — переносят только Кельи ([Aspect.Words]). */
-data class RoomItem(val name: String, val outer: Boolean, val aspect: Aspect = Aspect.Words)
+/**
+ * Комната Обители: [name] — её имя у сервера, по нему в неё входят; [testator] — Тренер, если это
+ * Узы, где хозяин — ученик. Человеку она — [said]: такая комната зовётся по Тренеру, без
+ * «Послушания».
+ */
+data class RoomItem(val name: String, val outer: Boolean, val aspect: Aspect = Aspect.Words, val testator: String = "") {
+    val said: String get() = roomSaid(name, testator)
+}
+
+fun roomSaid(name: String, testator: String): String = if (testator.isEmpty()) name else "Тренер — $testator"
 
 /**
  * Всплывающее: [text] — что сказано; [room] — комната своей Обители, куда оно ведёт, если ведёт;
@@ -103,7 +112,8 @@ sealed interface View {
      * Во Вратах — [gatesOpen], [keeping] (я их хозяин) и, хозяину, [waiting] и метки
      * нерождённых [unborn]; в Кормчей — [people] и все комнаты Обители с их частями [rooms]:
      * здесь переносят Кельи. В комнате Уз [underways] — начатые подходы её тренировок, по
-     * номеру тренировки: в каждой не больше одного.
+     * номеру тренировки: в каждой не больше одного; [testator] — Тренер, если я здесь ученик, и
+     * тогда комната зовётся по нему ([said]).
      */
     data class Room(
         override val host: String,
@@ -118,7 +128,10 @@ sealed interface View {
         val unborn: List<Long> = emptyList(),
         val underways: Map<Long, UnderwayItem> = emptyMap(),
         val rooms: List<RoomItem> = emptyList(),
-    ) : View
+        val testator: String = "",
+    ) : View {
+        val said: String get() = roomSaid(room, testator)
+    }
 }
 
 /** Тренировка, которую выполняют: где она — Обитель [host] и комната [room] — и её номер. */

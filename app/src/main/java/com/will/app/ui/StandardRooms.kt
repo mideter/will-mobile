@@ -235,7 +235,7 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
                             Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 16.dp, end = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(room.name, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                            Text(room.said, fontSize = 16.sp, modifier = Modifier.weight(1f))
                             if (room.aspect == Aspect.Words) {
                                 TextButton(onClick = { session.arrange(room.name, outer = !outer) }) {
                                     Text(if (outer) "во внутреннюю" else "во внешнюю", color = WillColors.Muted)

@@ -209,4 +209,13 @@ class AbodeScreenTest {
         abode("boris", emptyList())
         compose.onNodeWithText("Ни одна комната вам здесь не открыта").assertIsDisplayed()
     }
+
+    @Test
+    fun `a room where one is taught is named by one's trainer, and entered by its own name`() {
+        abode("", ownRooms + room { name = "Послушание — boris"; part = RoomPart.INNER; aspect = RoomAspect.WORDS; testator = "boris" })
+        compose.onNodeWithText("Комнаты").performClick()
+        compose.onAllNodesWithText("Послушание — boris").assertCountEquals(0)
+        compose.onNodeWithText("Тренер — boris").performClick()
+        assertEquals("Послушание — boris", lastTurn().room)
+    }
 }

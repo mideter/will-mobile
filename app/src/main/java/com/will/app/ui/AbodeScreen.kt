@@ -119,7 +119,7 @@ private fun Rooms(view: View.Abode, session: WillSession) {
             val rooms = view.rooms.filter { it.outer == outer }.sortedBy { it.aspect == Aspect.Words }
             if (rooms.isEmpty()) continue
             item { SectionTitle(title) }
-            item { Group(rooms) { room -> Line(room.name) { session.enter(room.name) } } }
+            item { Group(rooms) { room -> Line(room.said) { session.enter(room.name) } } }
         }
     }
 }
