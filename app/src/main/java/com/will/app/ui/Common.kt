@@ -44,24 +44,30 @@ fun Header(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Шапка везде — плашка «где я»: касание ведёт назад, туда, куда говорит подпись, а дома
-            // копирует имя. Заголовок стоит по линии текста групп и не прыгает.
-            val onClick = onBack ?: onTitleClick
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .plaque()
-                    .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-            ) {
-                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Шапка — подпись к месту, а не предмет в нём: без плашки. Назад ведёт подпись «‹ куда» —
+            // синяя, как всякое действие; дома касание имени копирует его. Заголовок стоит по линии
+            // текста групп и не прыгает.
+            Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                Text(
+                    title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .let { if (onTitleClick != null) it.clickable(onClick = onTitleClick) else it }
+                        .padding(horizontal = 16.dp),
+                )
                 if (subtitle != null) {
                     Text(
                         if (onBack != null) "‹ $subtitle" else subtitle,
-                        fontSize = 13.sp,
-                        color = WillColors.Muted,
+                        fontSize = 14.sp,
+                        color = if (onBack != null) WillColors.Accent else WillColors.Muted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .let { if (onBack != null) it.clickable(onClick = onBack) else it }
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
             }
