@@ -526,7 +526,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
             Text(trainingSpanText(if (finished) span else span.copy(endNs = null), null), fontSize = 12.sp, color = WillColors.Muted)
         }
         training.exercises.forEachIndexed { e, exercise ->
-            Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(exercise.name, fontSize = 14.sp)
             InstructionLine(exercise.instruction)
             val remarks = TrainingCourse.remarksByApproachesDone(training, e)
             val count = TrainingCourse.approachCount(training, e, underway)

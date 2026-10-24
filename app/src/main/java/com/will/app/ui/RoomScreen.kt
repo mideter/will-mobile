@@ -3,6 +3,7 @@ package com.will.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,14 +29,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.will.app.Reply
 import com.will.app.UnderwayItem
 import com.will.app.View
 import com.will.app.WillSession
-import com.will.app.Reply
 import com.will.app.WillState
 import com.will.app.WordItem
 import will.v1.MessengerOuterClass.Word
@@ -119,7 +122,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
         if (view.words.isEmpty() && !state.loading) {
             Column(Modifier.weight(1f)) { Hint("Здесь пока ничего нет") }
         } else {
-            LazyColumn(Modifier.weight(1f), state = listState) {
+            LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(vertical = 8.dp)) {
                 items(shown, key = { it.id }) { word ->
                     WordRow(
                         word = word,
@@ -132,7 +135,6 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
                         },
                         done = word.kind == Word.Kind.BEHEST && word.id in fulfilled,
                     )
-                    HorizontalDivider(color = WillColors.Divider)
                 }
             }
         }
@@ -189,27 +191,34 @@ private fun feedOf(words: List<WordItem>): List<WordItem> {
 
 @Composable
 private fun WordRow(word: WordItem, deed: WordItem?, underway: UnderwayItem?, onFulfil: (() -> Unit)?, done: Boolean) {
-    // Веление, ждущее Послушника, исполняют нажатием на него самого.
+    // Каждое слово — своя карточка. Чьё оно, в комнате Уз ясно и так: задаёт Тренер, отчитывается
+    // ученик. Задание, ждущее ученика, выполняют касанием самой карточки.
     Column(
         Modifier
             .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(WillColors.Row)
             .let { if (onFulfil != null) it.clickable(onClick = onFulfil) else it }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            // Выполненное — история: тише целиком, со всем, что в нём; главное в карточке — название.
+            .alpha(if (done || word.kind == Word.Kind.DEED) 0.5f else 1f),
     ) {
-        if (!word.mine) {
-            Text(word.author, fontSize = 12.sp, color = WillColors.Muted)
-        }
         when (word.kind) {
             Word.Kind.BEHEST -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(word.body, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (onFulfil != null) Text("›", fontSize = 18.sp, color = WillColors.Muted)
+                }
                 Text(
-                    (if (word.exercises.isEmpty()) "Задание" else "Тренировка") + if (done) " · ✓ Выполнено" else "",
-                    fontSize = 12.sp,
-                    color = WillColors.Accent,
+                    listOfNotNull(if (word.exercises.isEmpty()) "задание" else "тренировка", "выполнено".takeIf { done })
+                        .joinToString(" · "),
+                    fontSize = 13.sp,
+                    color = WillColors.Muted,
                 )
-                Text(word.body, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                // Отчёт Послушника — его слово, если он что-то сказал.
+                // Отчёт ученика — его слово, если он что-то сказал.
                 if (deed != null && deed.body != SILENT_DEED) {
-                    Text("«${deed.body}»", fontSize = 14.sp, color = WillColors.Ink, modifier = Modifier.padding(top = 2.dp))
+                    Text("«${deed.body}»", fontSize = 14.sp, color = WillColors.Ink, modifier = Modifier.padding(top = 4.dp))
                 }
                 when {
                     word.exercises.isEmpty() -> Unit
@@ -218,22 +227,14 @@ private fun WordRow(word: WordItem, deed: WordItem?, underway: UnderwayItem?, on
                     deed != null -> ComparedExercisesView(word.exercises, deed.exercises)
                     else -> ExercisesView(word.exercises)
                 }
-                if (onFulfil != null) {
-                    Text(
-                        "Нажмите, чтобы выполнить ›",
-                        fontSize = 12.sp,
-                        color = WillColors.Accent,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
             }
             Word.Kind.DEED -> {
                 // Отчёт, чьё задание здесь не видно.
-                Text("✓ Выполнено", fontSize = 12.sp, color = WillColors.Accent)
-                Text(word.body, fontSize = 15.sp)
+                Text(word.body, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Text("выполнено", fontSize = 13.sp, color = WillColors.Muted)
                 if (word.exercises.isNotEmpty()) ExercisesView(word.exercises)
             }
-            else -> Text(word.body, fontSize = 15.sp)
+            else -> Text(word.body, fontSize = 16.sp)
         }
     }
 }

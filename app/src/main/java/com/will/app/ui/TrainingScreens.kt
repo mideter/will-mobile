@@ -100,7 +100,7 @@ fun clockText(serverNs: Long): String =
 fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = null) {
     Column(Modifier.padding(top = 4.dp)) {
         exercises.forEachIndexed { e, exercise ->
-            Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(exercise.name, fontSize = 14.sp)
             InstructionLine(exercise.instruction)
             exercise.approaches.forEachIndexed { a, approach ->
                 val asked = willed?.getOrNull(e)?.approaches?.getOrNull(a)
@@ -128,7 +128,7 @@ fun ComparedExercisesView(willed: List<ExerciseItem>, done: List<ExerciseItem>) 
     Column(Modifier.padding(top = 4.dp)) {
         willed.forEach { exercise ->
             val did = unmatched.firstOrNull { it.name == exercise.name }?.also { unmatched.remove(it) }
-            Text(exercise.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(exercise.name, fontSize = 14.sp)
             InstructionLine(exercise.instruction)
             val count = maxOf(exercise.approaches.size, did?.approaches?.size ?: 0)
             for (a in 0 until count) {
@@ -137,7 +137,7 @@ fun ComparedExercisesView(willed: List<ExerciseItem>, done: List<ExerciseItem>) 
         }
         // Упражнения, которых не задавали.
         unmatched.forEach { exercise ->
-            Text(exercise.name + " — сверх заданного", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = WillColors.Accent)
+            Text(exercise.name + " — сверх заданного", fontSize = 14.sp, color = WillColors.Accent)
             exercise.approaches.forEachIndexed { a, approach -> ComparedApproach(a + 1, null, approach) }
         }
     }
