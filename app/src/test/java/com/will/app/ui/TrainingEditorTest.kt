@@ -139,7 +139,7 @@ class TrainingEditorTest {
         compose.onAllNodesWithText("✕")[0].performClick()
         compose.onAllNodesWithText("✕").assertCountEquals(0)
         addExercise()
-        compose.onNodeWithText("2").assertIsDisplayed()
+        compose.onAllNodesWithText("Упражнение").assertCountEquals(2)
         compose.onAllNodesWithText("✕")[1].performClick()
         compose.onAllNodesWithText("Упражнение").assertCountEquals(1)
     }

@@ -195,38 +195,37 @@ private fun secondsOf(text: String): Int? {
     return seconds.takeIf { it in 0..MAX_REST }
 }
 
-/** Черновик подхода: вес, повторы и отдых перед ним. */
-internal class ApproachDraft(grams: Int, repetitions: Int, rest: Int = DEFAULT_REST) {
+/** Черновик подхода: вес и повторы. */
+internal class ApproachDraft(grams: Int, repetitions: Int) {
     var grams by mutableStateOf(grams)
     var repetitions by mutableStateOf(repetitions)
-    var rest by mutableStateOf(rest)
-
-    val item get() = ApproachItem(grams, repetitions, rest)
 
     companion object {
         val Saver = Saver<ApproachDraft, IntArray>(
-            save = { intArrayOf(it.grams, it.repetitions, it.rest) },
-            restore = { ApproachDraft(it[0], it[1], it[2]) },
+            save = { intArrayOf(it.grams, it.repetitions) },
+            restore = { ApproachDraft(it[0], it[1]) },
         )
     }
 }
 
-private class ExerciseDraft(name: String, approaches: List<ApproachDraft>, instruction: String = "") {
+/** Черновик упражнения: [rest] — один отдых перед каждым его подходом, как его и читают. */
+private class ExerciseDraft(name: String, approaches: List<ApproachDraft>, instruction: String = "", rest: Int = DEFAULT_REST) {
     var name by mutableStateOf(name)
     var instruction by mutableStateOf(instruction)
+    var rest by mutableStateOf(rest)
     val approaches: SnapshotStateList<ApproachDraft> = mutableStateListOf<ApproachDraft>().apply { addAll(approaches) }
 }
 
 private val ExerciseDraftsSaver = Saver<SnapshotStateList<ExerciseDraft>, ArrayList<Any>>(
     save = { drafts ->
         drafts.flatMapTo(ArrayList()) { draft ->
-            listOf(draft.name, draft.instruction, draft.approaches.flatMap { listOf(it.grams, it.repetitions, it.rest) }.toIntArray())
+            listOf(draft.name, draft.instruction, draft.rest, draft.approaches.flatMap { listOf(it.grams, it.repetitions) }.toIntArray())
         }
     },
     restore = { saved ->
-        saved.chunked(3).map { (name, instruction, numbers) ->
-            val approaches = (numbers as IntArray).toList().chunked(3).map { (g, r, s) -> ApproachDraft(g, r, s) }
-            ExerciseDraft(name as String, approaches, instruction as String)
+        saved.chunked(4).map { (name, instruction, rest, numbers) ->
+            val approaches = (numbers as IntArray).toList().chunked(2).map { (g, r) -> ApproachDraft(g, r) }
+            ExerciseDraft(name as String, approaches, instruction as String, rest as Int)
         }.toMutableStateList()
     },
 )
@@ -251,11 +250,13 @@ private fun troubleOf(drafts: List<ExerciseDraft>): String? {
 }
 
 private fun exercisesOf(drafts: List<ExerciseDraft>): List<ExerciseItem> =
-    drafts.map { draft -> ExerciseItem(draft.name.trim(), draft.approaches.map { it.item }, draft.instruction.trim()) }
+    drafts.map { draft ->
+        ExerciseItem(draft.name.trim(), draft.approaches.map { ApproachItem(it.grams, it.repetitions, draft.rest) }, draft.instruction.trim())
+    }
 
 /**
- * Редактор тренировки: Тренер составляет её — заголовок, упражнения карточками, подходы:
- * отдых перед подходом, вес и повторы — шагами. [names] — прежние названия упражнений для подсказки.
+ * Редактор тренировки: Тренер составляет её — название, упражнения карточками: отдых — один
+ * на упражнение, подходы — вес и повторы шагами. [names] — прежние названия упражнений для подсказки.
  * [sending] — тренировка отправлена и ждёт ответа сервера: второй раз её не задать.
  */
 @Composable
@@ -280,26 +281,37 @@ fun TrainingEditor(
                 PlainField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = "Тренировка",
-                    fontSize = 22.sp,
-                    modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 8.dp),
+                    placeholder = "Название тренировки",
+                    fontSize = 17.sp,
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(WillColors.Row)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                 )
             }
             itemsIndexed(drafts) { index, draft ->
                 ExerciseCard(
-                    number = index + 1,
                     draft = draft,
                     names = names,
                     onRemove = if (drafts.size > 1) ({ drafts.removeAt(index) }) else null,
                 )
             }
             item {
-                DashedCard(onClick = { drafts.add(ExerciseDraft("", listOf(ApproachDraft(0, 10)))) }) {
-                    Text("+ упражнение", color = WillColors.Accent, fontSize = 16.sp)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .yetToBe()
+                        .clickable { drafts.add(ExerciseDraft("", listOf(ApproachDraft(0, 10)))) }
+                        .padding(vertical = 14.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Text("+ упражнение", fontSize = 16.sp, color = WillColors.Accent)
                 }
             }
         }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).plaque().padding(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
             BottomButton(text = "Задать", trouble = trouble) { onDone(title, exercisesOf(drafts)) }
         }
     }
@@ -348,17 +360,16 @@ private fun PlainField(
 }
 
 @Composable
-private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>, onRemove: (() -> Unit)?) {
+private fun ExerciseCard(draft: ExerciseDraft, names: List<String>, onRemove: (() -> Unit)?) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(WillColors.Row)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$number", fontSize = 15.sp, color = WillColors.Muted, modifier = Modifier.width(24.dp))
             PlainField(
                 value = draft.name,
                 onValueChange = { draft.name = it },
@@ -381,17 +392,21 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>,
             onValueChange = { draft.instruction = it },
             placeholder = "Указание — как выполнять",
             fontSize = 14.sp,
-            modifier = Modifier.padding(start = 24.dp, top = 2.dp),
+            modifier = Modifier.padding(top = 2.dp),
             fontWeight = FontWeight.Normal,
         )
-        Spacer(Modifier.height(4.dp))
+        // Отдых — один на упражнение: перед каждым его подходом, как его и читают.
+        Row(Modifier.padding(top = 6.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("отдых", fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.width(52.dp))
+            RestStepper(draft, Modifier.width(170.dp))
+        }
         draft.approaches.forEachIndexed { index, approach ->
             ApproachRow(index + 1, approach, onRemove = if (draft.approaches.size > 1) ({ draft.approaches.removeAt(index) }) else null)
         }
         // Новый подход — как последний: обычно меняют одно число.
         TextButton(onClick = {
             val last = draft.approaches.lastOrNull()
-            draft.approaches.add(ApproachDraft(last?.grams ?: 0, last?.repetitions ?: 10, last?.rest ?: DEFAULT_REST))
+            draft.approaches.add(ApproachDraft(last?.grams ?: 0, last?.repetitions ?: 10))
         }) { Text("+ подход") }
     }
 }
@@ -399,11 +414,6 @@ private fun ExerciseCard(number: Int, draft: ExerciseDraft, names: List<String>,
 @Composable
 private fun ApproachRow(number: Int, approach: ApproachDraft, onRemove: (() -> Unit)?) {
     Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        // Отдых — перед подходом: насколько отдохнувшим к нему приступать.
-        Row(Modifier.padding(start = 24.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("отдых", fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.width(52.dp))
-            RestStepper(approach, Modifier.width(170.dp))
-        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("$number", fontSize = 14.sp, color = WillColors.Muted, modifier = Modifier.width(24.dp))
             WeightStepper(approach, Modifier.weight(1.3f))
@@ -419,13 +429,13 @@ private fun ApproachRow(number: Int, approach: ApproachDraft, onRemove: (() -> U
 }
 
 @Composable
-private fun RestStepper(approach: ApproachDraft, modifier: Modifier) {
+private fun RestStepper(draft: ExerciseDraft, modifier: Modifier) {
     Stepper(
-        text = restText(approach.rest),
-        onMinus = { approach.rest = (approach.rest - REST_STEP).coerceAtLeast(0) },
-        onPlus = { approach.rest = (approach.rest + REST_STEP).coerceAtMost(MAX_REST) },
-        exact = ExactInput("мм:сс", if (approach.rest == 0) "" else restText(approach.rest), KeyboardType.Text) {
-            secondsOf(it)?.let { s -> approach.rest = s; true } ?: false
+        text = restText(draft.rest),
+        onMinus = { draft.rest = (draft.rest - REST_STEP).coerceAtLeast(0) },
+        onPlus = { draft.rest = (draft.rest + REST_STEP).coerceAtMost(MAX_REST) },
+        exact = ExactInput("мм:сс", if (draft.rest == 0) "" else restText(draft.rest), KeyboardType.Text) {
+            secondsOf(it)?.let { s -> draft.rest = s; true } ?: false
         },
         modifier = modifier,
     )
@@ -536,22 +546,12 @@ private fun StepButton(sign: String, onClick: () -> Unit) {
     ) { Text(sign, fontSize = 20.sp, color = WillColors.Accent) }
 }
 
-@Composable
-private fun DashedCard(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .height(56.dp)
-            .drawBehind {
-                drawRoundRect(
-                    color = WillColors.Muted,
-                    style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))),
-                    cornerRadius = CornerRadius(14.dp.toPx()),
-                )
-            }
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { content() }
-}
+private fun Modifier.yetToBe(): Modifier =
+    // Пунктир — то, чего ещё нет, но может быть.
+    drawBehind {
+        drawRoundRect(
+            color = WillColors.Accent,
+            style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))),
+            cornerRadius = CornerRadius(12.dp.toPx()),
+        )
+    }.clip(RoundedCornerShape(12.dp))
