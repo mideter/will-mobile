@@ -144,20 +144,16 @@ class AbodeScreenTest {
     }
 
     @Test
-    fun `the supplications are among the deeds, counted with what awaits one only from the rooms, and lead to the helm`() {
+    fun `the supplications are among the deeds and lead to the helm`() {
         transport.tell(serverEvent { supplications = supplications { suppliantNames += listOf("boris", "viktor") } })
         abode("", ownRooms, owed = listOf("Понедельник" to "Послушание — gleb"))
-        compose.onAllNodesWithText("3").assertCountEquals(0)
-        compose.onNodeWithText("Комнаты").performClick()
-        compose.onNodeWithText("3").assertIsDisplayed()
-        compose.onNodeWithText("Дела").performClick()
         compose.onNodeWithText("Просьбы").assertIsDisplayed()
         compose.onNodeWithText("viktor").performClick()
         assertEquals("Кормчая", lastTurn().room)
     }
 
     @Test
-    fun `what was done and not yet seen is to review, between what to fulfil and what one awaits, counted from the rooms, and leads to its room`() {
+    fun `what was done and not yet seen is to review, between what to fulfil and what one awaits, and leads to its room`() {
         abode(
             "", ownRooms,
             owed = listOf("Понедельник" to "Послушание — boris"),
@@ -169,9 +165,6 @@ class AbodeScreenTest {
         val await = compose.onNodeWithText("Ожидаю").fetchSemanticsNode().boundsInRoot.top
         assertEquals(listOf(fulfil, review, await), listOf(fulfil, review, await).sorted())
         compose.onNodeWithText("viktor · задание").assertIsDisplayed()
-        compose.onNodeWithText("Комнаты").performClick()
-        compose.onNodeWithText("2").assertIsDisplayed()
-        compose.onNodeWithText("Дела").performClick()
         compose.onNodeWithText("Среда").performClick()
         assertEquals("Ведение — viktor", lastTurn().room)
     }

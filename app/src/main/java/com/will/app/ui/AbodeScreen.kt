@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Aspect
@@ -67,10 +69,8 @@ fun AbodeScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // Из Комнат тихо сказано, сколько ждёт в Делах; на самих Делах число повторяло бы их.
-                val waiting = if (tab == AbodeTab.Rooms) view.owed.size + view.unreviewed.size + state.supplications.size else 0
-                Tab("Дела", waiting, tab == AbodeTab.Deeds) { onTab(AbodeTab.Deeds) }
-                Tab("Комнаты", 0, tab == AbodeTab.Rooms) { onTab(AbodeTab.Rooms) }
+                Tab("Дела", tab == AbodeTab.Deeds) { onTab(AbodeTab.Deeds) }
+                Tab("Комнаты", tab == AbodeTab.Rooms) { onTab(AbodeTab.Rooms) }
             }
         }
     }
@@ -128,19 +128,18 @@ private fun Rooms(view: View.Abode, session: WillSession) {
 }
 
 @Composable
-private fun RowScope.Tab(title: String, count: Int, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
+private fun RowScope.Tab(title: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        title,
+        fontSize = 15.sp,
+        color = if (selected) WillColors.Accent else WillColors.Muted,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
             .weight(1f)
-            .plaque()
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, fontSize = 15.sp, color = if (selected) WillColors.Accent else WillColors.Muted)
-        if (count > 0) Text("$count", fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 6.dp))
-    }
+    )
 }
 
 @Composable

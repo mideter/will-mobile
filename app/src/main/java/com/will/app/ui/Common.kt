@@ -2,7 +2,6 @@ package com.will.app.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -140,7 +139,7 @@ fun Modifier.keptInSight(): Modifier {
 }
 
 fun Modifier.plaque(): Modifier =
-    clip(RoundedCornerShape(12.dp)).background(WillColors.Row).border(1.dp, WillColors.Outline, RoundedCornerShape(12.dp))
+    clip(RoundedCornerShape(12.dp)).background(WillColors.Row)
 
 fun Modifier.goneUnder(list: LazyListState): Modifier =
     drawWithContent {

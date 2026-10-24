@@ -33,13 +33,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Reply
@@ -149,7 +146,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
             }
         }
 
-        // Внизу — плашки, как вкладки Обители: в Ведении ещё и «+ Тренировка» рядом с полем.
+        // Внизу — поле; в Ведении рядом с ним ещё и «+ Тренировка».
         if (view.writable) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -157,21 +154,15 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
                 verticalAlignment = Alignment.Bottom,
             ) {
                 if (trainer) {
-                    Row(
-                        Modifier
-                            .plaque()
+                    Text(
+                        "+ Тренировка",
+                        fontSize = 15.sp,
+                        color = WillColors.Accent,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable { composing = true }
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                    ) {
-                        Text(
-                            buildAnnotatedString {
-                                withStyle(SpanStyle(color = WillColors.Accent)) { append("+ ") }
-                                append("Тренировка")
-                            },
-                            fontSize = 15.sp,
-                            color = WillColors.Ink,
-                        )
-                    }
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                    )
                 }
                 Composer(
                     hint = if (trainer) "Задать…" else "Написать…",
@@ -290,7 +281,9 @@ private fun Composer(hint: String, onSend: (String) -> Unit, modifier: Modifier 
             text = ""
         }
     }
-    Row(modifier.plaque().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier.plaque().padding(start = 14.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         BasicTextField(
             value = text,
             onValueChange = { text = it },

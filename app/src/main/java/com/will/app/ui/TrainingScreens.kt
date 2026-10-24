@@ -287,8 +287,7 @@ fun TrainingEditor(
                     fontSize = 17.sp,
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(WillColors.Row)
+                        .plaque()
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                 )
             }
