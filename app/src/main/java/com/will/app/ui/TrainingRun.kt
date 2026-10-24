@@ -93,6 +93,7 @@ fun TrainingRun(
     underway: UnderwayItem?,
     choice: Choice,
     session: WillSession,
+    room: String,
     beginning: Boolean,
     telling: Boolean,
     remarking: Reply,
@@ -153,7 +154,9 @@ fun TrainingRun(
     Column(Modifier.fillMaxSize()) {
         // На экране выполнения тренировка ещё идёт, сколько бы подходов ни было закончено.
         val span = TrainingCourse.span(training, doing)?.copy(endNs = null)
-        Header(title = training.body, subtitle = span?.let { trainingSpanText(it, nowNs) }, onBack = onClose)
+        // Подпись шапки говорит, куда ведёт назад; время тренировки — под ней, на самом экране.
+        Header(title = training.body, subtitle = room, onBack = onClose)
+        span?.let { Hint(trainingSpanText(it, nowNs)) }
         val listState = rememberLazyListState()
         // Подход, что идёт или выбран следующим, — на виду в списке: его номер и указание к упражнению.
         val inSight = going?.let { it.exercise to it.approach } ?: selected.takeIf { doing == null }

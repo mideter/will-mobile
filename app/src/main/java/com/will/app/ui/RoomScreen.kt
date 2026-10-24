@@ -95,6 +95,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
     fulfilling?.takeIf { it.exercises.isNotEmpty() }?.let { training ->
         TrainingRun(
             training, view.underways[training.id], state.choice, session,
+            room = view.room,
             beginning = state.beginning == Reply.Pending,
             telling = state.telling == Reply.Pending,
             remarking = state.remarking,
