@@ -1,6 +1,7 @@
 package com.will.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,16 +31,20 @@ fun Header(
 ) {
     Column {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Заголовок всегда у края; путь назад — сама подпись: она говорит, где я, туда и ведёт.
+            // Шапка везде — плашка «где я»: касание ведёт назад, туда, куда говорит подпись, а дома
+            // копирует имя. Заголовок стоит по линии текста групп и не прыгает.
             val onClick = onBack ?: onTitleClick
             Column(
                 modifier = Modifier
                     .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(WillColors.Row)
+                    .border(1.dp, WillColors.Outline, RoundedCornerShape(12.dp))
                     .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
                 Text(title, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) {
@@ -54,7 +59,6 @@ fun Header(
             }
             Row(horizontalArrangement = Arrangement.End) { actions() }
         }
-        HorizontalDivider(color = WillColors.Divider)
     }
 }
 

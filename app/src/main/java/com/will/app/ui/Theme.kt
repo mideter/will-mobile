@@ -18,6 +18,7 @@ object WillColors {
     val Row = Color(0xFFF8F8F8)
     val Accent = Color(0xFF3B82F6)
     val Divider = Color(0xFFECECEC)
+    val Outline = Color(0xFFC8C8C8)
     val Composer = Color(0xFFFAFAFA)
     val Supplication = Color(0xFF9E1B32)
     val SupplicationRow = Color(0xFFFBECEE)
