@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Aspect
@@ -42,7 +39,8 @@ import com.will.app.WillState
  * Врата — порог Обители и ядро её внешней части: через них выходят и входят, через них и
  * рождаются. В своих хозяин держит их открытыми: видит, кто ждёт, и впускает знакомым; видит
  * нерождённых и рождает их своими чадами; отсюда же уходит — в Обители, где обитает, или к
- * чужим Вратам по имени. У чужих Врат обитатель входит внутрь, а пришедший ждёт, пока впустят.
+ * чужим Вратам по имени. У чужих Врат обитатель входит внутрь, а пришедший ждёт, пока впустят, и
+ * видит, у Врат ли хозяин. Всё — группами, как в обзоре; пустое не показывается.
  */
 @Composable
 fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
@@ -63,55 +61,37 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
     LaunchedEffect(Unit) { session.listDwellings() }
     var going by remember { mutableStateOf(false) }
 
-    Hint("Врата открыты, пока вы здесь.")
-    LazyColumn(Modifier.fillMaxSize()) {
-        item { SectionTitle("У Врат") }
-        if (view.waiting.isEmpty()) item { Hint("Никто не ждёт") }
-        items(view.waiting, key = { "waiting $it" }) { name ->
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(name, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                TextButton(onClick = { session.admit(name) }) { Text("Впустить") }
+    // Пустая секция не говорит о себе: пока никого нет, нет и её.
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        if (view.waiting.isNotEmpty()) {
+            item { SectionTitle("У Врат") }
+            // Кто стоит у Врат, тот ждёт ответа — как Просьба, красным.
+            item {
+                Group(view.waiting, WillColors.SupplicationRow) { name ->
+                    Acting(name, "Впустить", { Text("Ждёт, чтобы впустили", fontSize = 13.sp, color = WillColors.Supplication) }) {
+                        session.admit(name)
+                    }
+                }
             }
-            HorizontalDivider(color = WillColors.Divider)
         }
 
         // Через эти же Врата рождаются: отцом по плоти станет их хозяин.
-        item { SectionTitle("Ждут рождения") }
-        item { Hint("Рождённый здесь станет вашим чадом по плоти.") }
-        if (view.unborn.isEmpty()) item { Hint("Никто не ждёт") }
-        items(view.unborn, key = { "unborn $it" }) { mark ->
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("#$mark", fontSize = 18.sp, modifier = Modifier.weight(1f))
-                TextButton(onClick = { session.bear(mark) }) { Text("Родить") }
-            }
-            HorizontalDivider(color = WillColors.Divider)
+        if (view.unborn.isNotEmpty()) {
+            item { SectionTitle("Дать имя") }
+            item { Group(view.unborn) { mark -> Acting("#$mark", "Дать") { session.bear(mark) } } }
+            item { Hint("Кому вы дадите имя, у того вы всегда будете хотя бы ближним.") }
         }
 
-        // Из Обители выходят только через свои Врата.
-        item { SectionTitle("Выйти") }
-        if (state.dwellings.isEmpty()) item { Hint("Вас пока никто не знает") }
-        items(state.dwellings, key = { "dwelling ${it.name}" }) { dwelling ->
-            Row(
-                Modifier.fillMaxWidth().clickable { session.gates(dwelling.name) }.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(dwelling.name, fontSize = 16.sp)
-                    Text(listOfNotNull("знает вас", WillSession.kindSaid(dwelling.kind)).joinToString(" · "), fontSize = 13.sp, color = WillColors.Muted)
-                }
-                Text("›", fontSize = 18.sp, color = WillColors.Muted)
-            }
-            HorizontalDivider(color = WillColors.Divider)
-        }
+        // Из своего выходят только через свои Врата.
+        item { SectionTitle("Посетить") }
         item {
-            TextButton(onClick = { going = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                Text("К чужим Вратам…")
+            Group(state.dwellings + null) { dwelling ->
+                if (dwelling == null) {
+                    Line("по имени…") { going = true }
+                } else {
+                    val known = listOfNotNull("знает вас", WillSession.kindSaid(dwelling.kind)).joinToString(" · ")
+                    Line(dwelling.name, { Text(known, fontSize = 13.sp, color = WillColors.Muted) }) { session.gates(dwelling.name) }
+                }
             }
         }
     }
@@ -128,27 +108,36 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
 }
 
 @Composable
-private fun OthersGates(state: WillState, view: View.Room, session: WillSession) {
-    val dwelling = state.dwellings.firstOrNull { it.name == view.host }
-    Text(
-        if (view.gatesOpen) "Врата открыты: хозяин у Врат." else "Врата закрыты: хозяина нет у Врат.",
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-        fontSize = 17.sp,
-        fontWeight = FontWeight.Medium,
-    )
-    if (dwelling != null) {
-        Hint("${view.host} знает вас" + (WillSession.kindSaid(dwelling.kind)?.let { " — $it" } ?: "") + ".")
-        TextButton(onClick = { session.visit(view.host) }, modifier = Modifier.padding(horizontal = 8.dp)) {
-            Text("Войти")
+private fun Acting(title: String, action: String, below: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 16.sp)
+            below?.invoke()
         }
-    } else {
-        Hint(
-            if (view.gatesOpen) {
-                "Хозяин видит вас: ждите, пока впустит."
+        TextButton(onClick = onClick) { Text(action) }
+    }
+}
+
+@Composable
+private fun OthersGates(state: WillState, view: View.Room, session: WillSession) {
+    // Кого здесь знают, тот входит сам — хозяин ему не нужен; кого не знают, тому весть одна:
+    // видит ли его хозяин.
+    val known = state.dwellings.any { it.name == view.host }
+    Column(Modifier.padding(top = 12.dp)) {
+        Group(listOf(known)) {
+            if (known) {
+                Line("Войти") { session.visit(view.host) }
             } else {
-                "Можно ждать здесь: подойдя к Вратам, хозяин увидит вас."
-            },
-        )
+                Text(
+                    if (view.gatesOpen) "Хозяин видит вас: ждите, пока впустит." else "Подойдя к Вратам, хозяин увидит вас.",
+                    fontSize = 16.sp,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                )
+            }
+        }
     }
 }
 
@@ -157,16 +146,16 @@ private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
     var host by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("К чужим Вратам") },
+        title = { Text("Посетить по имени") },
         text = {
             OutlinedTextField(
                 value = host,
                 onValueChange = { host = it },
                 singleLine = true,
-                placeholder = { Text("Имя хозяина") },
+                placeholder = { Text("Имя") },
             )
         },
-        confirmButton = { TextButton(onClick = { onGo(host) }, enabled = host.isNotBlank()) { Text("Пойти") } },
+        confirmButton = { TextButton(onClick = { onGo(host) }, enabled = host.isNotBlank()) { Text("Посетить") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
     )
 }

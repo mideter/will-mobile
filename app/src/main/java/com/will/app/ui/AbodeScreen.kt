@@ -152,20 +152,3 @@ private fun WaitingRow(waiting: Waiting, onClick: () -> Unit) {
         }
     }, onClick)
 }
-
-@Composable
-private fun Line(title: String, below: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = if (below == null) 12.dp else 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp)
-            below?.invoke()
-        }
-        Text("›", fontSize = 18.sp, color = WillColors.Muted)
-    }
-}

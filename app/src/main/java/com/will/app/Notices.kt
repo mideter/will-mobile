@@ -16,7 +16,8 @@ object Notices {
             // Чего не позволяет мир.
             NoticeCode.NOTICE_ALREADY_DWELLS -> "Вы уже знаете этого человека"
             NoticeCode.NOTICE_NOT_AT_GATES -> "Уже не у Врат"
-            NoticeCode.NOTICE_NO_SUCH_UNBORN -> "Такого нерождённого нет"
+            // Номер берут из списка, и список сразу говорит, что его уже нет: экран показывает сам.
+            NoticeCode.NOTICE_NO_SUCH_UNBORN -> null
             NoticeCode.NOTICE_DOES_NOT_DWELL -> "Вы не знаете этого человека"
             NoticeCode.NOTICE_DOES_NOT_ENTER_ROOM -> "Вам не открыта эта комната"
             NoticeCode.NOTICE_STAND_IN_CELL -> "Это делают в Слове, Ведении или Послушании"
@@ -59,7 +60,7 @@ object Notices {
             NoticeCode.NOTICE_INVALID_TRAINING -> "Тренировка составлена неверно"
             NoticeCode.NOTICE_UNKNOWN_TRAINING -> "Такой тренировки нет"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_CLOSED -> "Отец по духу пока не открыт"
-            NoticeCode.NOTICE_AWAITS_BIRTH -> "Вы ещё не рождены: ждите"
+            NoticeCode.NOTICE_AWAITS_BIRTH -> "Имени пока нет — назовите свой номер тому, кто уже здесь"
             // Что сделано мной — видно на экране, поэтому не говорится.
             NoticeCode.NOTICE_SUPPLICATION_SENT,
             NoticeCode.NOTICE_BEHEST_FULFILLED,

@@ -30,7 +30,7 @@ import will.v1.threshold
 import will.v1.turned
 import will.v1.unborn
 
-// Диалог «К чужим Вратам» здесь не пробуют: под Robolectric окно диалога не даёт Compose успокоиться.
+// Диалог «Посетить по имени» здесь не пробуют: под Robolectric окно диалога не даёт Compose успокоиться.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp")
 class GatesScreenTest {
@@ -71,15 +71,16 @@ class GatesScreenTest {
         compose.onNodeWithText("Впустить").performClick()
         assertEquals("boris", transport.sent.last { it.hasAdmit() }.admit.name)
         compose.onNodeWithText("#4").assertIsDisplayed()
-        compose.onNodeWithText("Родить").performClick()
+        compose.onNodeWithText("Дать").performClick()
         assertEquals(4L, transport.sent.last { it.hasBear() }.bear.mark)
     }
 
     @Test
-    fun `no one waiting and no one awaiting birth, it says so`() {
+    fun `no one waiting and no one awaiting birth, their sections are not shown, and one may still visit by name`() {
         gates("", open = true)
-        compose.onAllNodesWithText("Никто не ждёт").assertCountEquals(2)
-        compose.onNodeWithText("Вас пока никто не знает").assertIsDisplayed()
+        compose.onAllNodesWithText("У Врат").assertCountEquals(0)
+        compose.onAllNodesWithText("Дать имя").assertCountEquals(0)
+        compose.onNodeWithText("по имени…").assertIsDisplayed()
     }
 
     @Test
@@ -98,8 +99,7 @@ class GatesScreenTest {
         gates("viktor", open = false)
         compose.onNodeWithText("Врата — viktor").assertIsDisplayed()
         compose.onNodeWithText("‹ Врата — anna").assertIsDisplayed()
-        compose.onNodeWithText("Врата закрыты: хозяина нет у Врат.").assertIsDisplayed()
-        compose.onNodeWithText("viktor знает вас — ближний.").assertIsDisplayed()
+        compose.onAllNodesWithText("Хозяина нет у Врат").assertCountEquals(0)
         compose.onNodeWithText("Войти").performClick()
         assertEquals("viktor", lastTurn().abodeOf)
         assertEquals("", lastTurn().room)
@@ -108,10 +108,9 @@ class GatesScreenTest {
     @Test
     fun `one who has come waits, sees the host come to the gates, and once let in goes in`() {
         gates("viktor", open = false)
-        compose.onNodeWithText("Можно ждать здесь: подойдя к Вратам, хозяин увидит вас.").assertIsDisplayed()
+        compose.onNodeWithText("Подойдя к Вратам, хозяин увидит вас.").assertIsDisplayed()
         compose.onAllNodesWithText("Войти").assertCountEquals(0)
         transport.tell(serverEvent { threshold = threshold { open = true } })
-        compose.onNodeWithText("Врата открыты: хозяин у Врат.").assertIsDisplayed()
         compose.onNodeWithText("Хозяин видит вас: ждите, пока впустит.").assertIsDisplayed()
         dwellingIn("viktor")
         compose.onNodeWithText("Войти").assertIsDisplayed()
