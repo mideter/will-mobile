@@ -79,6 +79,13 @@ object TrainingCourse {
         return Rest(last.finishedAtNs, restWilled(training, e, a))
     }
 
+    fun sameRest(exercise: ExerciseItem): Int? {
+        // Отдых говорят один раз на упражнение, когда он везде один; перед первым подходом
+        // упражнения он бывает пуст — отдыхать было не после чего, — и тогда в счёт не идёт.
+        val rests = exercise.approaches.mapIndexedNotNull { i, a -> a.restSeconds.takeIf { i > 0 || it != 0 } }
+        return rests.firstOrNull()?.takeIf { first -> first > 0 && rests.all { it == first } }
+    }
+
     fun restWilled(training: WordItem, exercise: Int, approach: Int): Int {
         val approaches = training.exercises.getOrNull(exercise)?.approaches ?: return 0
         return (approaches.getOrNull(approach) ?: approaches.lastOrNull())?.restSeconds ?: 0

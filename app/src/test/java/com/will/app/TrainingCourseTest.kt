@@ -209,4 +209,12 @@ class TrainingCourseTest {
     private companion object {
         const val NS = 1_000_000_000L
     }
+
+    @Test
+    fun `rest is said once for an exercise when it is one throughout, the first approach's empty rest aside`() {
+        assertEquals(60, TrainingCourse.sameRest(squat))
+        assertEquals(90, TrainingCourse.sameRest(ExerciseItem("Тяга", listOf(ApproachItem(50_000, 10, 0), ApproachItem(60_000, 8, 90), ApproachItem(60_000, 8, 90)))))
+        assertEquals(null, TrainingCourse.sameRest(press))
+        assertEquals(null, TrainingCourse.sameRest(ExerciseItem("Без отдыха", listOf(ApproachItem(0, 5, 0), ApproachItem(0, 5, 0)))))
+    }
 }

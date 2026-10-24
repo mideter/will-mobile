@@ -178,6 +178,9 @@ fun TrainingRun(
                             Text("заметка", fontSize = 13.sp, color = WillColors.Muted)
                         }
                     }
+                    val same = TrainingCourse.sameRest(exercise)
+                    // Заданный отдых, один на всё упражнение, сказан здесь раз; перед подходами — только отдохнутый.
+                    same?.let { Text("отдых ${restText(it)}", fontSize = 13.sp, color = WillColors.Muted) }
                     InstructionLine(exercise.instruction)
                     if (remarkingOn == e) {
                         RemarkField(onSay = { session.sayRemark(training.id, e, it) }, sending = remarking == Reply.Pending, key = "${training.id}:$e")
@@ -194,10 +197,10 @@ fun TrainingRun(
                         when {
                             // Перед первым сделанным подходом отдыхать было не после чего: строки нет.
                             begun != null -> TrainingCourse.restTakenBefore(training.efforts, begun)?.let {
-                                RestRow(restTaken(it, willedRest), WillColors.Muted)
+                                RestRow(restTaken(it), WillColors.Muted)
                             }
                             // Перед подходом, который будет первым, отдыхать не после чего: заданного отдыха не видно.
-                            willedRest > 0 && !(training.efforts.isEmpty() && doing == null && selected == e to a) ->
+                            same == null && willedRest > 0 && !(training.efforts.isEmpty() && doing == null && selected == e to a) ->
                                 RestRow("отдых ${restText(willedRest)}", WillColors.Muted)
                         }
                         RunRow(
@@ -331,8 +334,7 @@ internal fun approachLine(training: WordItem, exercise: Int, approach: Int): Str
     ).joinToString(" · ")
 }
 
-internal fun restTaken(seconds: Long, willed: Int): String =
-    "отдых ${spanText(seconds)}" + if (willed > 0) " (задано ${restText(willed)})" else ""
+internal fun restTaken(seconds: Long): String = "отдых ${spanText(seconds)}"
 
 @Composable
 private fun RestRow(text: String, colour: Color) {
@@ -537,7 +539,8 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
             Text(trainingSpanText(if (finished) span else span.copy(endNs = null), null), fontSize = 12.sp, color = WillColors.Muted)
         }
         training.exercises.forEachIndexed { e, exercise ->
-            Text(exercise.name, fontSize = 14.sp)
+            val same = TrainingCourse.sameRest(exercise)
+            ExerciseName(exercise.name, same)
             InstructionLine(exercise.instruction)
             val remarks = TrainingCourse.remarksByApproachesDone(training, e)
             val count = TrainingCourse.approachCount(training, e, underway)
@@ -548,8 +551,8 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                 val begun = effort?.begunAtNs ?: underway?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
                 val willedRest = TrainingCourse.restWilled(training, e, a)
                 when {
-                    begun != null -> TrainingCourse.restTakenBefore(training.efforts, begun)?.let { FeedRestLine(restTaken(it, willedRest)) }
-                    asked != null && willedRest > 0 && !finished && first != e to a -> FeedRestLine("отдых ${restText(willedRest)}")
+                    begun != null -> TrainingCourse.restTakenBefore(training.efforts, begun)?.let { FeedRestLine(restTaken(it)) }
+                    same == null && asked != null && willedRest > 0 && !finished && first != e to a -> FeedRestLine("отдых ${restText(willedRest)}")
                 }
                 val (line, colour) = when {
                     effort != null -> {

@@ -102,13 +102,14 @@ fun clockText(serverNs: Long): String =
 fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = null) {
     Column(Modifier.padding(top = 4.dp)) {
         exercises.forEachIndexed { e, exercise ->
-            Text(exercise.name, fontSize = 14.sp)
+            val same = TrainingCourse.sameRest(exercise)
+            ExerciseName(exercise.name, same)
             InstructionLine(exercise.instruction)
             exercise.approaches.forEachIndexed { a, approach ->
                 val asked = willed?.getOrNull(e)?.approaches?.getOrNull(a)
                 val differs = willed != null && asked != approach
-                // Отдых — своей строкой над подходом, к которому он ведёт.
-                if (approach.restSeconds != 0) {
+                // Отдых — своей строкой над подходом, к которому он ведёт, когда он не один на всё упражнение.
+                if (same == null && approach.restSeconds != 0) {
                     Text("отдых ${restText(approach.restSeconds)}", fontSize = 12.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 28.dp))
                 }
                 Text(
@@ -120,6 +121,14 @@ fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = n
                 )
             }
         }
+    }
+}
+
+@Composable
+fun ExerciseName(name: String, sameRest: Int?) {
+    Row {
+        Text(name, fontSize = 14.sp)
+        if (sameRest != null) Text(" · отдых ${restText(sameRest)}", fontSize = 14.sp, color = WillColors.Muted)
     }
 }
 
