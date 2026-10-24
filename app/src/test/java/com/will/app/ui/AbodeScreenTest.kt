@@ -107,7 +107,7 @@ class AbodeScreenTest {
     fun `one's own abode shows one's name and its rooms by parts, the core before the cells`() {
         abode("", ownRooms)
         compose.onNodeWithText("anna").assertIsDisplayed()
-        compose.onNodeWithText("это вы").assertIsDisplayed()
+        compose.onNodeWithText("дома").assertIsDisplayed()
         val inner = compose.onNodeWithText("Внутренняя часть").fetchSemanticsNode().boundsInRoot.top
         val helm = compose.onNodeWithText("Кормчая").fetchSemanticsNode().boundsInRoot.top
         val word = compose.onNodeWithText("Слово").fetchSemanticsNode().boundsInRoot.top
