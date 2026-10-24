@@ -5,6 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -30,7 +33,6 @@ import will.v1.threshold
 import will.v1.turned
 import will.v1.unborn
 
-// Диалог «Посетить по имени» здесь не пробуют: под Robolectric окно диалога не даёт Compose успокоиться.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp")
 class GatesScreenTest {
@@ -90,6 +92,17 @@ class GatesScreenTest {
         compose.onNodeWithText("знает вас · ближний").assertIsDisplayed()
         compose.onNodeWithText("viktor").performClick()
         assertEquals("viktor", lastTurn().abodeOf)
+        assertEquals("Врата", lastTurn().room)
+    }
+
+    @Test
+    fun `one visits by name, the row opened in place, and not without a name`() {
+        gates("", open = true)
+        compose.onNodeWithText("по имени…").performClick()
+        compose.onNode(hasText("Посетить") and hasClickAction()).assertIsNotEnabled()
+        compose.onNodeWithText("Имя").performTextInput(" boris ")
+        compose.onNode(hasText("Посетить") and hasClickAction()).performClick()
+        assertEquals("boris", lastTurn().abodeOf)
         assertEquals("Врата", lastTurn().room)
     }
 

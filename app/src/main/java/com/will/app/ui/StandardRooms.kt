@@ -1,5 +1,7 @@
 package com.will.app.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,8 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,11 +25,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Aspect
@@ -87,7 +100,14 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
         item {
             Group(state.dwellings + null) { dwelling ->
                 if (dwelling == null) {
-                    Line("по имени…") { going = true }
+                    if (!going) {
+                        Line("по имени…") { going = true }
+                    } else {
+                        ByName { host ->
+                            going = false
+                            session.gates(host)
+                        }
+                    }
                 } else {
                     val known = listOfNotNull("знает вас", WillSession.kindSaid(dwelling.kind)).joinToString(" · ")
                     Line(dwelling.name, { Text(known, fontSize = 13.sp, color = WillColors.Muted) }) { session.gates(dwelling.name) }
@@ -96,15 +116,7 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
         }
     }
 
-    if (going) {
-        GoToGatesDialog(
-            onGo = { host ->
-                going = false
-                session.gates(host)
-            },
-            onDismiss = { going = false },
-        )
-    }
+    BackHandler(enabled = going) { going = false }
 }
 
 @Composable
@@ -141,23 +153,41 @@ private fun OthersGates(state: WillState, view: View.Room, session: WillSession)
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GoToGatesDialog(onGo: (String) -> Unit, onDismiss: () -> Unit) {
-    var host by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Посетить по имени") },
-        text = {
-            OutlinedTextField(
-                value = host,
-                onValueChange = { host = it },
-                singleLine = true,
-                placeholder = { Text("Имя") },
-            )
-        },
-        confirmButton = { TextButton(onClick = { onGo(host) }, enabled = host.isNotBlank()) { Text("Посетить") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-    )
+private fun ByName(onGo: (String) -> Unit) {
+    var host by rememberSaveable { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    // Клавиатура поднимается после поля и сжимает экран: обрезанная краем строка выходит на виду.
+    val sight = remember { BringIntoViewRequester() }
+    var cut by remember { mutableStateOf(false) }
+    LaunchedEffect(cut) { if (cut) sight.bringIntoView() }
+    val go = { if (host.isNotBlank()) onGo(host.trim()) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(sight)
+            .onGloballyPositioned { cut = it.boundsInRoot().height < it.size.height }
+            .padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicTextField(
+            value = host,
+            onValueChange = { host = it },
+            textStyle = TextStyle(fontSize = 16.sp, color = WillColors.Ink),
+            cursorBrush = SolidColor(WillColors.Accent),
+            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { go() }),
+            singleLine = true,
+            modifier = Modifier.weight(1f).focusRequester(focus),
+            decorationBox = { inner ->
+                if (host.isEmpty()) Text("Имя", fontSize = 16.sp, color = WillColors.Muted)
+                inner()
+            },
+        )
+        TextButton(onClick = go, enabled = host.isNotBlank()) { Text("Посетить") }
+    }
 }
 
 /**
