@@ -1,5 +1,6 @@
 package com.will.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -12,10 +13,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -31,7 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -125,6 +130,9 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
             LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(vertical = 8.dp)) {
                 items(shown, key = { it.id }) { word ->
                     WordRow(
+                        reporting = word.id == fulfilling?.id && word.exercises.isEmpty(),
+                        sending = sendingFulfil,
+                        onReport = { report -> session.fulfil(word.id, report) },
                         word = word,
                         deed = deeds[word.id],
                         underway = view.underways[word.id],
@@ -152,29 +160,8 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
         }
     }
 
-    fulfilling?.let { behest ->
-        var report by rememberSaveable { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { fulfillingId = null },
-            title = { Text("Выполнить") },
-            text = {
-                Column {
-                    Text(behest.body, modifier = Modifier.padding(bottom = 8.dp))
-                    OutlinedTextField(
-                        value = report,
-                        onValueChange = { report = it },
-                        placeholder = { Text("Отчёт (необязательно)") },
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { session.fulfil(behest.id, report) }, enabled = !sendingFulfil) {
-                    Text(if (sendingFulfil) "Отправляется…" else "Выполнить")
-                }
-            },
-            dismissButton = { TextButton(onClick = { fulfillingId = null }) { Text("Отмена") } },
-        )
-    }
+    // Простое задание выполняют на месте: карточка раскрывается полем отчёта; «назад» — свернуть.
+    BackHandler(enabled = fulfilling != null) { fulfillingId = null }
 }
 
 private fun feedOf(words: List<WordItem>): List<WordItem> {
@@ -190,7 +177,16 @@ private fun feedOf(words: List<WordItem>): List<WordItem> {
 }
 
 @Composable
-private fun WordRow(word: WordItem, deed: WordItem?, underway: UnderwayItem?, onFulfil: (() -> Unit)?, done: Boolean) {
+private fun WordRow(
+    word: WordItem,
+    deed: WordItem?,
+    underway: UnderwayItem?,
+    onFulfil: (() -> Unit)?,
+    done: Boolean,
+    reporting: Boolean,
+    sending: Boolean,
+    onReport: (String) -> Unit,
+) {
     // Каждое слово — своя карточка. Чьё оно, в комнате Уз ясно и так: задаёт Тренер, отчитывается
     // ученик. Задание, ждущее ученика, выполняют касанием самой карточки.
     Column(
@@ -220,6 +216,7 @@ private fun WordRow(word: WordItem, deed: WordItem?, underway: UnderwayItem?, on
                 if (deed != null && deed.body != SILENT_DEED) {
                     Text("«${deed.body}»", fontSize = 14.sp, color = WillColors.Ink, modifier = Modifier.padding(top = 4.dp))
                 }
+                if (reporting) ReportField(sending, onReport)
                 when {
                     word.exercises.isEmpty() -> Unit
                     // Выполнение по подходам: заданное и сделанное, вживую.
@@ -236,6 +233,29 @@ private fun WordRow(word: WordItem, deed: WordItem?, underway: UnderwayItem?, on
             }
             else -> Text(word.body, fontSize = 16.sp)
         }
+    }
+}
+
+@Composable
+private fun ReportField(sending: Boolean, onReport: (String) -> Unit) {
+    var report by rememberSaveable { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    Row(Modifier.fillMaxWidth().keptInSight().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        BasicTextField(
+            value = report,
+            onValueChange = { report = it },
+            textStyle = TextStyle(fontSize = 15.sp, color = WillColors.Ink),
+            cursorBrush = SolidColor(WillColors.Accent),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (!sending) onReport(report) }),
+            modifier = Modifier.weight(1f).focusRequester(focus),
+            decorationBox = { inner ->
+                if (report.isEmpty()) Text("Отчёт, если есть что сказать", fontSize = 15.sp, color = WillColors.Muted)
+                inner()
+            },
+        )
+        TextButton(onClick = { onReport(report) }, enabled = !sending) { Text(if (sending) "Отправляется…" else "Выполнить") }
     }
 }
 

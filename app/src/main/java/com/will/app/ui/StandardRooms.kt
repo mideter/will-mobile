@@ -1,7 +1,6 @@
 package com.will.app.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,8 +31,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -153,23 +148,14 @@ private fun OthersGates(state: WillState, view: View.Room, session: WillSession)
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ByName(onGo: (String) -> Unit) {
     var host by rememberSaveable { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    // Клавиатура поднимается после поля и сжимает экран: обрезанная краем строка выходит на виду.
-    val sight = remember { BringIntoViewRequester() }
-    var cut by remember { mutableStateOf(false) }
-    LaunchedEffect(cut) { if (cut) sight.bringIntoView() }
     val go = { if (host.isNotBlank()) onGo(host.trim()) }
     Row(
-        Modifier
-            .fillMaxWidth()
-            .bringIntoViewRequester(sight)
-            .onGloballyPositioned { cut = it.boundsInRoot().height < it.size.height }
-            .padding(start = 16.dp, end = 4.dp),
+        Modifier.fillMaxWidth().keptInSight().padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BasicTextField(
