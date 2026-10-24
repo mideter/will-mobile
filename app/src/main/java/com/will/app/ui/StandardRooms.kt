@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -70,7 +71,8 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
     var going by remember { mutableStateOf(false) }
 
     // Пустая секция не говорит о себе: пока никого нет, нет и её.
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    val listState = rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().goneUnder(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
         if (view.waiting.isNotEmpty()) {
             item { SectionTitle("У Врат") }
             // Кто стоит у Врат, тот ждёт ответа — как Просьба, красным.
@@ -189,7 +191,8 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
 
     Column(Modifier.fillMaxSize()) {
         Header(title = "Кормчая", subtitle = state.ownName, onBack = { session.back() })
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        val listState = rememberLazyListState()
+        LazyColumn(Modifier.fillMaxSize().goneUnder(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
             if (state.supplications.isNotEmpty()) {
                 item { SectionTitle("Просьбы") }
                 item {

@@ -43,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -162,7 +161,7 @@ fun TrainingRun(
         LaunchedEffect(inSight) {
             inSight?.let { (e, _) -> listState.animateScrollToItem(e) }
         }
-        LazyColumn(Modifier.weight(1f), state = listState) {
+        LazyColumn(Modifier.weight(1f).goneUnder(listState).hiddenBeneath(listState), state = listState) {
             itemsIndexed(training.exercises) { e, exercise ->
                 Column(
                     Modifier
@@ -235,11 +234,9 @@ fun TrainingRun(
 
         // Пульт внизу: что сейчас, таймер и главное действие; после подхода — рассказ о нём.
         Column(
-            // Пульт стоит прямо на белом: время держит низ само. Когда под ним прячется
-            // недосмотренный список, он приподнимается над ним тенью.
+            // Пульт стоит прямо на белом: время держит низ само.
             Modifier
                 .fillMaxWidth()
-                .shadow(if (listState.canScrollForward) 8.dp else 0.dp)
                 .background(WillColors.Background)
                 .padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -90,7 +91,8 @@ fun LineageScreen(state: WillState, session: WillSession, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Header(title = "Моя линия", subtitle = "Чада по духу", onBack = onBack)
         if (ordered.isEmpty()) Hint("Никто не избрал вас отцом по духу")
-        LazyColumn(Modifier.fillMaxSize()) {
+        val listState = rememberLazyListState()
+        LazyColumn(Modifier.fillMaxSize().goneUnder(listState), state = listState) {
             items(ordered, key = { it.name }) { descent ->
                 Text(
                     descent.name,

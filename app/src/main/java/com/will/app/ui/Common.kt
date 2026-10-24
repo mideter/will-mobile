@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -138,3 +141,17 @@ fun Modifier.keptInSight(): Modifier {
 
 fun Modifier.plaque(): Modifier =
     clip(RoundedCornerShape(12.dp)).background(WillColors.Row).border(1.dp, WillColors.Outline, RoundedCornerShape(12.dp))
+
+fun Modifier.goneUnder(list: LazyListState): Modifier =
+    drawWithContent {
+        drawContent()
+        // Лента, ушедшая под шапку, отделяется от неё чертой; в покое их разделяет воздух.
+        if (list.canScrollBackward) drawLine(WillColors.Outline, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx())
+    }
+
+fun Modifier.hiddenBeneath(list: LazyListState): Modifier =
+    drawWithContent {
+        drawContent()
+        // Недосмотренное, скрытое под низом экрана, отделяется от него чертой.
+        if (list.canScrollForward) drawLine(WillColors.Outline, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
+    }

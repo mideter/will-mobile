@@ -129,7 +129,7 @@ fun RoomScreen(state: WillState, view: View.Room, session: WillSession) {
         if (view.words.isEmpty() && !state.loading) {
             Column(Modifier.weight(1f)) { Hint("Здесь пока ничего нет") }
         } else {
-            LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(vertical = 8.dp)) {
+            LazyColumn(Modifier.weight(1f).goneUnder(listState).hiddenBeneath(listState), state = listState, contentPadding = PaddingValues(vertical = 8.dp)) {
                 items(shown, key = { it.id }) { word ->
                     WordRow(
                         reporting = word.id == fulfilling?.id && word.exercises.isEmpty(),

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -78,7 +79,8 @@ fun AbodeScreen(
 @Composable
 private fun Deeds(state: WillState, view: View.Abode, session: WillSession) {
     val helm = view.rooms.firstOrNull { it.aspect == Aspect.Dwellers }?.name
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    val listState = rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().goneUnder(listState).hiddenBeneath(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
         if (state.supplications.isNotEmpty()) {
             item { SectionTitle("Просьбы") }
             item {
@@ -110,7 +112,8 @@ private fun Deeds(state: WillState, view: View.Abode, session: WillSession) {
 @Composable
 private fun Rooms(view: View.Abode, session: WillSession) {
     val own = view.host.isEmpty()
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    val listState = rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().goneUnder(listState).hiddenBeneath(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
         if (view.rooms.isEmpty()) {
             item { Hint(if (own) "Комнат нет" else "Ни одна комната вам здесь не открыта") }
         }
