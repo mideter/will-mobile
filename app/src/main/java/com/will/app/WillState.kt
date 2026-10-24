@@ -93,7 +93,8 @@ sealed interface View {
 
     /**
      * Обитель. [owed] — что мне выполнить, задания, где я Послушник; [unreviewed] — что выполнено
-     * у меня как у Тренера, а я ещё не видел; [awaited] — чего я ожидаю от других.
+     * у меня как у Тренера, а я ещё не видел; [awaited] — чего я ожидаю от других; [waiting] —
+     * сколько стоит у моих Врат, ждёт, чтобы впустили: их имён я не знаю.
      */
     data class Abode(
         override val host: String,
@@ -101,6 +102,7 @@ sealed interface View {
         val owed: List<Waiting> = emptyList(),
         val awaited: List<Waiting> = emptyList(),
         val unreviewed: List<Waiting> = emptyList(),
+        val waiting: Int = 0,
     ) : View
 
     /**

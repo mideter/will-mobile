@@ -460,6 +460,7 @@ class WillSession(
                         owed = event.outstanding.owedList.map { it.toWaiting() },
                         awaited = event.outstanding.awaitedList.map { it.toWaiting() },
                         unreviewed = event.outstanding.unreviewedList.map { it.toWaiting() },
+                        waiting = event.outstanding.waiting,
                     )
                 }
                 when (val gathered = gathering) {

@@ -74,6 +74,7 @@ class AbodeScreenTest {
         owed: List<Pair<String, String>> = emptyList(),
         awaited: List<Pair<String, String>> = emptyList(),
         unreviewed: List<Pair<String, String>> = emptyList(),
+        waiting: Int = 0,
     ) {
         transport.tell(serverEvent { turned = turned { abodeOf = host } })
         transport.tell(serverEvent { rooms = rooms { rooms += shown } })
@@ -83,6 +84,7 @@ class AbodeScreenTest {
                     owed.forEachIndexed { i, (body, room) -> this.owed += waiting(10L + i, body, room, going = i == 0, ended = i == 1) }
                     awaited.forEachIndexed { i, (body, room) -> this.awaited += waiting(20L + i, body, room, training = true) }
                     unreviewed.forEachIndexed { i, (body, room) -> this.unreviewed += waiting(30L + i, body, room) }
+                    this.waiting = waiting
                 }
             })
         }
@@ -147,6 +149,16 @@ class AbodeScreenTest {
         compose.onNodeWithText("boris, viktor просят стать Тренером").assertIsDisplayed()
         compose.onNodeWithText("Кормчая").performClick()
         assertEquals("Кормчая", lastTurn().room)
+    }
+
+    @Test
+    fun `that some knock at the gates is said under them, without names, and they are entered`() {
+        abode("", ownRooms, waiting = 1)
+        compose.onNodeWithText("стук").assertIsDisplayed()
+        abode("", ownRooms, waiting = 3)
+        compose.onNodeWithText("стук · 3").assertIsDisplayed()
+        compose.onNodeWithText("Врата").performClick()
+        assertEquals("Врата", lastTurn().room)
     }
 
     @Test
