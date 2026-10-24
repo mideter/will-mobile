@@ -1,5 +1,7 @@
 package com.will.app.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,11 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -63,8 +66,10 @@ fun AbodeScreen(
         }
 
         if (own) {
-            HorizontalDivider(color = WillColors.Divider)
-            Row(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 // Из Комнат тихо сказано, сколько ждёт в Делах; на самих Делах число повторяло бы их.
                 val waiting = if (tab == AbodeTab.Rooms) view.owed.size + view.unreviewed.size + state.supplications.size else 0
                 Tab("Дела", waiting, tab == AbodeTab.Deeds) { onTab(AbodeTab.Deeds) }
@@ -126,7 +131,13 @@ private fun Rooms(view: View.Abode, session: WillSession) {
 @Composable
 private fun RowScope.Tab(title: String, count: Int, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.weight(1f).clickable(onClick = onClick).padding(vertical = 14.dp),
+        Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(WillColors.Row)
+            .border(1.dp, WillColors.Outline, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
