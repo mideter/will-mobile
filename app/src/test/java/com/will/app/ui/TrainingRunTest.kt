@@ -147,7 +147,7 @@ class TrainingRunTest {
         begin(0)
         end(0)
         compose.onAllNodesWithText("−")[1].performClick()
-        compose.onNodeWithText("!! тяжело").performClick()
+        compose.onNodeWithText("на пределе").performClick()
         compose.onNodeWithText("Готово").performClick()
         transport.refuse(last { it.hasFinishApproach() })
 
@@ -157,6 +157,17 @@ class TrainingRunTest {
         val again = last { it.hasFinishApproach() }
         assertEquals(4, again.finishApproach.repetitions)
         assertEquals(2, again.finishApproach.strain)
+    }
+
+    @Test
+    fun `a strain is chosen by a touch and taken back by another, and with none chosen it went as it should`() {
+        room(count = 2)
+        begin(0)
+        end(0)
+        compose.onNodeWithText("тяжело").performClick()
+        compose.onNodeWithText("тяжело").performClick()
+        compose.onNodeWithText("Готово").performClick()
+        assertEquals(0, last { it.hasFinishApproach() }.finishApproach.strain)
     }
 
     @Test

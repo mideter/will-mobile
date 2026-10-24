@@ -8,8 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,11 +51,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -379,7 +383,7 @@ private fun RunRow(
             effort != null -> {
                 val changed = willed != null && (willed.weightGrams != effort.weightGrams || willed.repetitions != effort.repetitions)
                 val took = (effort.finishedAtNs - effort.begunAtNs) / NANOS
-                "${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}${marksOf(effort)}" to
+                "${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}" to
                     (if (changed || willed == null) WillColors.Accent else WillColors.Ink)
             }
             // Сколько подход идёт, говорит пульт; строке довольно, что идёт он.
@@ -389,7 +393,7 @@ private fun RunRow(
                 (if (selected) WillColors.Ink else WillColors.Muted)
             else -> "сверх заданного" to WillColors.Accent
         }
-        Text(line, fontSize = 15.sp, color = colour)
+        Text(withStrain(line, colour, effort?.strain ?: 0), fontSize = 15.sp)
     }
 }
 
@@ -456,20 +460,17 @@ private fun TellingPanel(
 
 @Composable
 private fun StrainChoice(strain: Int, onChoose: (Int) -> Unit) {
-    // «Как надо» выбрано заранее: новичку довольно нажать «Готово».
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, WillColors.Divider, RoundedCornerShape(10.dp)),
-    ) {
-        for ((marks, label) in listOf(0 to "как надо", 1 to "! с нагрузкой", 2 to "!! тяжело")) {
+    // Ничего не выбрано — значит, как надо: новичку довольно нажать «Готово». Выбранное
+    // снимают тем же касанием.
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for ((marks, label) in STRAINS) {
             val chosen = strain == marks
             Box(
                 Modifier
                     .weight(1f)
-                    .background(if (chosen) WillColors.Accent.copy(alpha = 0.12f) else WillColors.Background)
-                    .clickable { onChoose(marks) }
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (chosen) WillColors.Accent.copy(alpha = 0.12f) else WillColors.Row)
+                    .clickable { onChoose(if (chosen) 0 else marks) }
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -489,7 +490,17 @@ private fun placeOf(training: WordItem, exercise: Int, approach: Int): String {
     return if (training.exercises.size > 1) "$name, подход ${approach + 1}" else "подход ${approach + 1}"
 }
 
-private fun marksOf(effort: EffortItem) = if (effort.strain > 0) " " + "!".repeat(effort.strain) else ""
+private val STRAINS = listOf(1 to "тяжело", 2 to "на пределе")
+
+private fun withStrain(line: String, colour: Color, strain: Int): AnnotatedString = buildAnnotatedString {
+    withStyle(SpanStyle(color = colour)) { append(line) }
+    val said = STRAINS.firstOrNull { it.first == strain }?.second ?: return@buildAnnotatedString
+    withStyle(SpanStyle(color = WillColors.Muted)) { append(" · ") }
+    // Предел выступает весом, а не цветом: красный отдан тому, кто ждёт ответа.
+    val style = if (strain == STRAINS.last().first) SpanStyle(color = WillColors.Ink, fontWeight = FontWeight.Medium)
+    else SpanStyle(color = WillColors.Muted)
+    withStyle(style) { append(said) }
+}
 
 @Composable
 private fun RemarkField(onSay: (String) -> Unit, sending: Boolean, key: String) {
@@ -563,7 +574,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                             else -> "${weightText(asked.weightGrams)} × ${asked.repetitions} → ${weightText(effort.weightGrams)} × $did"
                         }
                         val took = (effort.finishedAtNs - effort.begunAtNs) / NANOS
-                        "$head · ${spanText(took)}${marksOf(effort)}" to
+                        "$head · ${spanText(took)}" to
                             (if (head.endsWith("✓")) WillColors.Ink else WillColors.Accent)
                     }
                     underway != null && underway.exercise == e && underway.approach == a ->
@@ -572,7 +583,7 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                         if (finished) " — не сделан" else "") to WillColors.Muted
                     else -> "+ сверх заданного…" to WillColors.Accent
                 }
-                Text("${a + 1}. $line", fontSize = 14.sp, color = colour, modifier = Modifier.padding(start = 12.dp))
+                Text(withStrain("${a + 1}. $line", colour, effort?.strain ?: 0), fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp))
             }
             remarks.filterKeys { it >= count }.values.flatten().forEach { RemarkRow(it, start = 12.dp) }
         }
