@@ -290,14 +290,16 @@ fun TrainingEditor(
                 }
             }
         }
-        BottomButton(text = "Задать", trouble = trouble) { onDone(title, exercisesOf(drafts)) }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).plaque().padding(12.dp)) {
+            BottomButton(text = "Задать", trouble = trouble) { onDone(title, exercisesOf(drafts)) }
+        }
     }
 }
 
 @Composable
 internal fun BottomButton(text: String, trouble: String?, busy: Boolean = false, onClick: () -> Unit) {
     // Всегда видна: пока что-то не так, неактивна и говорит почему; нажатое ещё в пути — говорит [text].
-    Column(Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 8.dp, 16.dp, 12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         if (trouble != null) {
             Text(trouble, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(bottom = 6.dp))
         }

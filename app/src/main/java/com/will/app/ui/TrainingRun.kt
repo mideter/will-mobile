@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -166,8 +167,8 @@ fun TrainingRun(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
                         .background(WillColors.Row)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 ) {
@@ -231,7 +232,13 @@ fun TrainingRun(
 
         // Пульт внизу: что сейчас, таймер и главное действие; после подхода — рассказ о нём.
         Column(
-            Modifier.fillMaxWidth().background(WillColors.Composer).padding(16.dp, 12.dp, 16.dp, 12.dp),
+            // Пульт стоит прямо на белом: время держит низ само. Когда под ним прячется
+            // недосмотренный список, он приподнимается над ним тенью.
+            Modifier
+                .fillMaxWidth()
+                .shadow(if (listState.canScrollForward) 8.dp else 0.dp)
+                .background(WillColors.Background)
+                .padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (closing) {
