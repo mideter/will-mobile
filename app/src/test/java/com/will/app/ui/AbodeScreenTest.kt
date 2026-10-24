@@ -3,9 +3,6 @@ package com.will.app.ui
 import android.content.ClipboardManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -57,8 +54,7 @@ class AbodeScreenTest {
         transport.welcome("anna")
         compose.setContent {
             val state by session.state.collectAsState()
-            var tab by remember { mutableStateOf(AbodeTab.Deeds) }
-            (state.view as? View.Abode)?.let { AbodeScreen(state, it, session, tab) { tab = it } }
+            (state.view as? View.Abode)?.let { AbodeScreen(state, it, session) }
         }
     }
 
@@ -67,6 +63,10 @@ class AbodeScreenTest {
         room { name = "Врата"; part = RoomPart.OUTER; aspect = RoomAspect.THRESHOLD },
         room { name = "Кормчая"; part = RoomPart.INNER; aspect = RoomAspect.DWELLERS },
     )
+
+    private fun taught(by: String) = room { name = "Послушание — $by"; part = RoomPart.INNER; aspect = RoomAspect.WORDS; testator = by }
+
+    private fun teaching(whom: String) = room { name = "Ведение — $whom"; part = RoomPart.INNER; aspect = RoomAspect.WORDS }
 
     private fun abode(
         host: String,
@@ -106,7 +106,6 @@ class AbodeScreenTest {
         abode("", ownRooms)
         compose.onNodeWithText("anna").assertIsDisplayed()
         compose.onNodeWithText("это вы").assertIsDisplayed()
-        compose.onNodeWithText("Комнаты").performClick()
         val inner = compose.onNodeWithText("Внутренняя часть").fetchSemanticsNode().boundsInRoot.top
         val helm = compose.onNodeWithText("Кормчая").fetchSemanticsNode().boundsInRoot.top
         val word = compose.onNodeWithText("Слово").fetchSemanticsNode().boundsInRoot.top
@@ -127,63 +126,48 @@ class AbodeScreenTest {
     }
 
     @Test
-    fun `what awaits one and what one set for others are shown, whose and what, with the approach going or ended, and lead to their rooms`() {
+    fun `under a tie room is said what waits in it, with the approach going or ended, and the room is entered`() {
         abode(
-            "", ownRooms,
+            "", ownRooms + taught("boris") + taught("viktor") + teaching("gleb"),
             owed = listOf("Понедельник" to "Послушание — boris", "Среда" to "Послушание — viktor"),
             awaited = listOf("Пятница" to "Ведение — gleb"),
         )
-        compose.onNodeWithText("Выполнить").assertIsDisplayed()
-        compose.onNodeWithText("Ожидаю").assertIsDisplayed()
-        compose.onNodeWithText("boris · задание").assertIsDisplayed()
-        compose.onNodeWithText("gleb · тренировка").assertIsDisplayed()
+        compose.onAllNodesWithText("выполнить 1").assertCountEquals(2)
         compose.onNodeWithText("идёт подход").assertIsDisplayed()
         compose.onNodeWithText("подход закончен — как прошёл?").assertIsDisplayed()
-        compose.onNodeWithText("Пятница").performClick()
-        assertEquals("Ведение — gleb", lastTurn().room)
+        compose.onNodeWithText("ожидаю 1").assertIsDisplayed()
+        compose.onNodeWithText("Тренер — boris").performClick()
+        assertEquals("Послушание — boris", lastTurn().room)
     }
 
     @Test
-    fun `the supplications are among the deeds and lead to the helm`() {
+    fun `the supplications are said in red under the helm, which they lead to`() {
         transport.tell(serverEvent { supplications = supplications { suppliantNames += listOf("boris", "viktor") } })
-        abode("", ownRooms, owed = listOf("Понедельник" to "Послушание — gleb"))
-        compose.onNodeWithText("Просьбы").assertIsDisplayed()
-        compose.onNodeWithText("viktor").performClick()
+        abode("", ownRooms)
+        compose.onNodeWithText("boris, viktor просят стать Тренером").assertIsDisplayed()
+        compose.onNodeWithText("Кормчая").performClick()
         assertEquals("Кормчая", lastTurn().room)
     }
 
     @Test
-    fun `what was done and not yet seen is to review, between what to fulfil and what one awaits, and leads to its room`() {
+    fun `what was done and not yet seen is to review, said before what one awaits in the same room`() {
         abode(
-            "", ownRooms,
-            owed = listOf("Понедельник" to "Послушание — boris"),
-            awaited = listOf("Пятница" to "Ведение — gleb"),
+            "", ownRooms + teaching("viktor"),
+            awaited = listOf("Пятница" to "Ведение — viktor"),
             unreviewed = listOf("Среда" to "Ведение — viktor"),
         )
-        val fulfil = compose.onNodeWithText("Выполнить").fetchSemanticsNode().boundsInRoot.top
-        val review = compose.onNodeWithText("Проверить").fetchSemanticsNode().boundsInRoot.top
-        val await = compose.onNodeWithText("Ожидаю").fetchSemanticsNode().boundsInRoot.top
-        assertEquals(listOf(fulfil, review, await), listOf(fulfil, review, await).sorted())
-        compose.onNodeWithText("viktor · задание").assertIsDisplayed()
-        compose.onNodeWithText("Среда").performClick()
-        assertEquals("Ведение — viktor", lastTurn().room)
+        compose.onNodeWithText("проверить 1 · ожидаю 1").assertIsDisplayed()
     }
 
     @Test
-    fun `the deeds are told anew while one looks at them`() {
-        abode("", ownRooms, awaited = listOf("Пятница" to "Ведение — gleb"))
-        compose.onNodeWithText("Ожидаю").assertIsDisplayed()
+    fun `what waits is told anew while one looks at the abode`() {
+        abode("", ownRooms + teaching("gleb"), awaited = listOf("Пятница" to "Ведение — gleb"))
+        compose.onNodeWithText("ожидаю 1").assertIsDisplayed()
         transport.tell(serverEvent {
             outstanding = outstanding { unreviewed += waiting(20L, "Пятница", "Ведение — gleb", training = true) }
         })
-        compose.onNodeWithText("Проверить").assertIsDisplayed()
-        compose.onAllNodesWithText("Ожидаю").assertCountEquals(0)
-    }
-
-    @Test
-    fun `with nothing awaiting, the deeds say so`() {
-        abode("", ownRooms)
-        compose.onNodeWithText("Дел нет").assertIsDisplayed()
+        compose.onNodeWithText("проверить 1").assertIsDisplayed()
+        compose.onAllNodesWithText("ожидаю 1").assertCountEquals(0)
     }
 
     @Test
@@ -191,7 +175,6 @@ class AbodeScreenTest {
         abode("boris", listOf(room { name = "Врата"; part = RoomPart.OUTER; aspect = RoomAspect.THRESHOLD }))
         compose.onNodeWithText("boris").assertIsDisplayed()
         compose.onAllNodesWithText("Слово").assertCountEquals(0)
-        compose.onAllNodesWithText("Выполнить").assertCountEquals(0)
         compose.onNodeWithText("‹ Врата").performClick()
         assertEquals("boris", lastTurn().abodeOf)
         assertEquals("Врата", lastTurn().room)
@@ -205,8 +188,7 @@ class AbodeScreenTest {
 
     @Test
     fun `a room where one is taught is named by one's trainer, and entered by its own name`() {
-        abode("", ownRooms + room { name = "Послушание — boris"; part = RoomPart.INNER; aspect = RoomAspect.WORDS; testator = "boris" })
-        compose.onNodeWithText("Комнаты").performClick()
+        abode("", ownRooms + taught("boris"))
         compose.onAllNodesWithText("Послушание — boris").assertCountEquals(0)
         compose.onNodeWithText("Тренер — boris").performClick()
         assertEquals("Послушание — boris", lastTurn().room)

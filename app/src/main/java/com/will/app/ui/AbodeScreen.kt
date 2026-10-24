@@ -1,50 +1,32 @@
 package com.will.app.ui
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Aspect
 import com.will.app.View
-import com.will.app.Waiting
+import com.will.app.RoomItem
 import com.will.app.WillSession
 import com.will.app.WillState
 
-/** Две стороны своей Обители: [Deeds] — что ждёт ответа, [Rooms] — сами комнаты. */
-enum class AbodeTab { Deeds, Rooms }
-
 /**
- * Обитель. Своя — двумя вкладками: Дела — Просьбы, что мне выполнить, что проверить и чего я
- * ожидаю от других, каждое ведёт в свою комнату; Комнаты — по частям: во внешней — Врата, через
- * них выходят; во внутренней — Кормчая, где отвечают на Просьбы. Чужая: только комнаты,
- * открытые моему роду; назад — к её Вратам.
+ * Обитель: её комнаты по частям — во внешней Врата, через них выходят; во внутренней Кормчая и
+ * Кельи. Своя: под каждой комнатой сказано, что в ней ждёт, — дело живёт там, где его
+ * выполняют: в Кормчей — Просьбы, в комнате Уз — что выполнить, что проверить, чего я ожидаю,
+ * и идущий подход. Чужая: только комнаты, открытые моему роду; назад — к её Вратам.
  */
 @Composable
-fun AbodeScreen(
-    state: WillState,
-    view: View.Abode,
-    session: WillSession,
-    tab: AbodeTab,
-    onTab: (AbodeTab) -> Unit,
-) {
+fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
     val own = view.host.isEmpty()
     val clipboard = LocalClipboardManager.current
 
@@ -59,103 +41,52 @@ fun AbodeScreen(
                 session.tell("Имя ${state.ownName} скопировано")
             }) else null,
         )
-
-        Box(Modifier.weight(1f)) {
-            if (own && tab == AbodeTab.Deeds) Deeds(state, view, session) else Rooms(view, session)
-        }
-
-        if (own) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Tab("Дела", tab == AbodeTab.Deeds) { onTab(AbodeTab.Deeds) }
-                Tab("Комнаты", tab == AbodeTab.Rooms) { onTab(AbodeTab.Rooms) }
+        val listState = rememberLazyListState()
+        LazyColumn(Modifier.fillMaxSize().goneUnder(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
+            if (view.rooms.isEmpty()) {
+                item { Hint(if (own) "Комнат нет" else "Ни одна комната вам здесь не открыта") }
             }
-        }
-    }
-}
-
-@Composable
-private fun Deeds(state: WillState, view: View.Abode, session: WillSession) {
-    val helm = view.rooms.firstOrNull { it.aspect == Aspect.Dwellers }?.name
-    val listState = rememberLazyListState()
-    LazyColumn(Modifier.fillMaxSize().goneUnder(listState).hiddenBeneath(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
-        if (state.supplications.isNotEmpty()) {
-            item { SectionTitle("Просьбы") }
-            item {
-                Group(state.supplications, WillColors.SupplicationRow) { suppliant ->
-                    Line(suppliant, { Text("Просит вас стать Тренером", fontSize = 13.sp, color = WillColors.Supplication) }) {
-                        helm?.let { session.enter(it) }
+            for ((title, outer) in listOf("Внутренняя часть" to false, "Внешняя часть" to true)) {
+                // Ядро части — Врата или Кормчая — впереди её Келий.
+                val rooms = view.rooms.filter { it.outer == outer }.sortedBy { it.aspect == Aspect.Words }
+                if (rooms.isEmpty()) continue
+                item { SectionTitle(title) }
+                item {
+                    Group(rooms) { room ->
+                        val suppliants = if (own && room.aspect == Aspect.Dwellers) state.supplications else emptyList()
+                        RoomLine(room, view, suppliants) { session.enter(room.name) }
                     }
                 }
             }
         }
-        if (view.owed.isNotEmpty()) {
-            item { SectionTitle("Выполнить") }
-            item { Group(view.owed) { waiting -> WaitingRow(waiting) { session.enter(waiting.room) } } }
-        }
-        if (view.unreviewed.isNotEmpty()) {
-            item { SectionTitle("Проверить") }
-            item { Group(view.unreviewed) { waiting -> WaitingRow(waiting) { session.enter(waiting.room) } } }
-        }
-        if (view.awaited.isNotEmpty()) {
-            item { SectionTitle("Ожидаю") }
-            item { Group(view.awaited) { waiting -> WaitingRow(waiting) { session.enter(waiting.room) } } }
-        }
-        if (state.supplications.isEmpty() && view.owed.isEmpty() && view.unreviewed.isEmpty() && view.awaited.isEmpty()) {
-            item { Hint("Дел нет") }
-        }
     }
 }
 
 @Composable
-private fun Rooms(view: View.Abode, session: WillSession) {
-    val own = view.host.isEmpty()
-    val listState = rememberLazyListState()
-    LazyColumn(Modifier.fillMaxSize().goneUnder(listState).hiddenBeneath(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
-        if (view.rooms.isEmpty()) {
-            item { Hint(if (own) "Комнат нет" else "Ни одна комната вам здесь не открыта") }
-        }
-        for ((title, outer) in listOf("Внутренняя часть" to false, "Внешняя часть" to true)) {
-            // Ядро части — Врата или Кормчая — впереди её Келий.
-            val rooms = view.rooms.filter { it.outer == outer }.sortedBy { it.aspect == Aspect.Words }
-            if (rooms.isEmpty()) continue
-            item { SectionTitle(title) }
-            item { Group(rooms) { room -> Line(room.said) { session.enter(room.name) } } }
-        }
-    }
-}
+private fun RoomLine(room: RoomItem, view: View.Abode, suppliants: List<String>, onClick: () -> Unit) {
+    val deeds = listOf("выполнить" to view.owed, "проверить" to view.unreviewed, "ожидаю" to view.awaited)
+        .mapNotNull { (what, list) -> list.count { it.room == room.name }.takeIf { it > 0 }?.let { "$what $it" } }
+    val underway = view.owed.firstNotNullOfOrNull { waiting -> waiting.underway?.takeIf { waiting.room == room.name } }
+    val quiet = suppliants.isEmpty() && deeds.isEmpty() && underway == null
 
-@Composable
-private fun RowScope.Tab(title: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        title,
-        fontSize = 15.sp,
-        color = if (selected) WillColors.Accent else WillColors.Muted,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .weight(1f)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-    )
-}
-
-@Composable
-private fun WaitingRow(waiting: Waiting, onClick: () -> Unit) {
-    val what = if (waiting.word.exercises.isEmpty()) "задание" else "тренировка"
-    Line(waiting.word.body, {
+    Line(room.said, if (quiet) null else ({
+        if (suppliants.isNotEmpty()) {
+            Text(
+                suppliants.joinToString(", ") + if (suppliants.size == 1) " просит стать Тренером" else " просят стать Тренером",
+                fontSize = 13.sp,
+                color = WillColors.Supplication,
+            )
+        }
         Row {
-            Text("${waiting.counterpart} · $what", fontSize = 13.sp, color = WillColors.Muted)
-            waiting.underway?.let {
-                Text(" · ", fontSize = 13.sp, color = WillColors.Muted)
+            if (deeds.isNotEmpty()) Text(deeds.joinToString(" · "), fontSize = 13.sp, color = WillColors.Muted)
+            if (deeds.isNotEmpty() && underway != null) Text(" · ", fontSize = 13.sp, color = WillColors.Muted)
+            if (underway != null) {
                 Text(
-                    if (it.endedAtNs == null) "идёт подход" else "подход закончен — как прошёл?",
+                    if (underway.endedAtNs == null) "идёт подход" else "подход закончен — как прошёл?",
                     fontSize = 13.sp,
                     color = WillColors.Accent,
                 )
             }
         }
-    }, onClick)
+    }), onClick)
 }

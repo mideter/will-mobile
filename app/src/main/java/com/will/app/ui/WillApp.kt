@@ -18,7 +18,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -41,7 +40,6 @@ fun WillApp(session: WillSession) {
     val state by session.state.collectAsState()
     var notice by remember { mutableStateOf<Notice?>(null) }
     var lastNotice by remember { mutableStateOf<Notice?>(null) }
-    var abodeTab by rememberSaveable { mutableStateOf(AbodeTab.Deeds) }
 
     LaunchedEffect(session) {
         // Новое сменяет прежнее и держится своё время заново.
@@ -57,7 +55,7 @@ fun WillApp(session: WillSession) {
     // подключение показывает свой экран, поэтому здесь — только когда уже было что показать.
     val lost = state.connection != Connection.Ready && (state.view != null || state.unbornMark != null)
     if (lost) Veil()
-    // Сверху, под шапкой: внизу вкладки и поле ввода, их всплывающее не закрывает.
+    // Сверху, под шапкой: внизу поле ввода и пульт, их всплывающее не закрывает.
     val popups: @Composable () -> Unit = {
         AnimatedVisibility(
             visible = notice != null,
@@ -95,7 +93,7 @@ fun WillApp(session: WillSession) {
                 Box(Modifier.weight(1f)) {
                     when (view) {
                         null -> ConnectingScreen()
-                        is View.Abode -> AbodeScreen(state, view, session, abodeTab) { abodeTab = it }
+                        is View.Abode -> AbodeScreen(state, view, session)
                         is View.Room -> when (view.aspect) {
                             Aspect.Threshold -> GatesScreen(state, view, session)
                             Aspect.Dwellers -> HelmScreen(state, view, session)
