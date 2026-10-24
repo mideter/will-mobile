@@ -4,8 +4,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -86,7 +84,7 @@ class HelmScreenTest {
     @Test
     fun `no one dwelling, it says where one lets in`() {
         helm()
-        compose.onNodeWithText("В вашей Обители никто не обитает. Впускают у Врат.").assertIsDisplayed()
+        compose.onNodeWithText("Вы пока никого не знаете. Впускают у Врат.").assertIsDisplayed()
     }
 
     @Test
@@ -104,7 +102,7 @@ class HelmScreenTest {
         helm(people = listOf(acquaintance("boris")))
         compose.onAllNodesWithText("друг").assertCountEquals(0)
         compose.onNodeWithText("boris").performClick()
-        compose.onNode(hasText("знакомый") and hasClickAction() and !hasText("boris")).performClick()
+        compose.onNodeWithText("знаю").performClick()
         assertEquals(0, transport.sent.count { it.hasRegard() })
         compose.onNodeWithText("друг").performClick()
         val regard = transport.sent.last { it.hasRegard() }.regard
@@ -117,10 +115,10 @@ class HelmScreenTest {
         val cases = listOf(
             Triple(acquaintance("boris"), true, null),
             Triple(acquaintance("viktor"), false, null),
-            Triple(acquaintance("gleb") { trainer = true }, true, "знакомый · Тренер"),
-            Triple(acquaintance("dana") { asks = true }, true, "знакомый · просит"),
-            Triple(acquaintance("egor") { asked = true }, true, "знакомый · просьба отправлена"),
-            Triple(acquaintance("zoya") { novice = true }, true, "знакомый · ученик"),
+            Triple(acquaintance("gleb") { trainer = true }, true, "Тренер"),
+            Triple(acquaintance("dana") { asks = true }, true, "просит"),
+            Triple(acquaintance("egor") { asked = true }, true, "просьба отправлена"),
+            Triple(acquaintance("zoya") { novice = true }, true, "ученик"),
         )
         val asks = mapOf("boris" to 1, "viktor" to 0, "gleb" to 0, "dana" to 0, "egor" to 0, "zoya" to 1)
         for ((dweller, dwelling, standing) in cases) {

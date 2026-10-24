@@ -95,15 +95,15 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
 
         // Из Обители выходят только через свои Врата.
         item { SectionTitle("Выйти") }
-        if (state.dwellings.isEmpty()) item { Hint("Вас ещё никто не принял") }
+        if (state.dwellings.isEmpty()) item { Hint("Вас пока никто не знает") }
         items(state.dwellings, key = { "dwelling ${it.name}" }) { dwelling ->
             Row(
                 Modifier.fillMaxWidth().clickable { session.gates(dwelling.name) }.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Обитель ${dwelling.name}", fontSize = 16.sp)
-                    Text("Я здесь — ${WillSession.kindName(dwelling.kind)}", fontSize = 13.sp, color = WillColors.Muted)
+                    Text(dwelling.name, fontSize = 16.sp)
+                    Text(listOfNotNull("знает вас", WillSession.kindSaid(dwelling.kind)).joinToString(" · "), fontSize = 13.sp, color = WillColors.Muted)
                 }
                 Text("›", fontSize = 18.sp, color = WillColors.Muted)
             }
@@ -137,7 +137,7 @@ private fun OthersGates(state: WillState, view: View.Room, session: WillSession)
         fontWeight = FontWeight.Medium,
     )
     if (dwelling != null) {
-        Hint("Вы обитаете здесь — ${WillSession.kindName(dwelling.kind)}.")
+        Hint("${view.host} знает вас" + (WillSession.kindSaid(dwelling.kind)?.let { " — $it" } ?: "") + ".")
         TextButton(onClick = { session.visit(view.host) }, modifier = Modifier.padding(horizontal = 8.dp)) {
             Text("Войти")
         }
@@ -204,8 +204,8 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
                 }
             }
 
-            item { SectionTitle("Обитатели") }
-            if (view.people.isEmpty()) item { Hint("В вашей Обители никто не обитает. Впускают у Врат.") }
+            item { SectionTitle("Знаю") }
+            if (view.people.isEmpty()) item { Hint("Вы пока никого не знаете. Впускают у Врат.") }
             else item {
                 Group(view.people) { dweller ->
                     DwellerRow(
@@ -254,13 +254,14 @@ private fun DwellerRow(dweller: Person, open: Boolean, mayAsk: Boolean, onToggle
         ) {
             Column(Modifier.weight(1f)) {
                 Text(dweller.name, fontSize = 16.sp)
-                val told = listOf(WillSession.kindName(dweller.kind)) + listOfNotNull(
+                val told = listOfNotNull(
+                    WillSession.kindSaid(dweller.kind),
                     "Тренер".takeIf { Standing.Trainer in standings },
                     "ученик".takeIf { Standing.Novice in standings },
                     "просит".takeIf { Standing.Asks in standings },
                     "просьба отправлена".takeIf { Standing.Asked in standings },
                 )
-                Text(told.joinToString(" · "), fontSize = 13.sp, color = WillColors.Muted)
+                if (told.isNotEmpty()) Text(told.joinToString(" · "), fontSize = 13.sp, color = WillColors.Muted)
             }
             Text("›", fontSize = 18.sp, color = WillColors.Muted, modifier = Modifier.rotate(if (open) 90f else 0f))
         }
@@ -268,7 +269,7 @@ private fun DwellerRow(dweller: Person, open: Boolean, mayAsk: Boolean, onToggle
             Row(Modifier.padding(start = 4.dp)) {
                 for (kind in Kind.entries) {
                     val chosen = kind == dweller.kind
-                    Choice(WillSession.kindName(kind), if (chosen) WillColors.Accent else WillColors.Muted) {
+                    Choice(WillSession.kindSaid(kind) ?: "знаю", if (chosen) WillColors.Accent else WillColors.Muted) {
                         if (!chosen) session.regard(dweller.name, kind)
                     }
                 }

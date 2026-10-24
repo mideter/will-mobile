@@ -79,15 +79,15 @@ class GatesScreenTest {
     fun `no one waiting and no one awaiting birth, it says so`() {
         gates("", open = true)
         compose.onAllNodesWithText("Никто не ждёт").assertCountEquals(2)
-        compose.onNodeWithText("Вас ещё никто не принял").assertIsDisplayed()
+        compose.onNodeWithText("Вас пока никто не знает").assertIsDisplayed()
     }
 
     @Test
     fun `from one's own gates one goes out to the abodes one dwells in`() {
         gates("", open = true)
         dwellingIn("viktor")
-        compose.onNodeWithText("Я здесь — ближний").assertIsDisplayed()
-        compose.onNodeWithText("Обитель viktor").performClick()
+        compose.onNodeWithText("знает вас · ближний").assertIsDisplayed()
+        compose.onNodeWithText("viktor").performClick()
         assertEquals("viktor", lastTurn().abodeOf)
         assertEquals("Врата", lastTurn().room)
     }
@@ -99,7 +99,7 @@ class GatesScreenTest {
         compose.onNodeWithText("Врата — viktor").assertIsDisplayed()
         compose.onNodeWithText("‹ Врата — anna").assertIsDisplayed()
         compose.onNodeWithText("Врата закрыты: хозяина нет у Врат.").assertIsDisplayed()
-        compose.onNodeWithText("Вы обитаете здесь — ближний.").assertIsDisplayed()
+        compose.onNodeWithText("viktor знает вас — ближний.").assertIsDisplayed()
         compose.onNodeWithText("Войти").performClick()
         assertEquals("viktor", lastTurn().abodeOf)
         assertEquals("", lastTurn().room)

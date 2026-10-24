@@ -589,7 +589,7 @@ class WillSession(
                 if (reply.notice.isNotEmpty()) Notices.say(reply.code, reply.argsList, reply.notice)?.let { tell(it) }
             }
             ServerEvent.EventCase.DWELLING -> {
-                tell("Вы обитаете у ${event.dwelling.hostName}: ${kindName(event.dwelling.kind.toKind())}")
+                tell(listOfNotNull("${event.dwelling.hostName} знает вас", kindSaid(event.dwelling.kind.toKind())).joinToString(" · "))
                 listDwellings()
             }
             ServerEvent.EventCase.DWELLERS -> {
@@ -730,8 +730,9 @@ class WillSession(
         const val GATES = "Врата"
         const val HELM = "Кормчая"
 
-        fun kindName(kind: Kind): String = when (kind) {
-            Kind.Acquaintance -> "знакомый"
+        fun kindSaid(kind: Kind): String? = when (kind) {
+            // Знать человека и есть нижняя ступень: о ней не говорится, говорится только выше.
+            Kind.Acquaintance -> null
             Kind.Neighbour -> "ближний"
             Kind.Friend -> "друг"
         }
