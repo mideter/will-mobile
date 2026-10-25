@@ -205,6 +205,8 @@ class TrainingService : Service() {
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // Система прячет уведомление службы до 10 с, а подход виден с первой секунды.
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(openApp())
         val t = training
         if (state == null || t == null) return builder.setContentTitle("Тренировка").build()
