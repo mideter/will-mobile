@@ -82,6 +82,16 @@ fun WillApp(session: WillSession) {
         return
     }
 
+    state.namedBy?.let { father ->
+        Box(Modifier.fillMaxSize()) {
+            Scaffold { padding ->
+                Box(Modifier.fillMaxSize().padding(padding)) { NamedScreen(state.ownName, father, session::begin) }
+            }
+            popups()
+        }
+        return
+    }
+
     val view = state.view
     BackHandler(enabled = view is View.Room || (view != null && view.host.isNotEmpty())) {
         session.back()

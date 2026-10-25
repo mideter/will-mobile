@@ -264,6 +264,8 @@ class WillSession(
         beat()
     }
 
+    fun begin() = _state.update { it.copy(namedBy = null) }
+
     fun stopWorkout() = _state.update { s -> s.copy(workout = goingIn(s.view, except = s.workout?.behestId)) }
 
     fun endApproach(behestId: Long) {
@@ -427,7 +429,13 @@ class WillSession(
                     return
                 }
                 _state.update {
-                    it.copy(connection = Connection.Ready, ownName = event.authOk.name, unbornMark = null, loading = true)
+                    it.copy(
+                        connection = Connection.Ready,
+                        ownName = event.authOk.name,
+                        unbornMark = null,
+                        namedBy = event.authOk.father.ifEmpty { it.namedBy },
+                        loading = true,
+                    )
                 }
                 beat()
                 // Проснувшись, всякий дома: вернуться можно только в свою комнату, где был. Туда —
@@ -596,7 +604,10 @@ class WillSession(
                 if (reply.notice.isNotEmpty()) Notices.say(reply.code, reply.argsList, reply.notice)?.let { tell(it) }
             }
             ServerEvent.EventCase.DWELLING -> {
-                tell(listOfNotNull("${event.dwelling.hostName} знает вас", kindSaid(event.dwelling.kind.toKind())).joinToString(" · "))
+                // Кто дал имя, того и знаешь первым: экран имени уже говорит о нём.
+                if (event.dwelling.hostName != _state.value.namedBy) {
+                    tell(listOfNotNull("${event.dwelling.hostName} знает вас", kindSaid(event.dwelling.kind.toKind())).joinToString(" · "))
+                }
                 listDwellings()
             }
             ServerEvent.EventCase.DWELLERS -> {

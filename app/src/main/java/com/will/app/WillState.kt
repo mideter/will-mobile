@@ -138,7 +138,8 @@ data class Workout(val host: String, val room: String, val behestId: Long)
 
 /**
  * Всё, из чего рисуются экраны. [loading] — слова и списки нового вида ещё идут;
- * [unbornMark] — тело ещё не рождено, вот его метка. [willing] и [fulfilling] — что с
+ * [unbornMark] — тело ещё не рождено, вот его метка; [namedBy] — имя только что дано, дал его
+ * этот человек: так и говорится, пока не начнут. [willing] и [fulfilling] — что с
  * тренировкой из редактора и с заданием, отправленным на выполнение; [beginning] — `Pending`,
  * пока сервер не сказал, что подход идёт, или почему нет; [telling] и [remarking] — так же
  * рассказ о подходе и заметка: до ответа пульт и поле не закрываются, и сказанное не теряется
@@ -154,6 +155,7 @@ data class WillState(
     val dwellings: List<Person> = emptyList(),
     val supplications: List<String> = emptyList(),
     val unbornMark: Long? = null,
+    val namedBy: String? = null,
     val willing: Reply = Reply.None,
     val fulfilling: Reply = Reply.None,
     val beginning: Reply = Reply.None,
