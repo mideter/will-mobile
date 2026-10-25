@@ -29,7 +29,7 @@ import com.will.app.Notice
 import com.will.app.View
 import com.will.app.WillSession
 
-private const val NOTICE_MILLIS = 3_000L
+private const val NOTICE_MILLIS = 5_000L
 
 /**
  * Корень приложения: вид из состояния сессии, «назад» — тем путём, каким пришли. Уведомления сервера — во
