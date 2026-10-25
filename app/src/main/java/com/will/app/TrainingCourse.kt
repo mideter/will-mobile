@@ -29,8 +29,14 @@ data class Choice(val behestId: Long = 0, val exercise: Int? = null, val extra: 
  *
  * Тренировка идёт с начала первого подхода до конца последнего: ни задание, ни заметка её не
  * начинают, а завершают её, может быть, и на другой день. Пока подход идёт, конца нет.
+ *
+ * Начатая тренировка, где подход не идёт, отдыхает: с конца последнего усилия до конца
+ * отдыха перед следующим подходом и ещё [ABANDONED_AFTER_MS] после — а нет следующего, то
+ * после конца последнего усилия. Дольше без подхода — заброшена: её больше не ведут.
  */
 object TrainingCourse {
+
+    const val ABANDONED_AFTER_MS = 15 * 60_000L
 
     fun approachCount(training: WordItem, exercise: Int, underway: UnderwayItem? = null): Int =
         maxOf(
@@ -77,6 +83,14 @@ object TrainingCourse {
         val (e, a) = selected ?: return null
         val last = training.efforts.maxByOrNull { it.finishedAtNs } ?: return null
         return Rest(last.finishedAtNs, restWilled(training, e, a))
+    }
+
+    fun idleSinceNs(training: WordItem, choice: Choice): Long? =
+        rest(training, selected(training, null, choice))?.endNs ?: training.efforts.maxOfOrNull { it.finishedAtNs }
+
+    fun resting(training: WordItem, choice: Choice, nowNs: Long): Boolean {
+        val since = idleSinceNs(training, choice) ?: return false
+        return nowNs - since < ABANDONED_AFTER_MS * 1_000_000
     }
 
     fun sameRest(exercise: ExerciseItem): Int? {

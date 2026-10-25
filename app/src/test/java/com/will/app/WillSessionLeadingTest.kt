@@ -5,6 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import will.v1.MessengerOuterClass.Word
 import will.v1.approach
+import will.v1.effort
 import will.v1.exercise
 import will.v1.historyEnd
 import will.v1.outstanding
@@ -33,6 +34,11 @@ class WillSessionLeadingTest {
     }
 
     private fun going(id: Long) = underway { behestId = id; doing = true; begunAtNs = 1 }
+
+    private fun rested(id: Long, minutesAgo: Long) = training(id).toBuilder().addEfforts(effort {
+        val finished = session.clock.nowNs() - minutesAgo * 60_000_000_000L
+        weightGrams = 40_000; repetitions = 5; begunAtNs = finished - 30_000_000_000L; finishedAtNs = finished
+    }).build()
 
     private fun room(host: String, room: String, vararg trainings: Pair<Long, Boolean>, underways: List<Long>) {
         transport.tell(serverEvent { turned = turned { abodeOf = host; this.room = room } })
@@ -106,5 +112,49 @@ class WillSessionLeadingTest {
         })
         transport.tell(serverEvent { historyEnd = historyEnd {} })
         assertEquals(Workout("", "Послушание — viktor", 9), workout())
+    }
+
+    @Test
+    fun `a training begun and resting, seen in the overview of one's abode, is led, an abandoned one is not`() {
+        transport.tell(serverEvent { turned = turned {} })
+        transport.tell(serverEvent {
+            outstanding = outstanding {
+                owed += outstandingBehest { room = "Послушание — viktor"; behest = rested(9, minutesAgo = 20) }
+                owed += outstandingBehest { room = "Послушание — boris"; behest = rested(7, minutesAgo = 1) }
+            }
+        })
+        transport.tell(serverEvent { historyEnd = historyEnd {} })
+        assertEquals(Workout("", "Послушание — boris", 7), workout())
+        assertEquals(1, phone.trainingsLed)
+    }
+
+    @Test
+    fun `an approach underway is led before a training resting`() {
+        transport.tell(serverEvent { turned = turned {} })
+        transport.tell(serverEvent {
+            outstanding = outstanding {
+                owed += outstandingBehest { room = "Послушание — boris"; behest = rested(7, minutesAgo = 1) }
+                owed += outstandingBehest { room = "Послушание — viktor"; behest = training(9); underway = going(9) }
+            }
+        })
+        transport.tell(serverEvent { historyEnd = historyEnd {} })
+        assertEquals(9L, workout()?.behestId)
+    }
+
+    @Test
+    fun `a training resting in one's room is led`() {
+        transport.tell(serverEvent { turned = turned { room = "Послушание — boris" } })
+        transport.tell(serverEvent { word = rested(7, minutesAgo = 1) })
+        transport.tell(serverEvent { historyEnd = historyEnd {} })
+        assertEquals(Workout("", "Послушание — boris", 7), workout())
+    }
+
+    @Test
+    fun `a training fulfilled in one's room is not led, however lately rested`() {
+        transport.tell(serverEvent { turned = turned { room = "Послушание — boris" } })
+        transport.tell(serverEvent { word = rested(7, minutesAgo = 1) })
+        transport.tell(serverEvent { word = word { id = 8; kind = Word.Kind.DEED; behestId = 7 } })
+        transport.tell(serverEvent { historyEnd = historyEnd {} })
+        assertNull(workout())
     }
 }

@@ -36,7 +36,7 @@ import com.will.app.WillState
  * и Кельи. Своя: под каждой комнатой сказано, что в ней ждёт, — дело живёт там, где его
  * выполняют: во Вратах — стук, без имён: они мне ещё никто; в
  * Кормчей — Просьбы; в комнате Уз — что выполнить, что проверить, чего я ожидаю, и идущий
- * подход. Чужая: только комнаты, открытые моему роду; назад — к её Вратам.
+ * подход или отдых. Чужая: только комнаты, открытые моему роду; назад — к её Вратам.
  */
 @Composable
 fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
@@ -81,7 +81,9 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
                                     if (state.supplications.size == 1) " просит стать Тренером" else " просят стать Тренером"
                             else -> null
                         }
-                        RoomLine(room, view, plea) { session.enter(room.name) }
+                        // Ведут тренировку этой комнаты — значит, в ней идёт подход или отдых.
+                        val led = own && state.workout?.let { it.host.isEmpty() && it.room == room.name } == true
+                        RoomLine(room, view, plea, led) { session.enter(room.name) }
                     }
                 }
             }
@@ -90,11 +92,16 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
 }
 
 @Composable
-private fun RoomLine(room: RoomItem, view: View.Abode, plea: String?, onClick: () -> Unit) {
+private fun RoomLine(room: RoomItem, view: View.Abode, plea: String?, led: Boolean, onClick: () -> Unit) {
     val deeds = listOf("выполнить" to view.owed, "проверить" to view.unreviewed, "ожидаю" to view.awaited)
         .mapNotNull { (what, list) -> list.count { it.room == room.name }.takeIf { it > 0 }?.let { "$what $it" } }
     val underway = view.owed.firstNotNullOfOrNull { waiting -> waiting.underway?.takeIf { waiting.room == room.name } }
-    val quiet = plea == null && deeds.isEmpty() && underway == null
+    val going = when {
+        underway != null -> if (underway.endedAtNs == null) "идёт подход" else "подход закончен — как прошёл?"
+        led -> "идёт отдых"
+        else -> null
+    }
+    val quiet = plea == null && deeds.isEmpty() && going == null
 
     Line(room.said, if (quiet) null else ({
         if (plea != null) {
@@ -105,10 +112,10 @@ private fun RoomLine(room: RoomItem, view: View.Abode, plea: String?, onClick: (
         }
         Row {
             if (deeds.isNotEmpty()) Text(deeds.joinToString(" · "), fontSize = 13.sp, color = WillColors.Muted)
-            if (deeds.isNotEmpty() && underway != null) Text(" · ", fontSize = 13.sp, color = WillColors.Muted)
-            if (underway != null) {
+            if (deeds.isNotEmpty() && going != null) Text(" · ", fontSize = 13.sp, color = WillColors.Muted)
+            if (going != null) {
                 Text(
-                    if (underway.endedAtNs == null) "идёт подход" else "подход закончен — как прошёл?",
+                    going,
                     fontSize = 13.sp,
                     color = WillColors.Accent,
                 )

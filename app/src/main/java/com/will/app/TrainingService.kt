@@ -35,9 +35,9 @@ import will.v1.MessengerOuterClass.Word
 /**
  * Ведёт идущую тренировку, пока экран погашен: уведомление с таймером подхода или отдыха
  * (его тикает сама система), «Приступить» прямо с экрана блокировки и вибрация, когда
- * заданный отдых вышел. Живёт с первого подхода до завершения тренировки; заброшенную —
- * без подхода дольше [IDLE_MS] после конца отдыха — гасит сам; завершённую сменяет другая,
- * где подход ещё идёт. Вести её начинают, пока приложение на экране; уже ведёт — второй раз
+ * заданный отдых вышел. Живёт с первого подхода до завершения тренировки; заброшенную
+ * ([TrainingCourse.ABANDONED_AFTER_MS]) гасит сам; завершённую сменяет другая, где подход
+ * или отдых ещё идёт. Вести её начинают, пока приложение на экране; уже ведёт — второй раз
  * не начинают.
  *
  * Тренировку видит из состояния сессии, пока смотрят в её комнату или в обзор своей Обители,
@@ -173,11 +173,9 @@ class TrainingService : Service() {
     private fun awaitIdle(state: WillState) {
         idle?.cancel()
         if (underway != null || state.beginning == Reply.Pending) return
-        val t = training
-        val restEndNs = t?.let { TrainingCourse.rest(it, TrainingCourse.selected(it, null, state.choice)) }?.endNs
-        val sinceNs = restEndNs ?: t?.efforts?.maxOfOrNull { it.finishedAtNs } ?: nowNs()
+        val sinceNs = training?.let { TrainingCourse.idleSinceNs(it, state.choice) } ?: nowNs()
         idle = scope.launch {
-            delay((IDLE_MS - (nowNs() - sinceNs) / 1_000_000).coerceAtLeast(0))
+            delay((TrainingCourse.ABANDONED_AFTER_MS - (nowNs() - sinceNs) / 1_000_000).coerceAtLeast(0))
             session.stopWorkout()
         }
     }
@@ -262,7 +260,6 @@ class TrainingService : Service() {
         private const val NOTIFICATION = 1
         private const val ACTION_BEGIN = "com.will.app.BEGIN"
         private const val WAKE_MARGIN_MS = 10_000L
-        private const val IDLE_MS = 15 * 60_000L
 
         @Volatile
         private var running = false

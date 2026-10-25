@@ -68,9 +68,10 @@ import will.v1.turn
  * Рождают, стоя в своих Вратах, — рождённый станет чадом по плоти. Переносят Кельи, стоя в
  * своей Кормчей. Отец по духу отказаться не может. Приступить к подходу из уведомления,
  * стоя в другом месте, — значит сначала дойти до комнаты Уз; с первым подходом тренировку
- * ведёт [TrainingService], пока её не завершат или не забросят. Подход, идущий в своей
- * тренировке, ведут, где бы и когда к нему ни приступили: увидев его в своей комнате, — и
- * после перезапуска, и когда завершили другую тренировку.
+ * ведёт [TrainingService], пока её не завершат или не забросят. Свою тренировку, где идёт
+ * подход или отдых ([TrainingCourse.resting]), ведут, где бы и когда к ней ни приступили:
+ * увидев её в своей комнате или в обзоре своей Обители, — и после перезапуска, и когда
+ * завершили другую; идущий подход — прежде отдыха.
  *
  * Слова: новое слово идёт в собираемый вид или, живое, в тот, на который смотрят. Обзор
  * своей Обители меняется от Уз — его перечитывают, если он перед глазами. Своё
@@ -263,7 +264,7 @@ class WillSession(
         beat()
     }
 
-    fun stopWorkout() = _state.update { s -> s.copy(workout = underwayIn(s.view, except = s.workout?.behestId)) }
+    fun stopWorkout() = _state.update { s -> s.copy(workout = goingIn(s.view, except = s.workout?.behestId)) }
 
     fun endApproach(behestId: Long) {
         val sentAt = clock.phoneNowNs()
@@ -355,25 +356,36 @@ class WillSession(
         look(host, room)
     }
 
-    private fun leadUnderway() {
+    private fun leadGoing() {
         if (_state.value.workout != null) return
-        val workout = underwayIn(_state.value.view) ?: return
+        val workout = goingIn(_state.value.view) ?: return
         _state.update { it.copy(workout = workout) }
         phone.leadTraining()
         beat()
     }
 
-    private fun underwayIn(view: View?, except: Long? = null): Workout? {
-        // Обзор своей Обители знает подходы всех её тренировок, где я Послушник.
+    private fun goingIn(view: View?, except: Long? = null): Workout? {
+        val nowNs = clock.nowNs()
+        val choice = _state.value.choice
+        // Обзор своей Обители знает все её тренировки, где я Послушник, с подходами.
         if (view is View.Abode && view.host.isEmpty()) {
-            val owed = view.owed.firstOrNull { it.underway != null && it.word.id != except } ?: return null
-            return Workout("", owed.room, owed.word.id)
+            val owed = view.owed.filter { it.word.id != except }
+            val going = owed.firstOrNull { it.underway != null }
+                ?: owed.firstOrNull { TrainingCourse.resting(it.word, choice, nowNs) }
+                ?: return null
+            return Workout("", going.room, going.word.id)
         }
-        // Своя тренировка — заданная мне в своей Обители; в Ведении подходы чужие, их не ведут.
+        // Своя тренировка — заданная мне в своей Обители и не исполненная; в Ведении подходы
+        // чужие, их не ведут.
         val room = (view as? View.Room)?.takeIf { it.host.isEmpty() } ?: return null
-        val id = room.underways.keys.firstOrNull { id -> id != except && room.words.any { it.id == id && !it.mine } }
+        val mine = room.words.filter { w ->
+            w.id != except && !w.mine && w.kind == Word.Kind.BEHEST &&
+                room.words.none { it.kind == Word.Kind.DEED && it.behestId == w.id }
+        }
+        val going = mine.firstOrNull { room.underways.containsKey(it.id) }
+            ?: mine.firstOrNull { TrainingCourse.resting(it, choice, nowNs) }
             ?: return null
-        return Workout("", room.room, id)
+        return Workout("", room.room, going.id)
     }
 
     private fun beat() {
@@ -500,7 +512,7 @@ class WillSession(
                     val shown = begun.view as? View.Room ?: return@update begun
                     begun.copy(view = shown.copy(underways = shown.underways.told()))
                 }
-                leadUnderway()
+                leadGoing()
             }
             ServerEvent.EventCase.EXERTED -> {
                 val e = event.exerted.effort
@@ -534,7 +546,7 @@ class WillSession(
                 val shown = gathering
                 gathering = null
                 _state.update { it.copy(view = shown ?: it.view, loading = false) }
-                leadUnderway()
+                leadGoing()
             }
             ServerEvent.EventCase.RECEIPT_ACK -> {
                 if (event.receiptAck.hasWord()) {

@@ -1,7 +1,9 @@
 package com.will.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import will.v1.MessengerOuterClass.Word
 
@@ -216,5 +218,22 @@ class TrainingCourseTest {
         assertEquals(90, TrainingCourse.sameRest(ExerciseItem("Тяга", listOf(ApproachItem(50_000, 10, 0), ApproachItem(60_000, 8, 90), ApproachItem(60_000, 8, 90)))))
         assertEquals(null, TrainingCourse.sameRest(press))
         assertEquals(null, TrainingCourse.sameRest(ExerciseItem("Без отдыха", listOf(ApproachItem(0, 5, 0), ApproachItem(0, 5, 0)))))
+    }
+
+    @Test
+    fun `a training begun rests until its willed rest is over and a while after, then it is abandoned`() {
+        assertFalse(TrainingCourse.resting(training(), Choice(), 0))
+        val t = training(done(0, 0, at = 0))
+        val idle = TrainingCourse.ABANDONED_AFTER_MS / 1000
+        assertEquals(150 * NS, TrainingCourse.idleSinceNs(t, Choice()))
+        assertTrue(TrainingCourse.resting(t, Choice(), 40 * NS))
+        assertTrue(TrainingCourse.resting(t, Choice(), (150 + idle - 1) * NS))
+        assertFalse(TrainingCourse.resting(t, Choice(), (150 + idle) * NS))
+    }
+
+    @Test
+    fun `with nothing willed left, a training rests from the end of its last approach`() {
+        val t = training(done(0, 0, at = 0), done(0, 1, at = 100), done(1, 0, at = 200), done(1, 1, at = 300), done(2, 0, at = 400))
+        assertEquals(430 * NS, TrainingCourse.idleSinceNs(t, Choice()))
     }
 }

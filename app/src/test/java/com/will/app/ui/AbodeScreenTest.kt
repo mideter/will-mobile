@@ -25,6 +25,7 @@ import will.v1.MessengerOuterClass.Room
 import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.Word
+import will.v1.effort
 import will.v1.exercise
 import will.v1.historyEnd
 import will.v1.outstanding
@@ -140,6 +141,20 @@ class AbodeScreenTest {
         compose.onNodeWithText("ожидаю 1").assertIsDisplayed()
         compose.onNodeWithText("Тренер — boris").performClick()
         assertEquals("Послушание — boris", lastTurn().room)
+    }
+
+    @Test
+    fun `a training begun and resting is said under its room, as an approach underway is`() {
+        transport.tell(serverEvent { turned = turned { abodeOf = "" } })
+        transport.tell(serverEvent { rooms = rooms { rooms += ownRooms + taught("boris") } })
+        val finished = session.clock.nowNs() - 60_000_000_000L
+        val owedTraining = waiting(10L, "Понедельник", "Послушание — boris", training = true)
+        val rested = owedTraining.behest.toBuilder()
+            .addEfforts(effort { weightGrams = 40_000; repetitions = 5; begunAtNs = finished - 30_000_000_000L; finishedAtNs = finished })
+        transport.tell(serverEvent { outstanding = outstanding { owed += owedTraining.toBuilder().setBehest(rested).build() } })
+        transport.tell(serverEvent { historyEnd = historyEnd {} })
+        compose.onNodeWithText("выполнить 1").assertIsDisplayed()
+        compose.onNodeWithText("идёт отдых").assertIsDisplayed()
     }
 
     @Test
