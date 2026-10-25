@@ -200,6 +200,18 @@ class TrainingRunTest {
     }
 
     @Test
+    fun `a remark open with no keyboard up leaves the panel whole, for it is the keyboard that takes the room`() {
+        room(count = 2)
+        begin(0)
+        end(0)
+        compose.onNodeWithText("Готово").performClick()
+        serveTelling(0, last { it.hasFinishApproach() })
+        compose.onNodeWithText("заметка").performClick()
+        compose.onNodeWithText("Приступить").assertIsDisplayed()
+        compose.onNodeWithText("завершить тренировку").assertIsDisplayed()
+    }
+
+    @Test
     fun `all willed done, the panel says so once and offers to finish`() {
         room(count = 1)
         begin(0)

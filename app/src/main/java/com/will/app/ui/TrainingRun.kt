@@ -121,6 +121,8 @@ fun TrainingRun(
         }
     }
 
+    val keyboard = keyboardUp()
+
     // Часы сервера — метки подходов ставит он: раз в четверть секунды.
     var nowNs by remember { mutableLongStateOf(session.clock.nowNs()) }
     LaunchedEffect(Unit) {
@@ -236,8 +238,9 @@ fun TrainingRun(
             }
         }
 
-        // Пульт внизу: что сейчас, таймер и главное действие; после подхода — рассказ о нём.
-        Column(
+        // Пульт внизу: что сейчас, таймер и главное действие; после подхода — рассказ о нём. Пока
+        // поднята клавиатура, его нет — место отдано списку; кроме завершения: там поле в самом пульте.
+        if (!keyboard || closing) Column(
             // Пульт стоит прямо на белом: время держит низ само.
             Modifier
                 .fillMaxWidth()
@@ -298,6 +301,7 @@ fun TrainingRun(
 
     // Завершают на месте, в самом пульте; «назад» — передумать.
     BackHandler(enabled = closing) { closing = false }
+    BackHandler(enabled = remarkingOn != null) { remarkingOn = null }
 }
 
 @Composable

@@ -1,5 +1,6 @@
 package com.will.app.ui
 
+import android.view.ViewTreeObserver
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,10 +30,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 @Composable
 fun Header(
@@ -154,3 +159,19 @@ fun Modifier.hiddenBeneath(list: LazyListState): Modifier =
         // Недосмотренное, скрытое под низом экрана, отделяется от него чертой.
         if (list.canScrollForward) drawLine(WillColors.Outline, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
     }
+
+@Composable
+fun keyboardUp(): Boolean {
+    // Окно ужимается под клавиатуру само (adjustResize), и Compose о ней не знает: спросить
+    // систему при каждой перекладке — ужатие окна и есть перекладка.
+    val view = LocalView.current
+    var up by remember { mutableStateOf(false) }
+    DisposableEffect(view) {
+        val listener = ViewTreeObserver.OnGlobalLayoutListener {
+            up = ViewCompat.getRootWindowInsets(view)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        }
+        view.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        onDispose { view.viewTreeObserver.removeOnGlobalLayoutListener(listener) }
+    }
+    return up
+}
