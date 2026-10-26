@@ -195,7 +195,7 @@ fun TrainingRun(
                     val next = TrainingCourse.nextWilledIn(training, e)
                     val count = TrainingCourse.approachCount(training, e, doing)
                     for (a in 0 until count) {
-                        remarks[a]?.forEach { RemarkRow(it, start = 28.dp) }
+                        remarks[a]?.forEach { RemarkRow(it, start = RUN_INSET) }
                         val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                         val begun = effort?.begunAtNs ?: doing?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
                         val willedRest = TrainingCourse.restWilled(training, e, a)
@@ -233,7 +233,7 @@ fun TrainingRun(
                             TextButton(onClick = { session.choose(training.id, e, extra = e) }) { Text("+ подход сверх заданного") }
                         }
                     }
-                    remarks.filterKeys { it >= count }.values.flatten().forEach { RemarkRow(it, start = 28.dp) }
+                    remarks.filterKeys { it >= count }.values.flatten().forEach { RemarkRow(it, start = RUN_INSET) }
                 }
             }
         }
@@ -344,7 +344,7 @@ internal fun restTaken(seconds: Long): String = "отдых ${spanText(seconds)}
 @Composable
 private fun RestRow(text: String, colour: Color) {
     // Своей строкой над подходом: отдых перед подходом, а не после.
-    Text(text, fontSize = 12.sp, color = colour, modifier = Modifier.padding(start = 48.dp, top = 4.dp))
+    Text(text, fontSize = 12.sp, color = colour, modifier = Modifier.padding(start = RUN_INSET, top = 4.dp))
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -540,32 +540,23 @@ private const val MAX_REMARK_BYTES = 4096
 
 @Composable
 fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) {
-    val first = if (training.efforts.isEmpty() && underway == null) {
-        TrainingCourse.nextApproach(training, TrainingCourse.focus(training, null, null))
-    } else {
-        null
-    }
     Column(Modifier.padding(top = 4.dp)) {
         // До завершения у тренировки нет конца, сколько бы подходов ни было закончено.
         TrainingCourse.span(training, underway)?.let { span ->
             Text(trainingSpanText(if (finished) span else span.copy(endNs = null), null), fontSize = 12.sp, color = WillColors.Muted)
         }
         training.exercises.forEachIndexed { e, exercise ->
-            val same = TrainingCourse.sameRest(exercise)
-            ExerciseName(exercise.name, same)
+            ExerciseName(exercise.name)
             InstructionLine(exercise.instruction)
             val remarks = TrainingCourse.remarksByApproachesDone(training, e)
             val count = TrainingCourse.approachCount(training, e, underway)
             for (a in 0 until count) {
-                remarks[a]?.forEach { RemarkRow(it, start = 12.dp) }
+                remarks[a]?.forEach { RemarkRow(it, start = FEED_INSET) }
                 val asked = exercise.approaches.getOrNull(a)
                 val effort = training.efforts.firstOrNull { it.exercise == e && it.approach == a }
                 val begun = effort?.begunAtNs ?: underway?.takeIf { it.exercise == e && it.approach == a }?.begunAtNs
-                val willedRest = TrainingCourse.restWilled(training, e, a)
-                when {
-                    begun != null -> TrainingCourse.restTakenBefore(training.efforts, begun)?.let { FeedRestLine(restTaken(it)) }
-                    same == null && asked != null && willedRest > 0 && !finished && first != e to a -> FeedRestLine("отдых ${restText(willedRest)}")
-                }
+                // Заданный отдых Тренер знает сам: в ленте — только отдохнутый, его и сравнивают.
+                if (begun != null) TrainingCourse.restTakenBefore(training.efforts, begun)?.let { FeedRestLine(restTaken(it)) }
                 val (line, colour) = when {
                     effort != null -> {
                         val did = "${effort.repetitions}"
@@ -589,12 +580,15 @@ fun EffortsView(training: WordItem, underway: UnderwayItem?, finished: Boolean) 
                 }
                 Text(withStrain("${a + 1}. $line", colour, effort?.strain ?: 0), fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp))
             }
-            remarks.filterKeys { it >= count }.values.flatten().forEach { RemarkRow(it, start = 12.dp) }
+            remarks.filterKeys { it >= count }.values.flatten().forEach { RemarkRow(it, start = FEED_INSET) }
         }
     }
 }
 
 @Composable
 private fun FeedRestLine(text: String) {
-    Text(text, fontSize = 12.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 28.dp))
+    Text(text, fontSize = 12.sp, color = WillColors.Muted, modifier = Modifier.padding(start = FEED_INSET))
 }
+
+private val FEED_INSET = 28.dp
+private val RUN_INSET = 48.dp

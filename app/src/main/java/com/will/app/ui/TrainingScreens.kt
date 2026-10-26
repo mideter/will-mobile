@@ -82,7 +82,7 @@ internal fun InstructionLine(instruction: String) {
 
 @Composable
 internal fun RemarkRow(remark: RemarkItem, start: androidx.compose.ui.unit.Dp) {
-    Text(remark.body, fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(start = start, top = 2.dp, bottom = 2.dp))
+    Text("«${remark.body}»", fontSize = 13.sp, color = WillColors.Muted, modifier = Modifier.padding(start = start, top = 2.dp, bottom = 2.dp))
 }
 
 fun trainingSpanText(span: TrainingCourse.Span, nowNs: Long?): String {
@@ -103,16 +103,11 @@ fun clockText(serverNs: Long): String =
 fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = null) {
     Column(Modifier.padding(top = 4.dp)) {
         exercises.forEachIndexed { e, exercise ->
-            val same = TrainingCourse.sameRest(exercise)
-            ExerciseName(exercise.name, same)
+            ExerciseName(exercise.name)
             InstructionLine(exercise.instruction)
             exercise.approaches.forEachIndexed { a, approach ->
                 val asked = willed?.getOrNull(e)?.approaches?.getOrNull(a)
                 val differs = willed != null && asked != approach
-                // Отдых — своей строкой над подходом, к которому он ведёт, когда он не один на всё упражнение.
-                if (same == null && approach.restSeconds != 0) {
-                    Text("отдых ${restText(approach.restSeconds)}", fontSize = 12.sp, color = WillColors.Muted, modifier = Modifier.padding(start = 28.dp))
-                }
                 Text(
                     "${a + 1}. ${weightText(approach.weightGrams)} × ${approach.repetitions}" +
                         if (differs && asked != null) "   (задано ${weightText(asked.weightGrams)} × ${asked.repetitions})" else "",
@@ -126,11 +121,8 @@ fun ExercisesView(exercises: List<ExerciseItem>, willed: List<ExerciseItem>? = n
 }
 
 @Composable
-fun ExerciseName(name: String, sameRest: Int?) {
-    Row {
-        Text(name, fontSize = 14.sp)
-        if (sameRest != null) Text(" · отдых ${restText(sameRest)}", fontSize = 14.sp, color = WillColors.Muted)
-    }
+fun ExerciseName(name: String) {
+    Text(name, fontSize = 14.sp)
 }
 
 @Composable

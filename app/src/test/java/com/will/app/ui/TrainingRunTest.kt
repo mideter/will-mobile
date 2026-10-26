@@ -196,7 +196,7 @@ class TrainingRunTest {
         transport.tell(serverEvent { remarked = remarked { behestId = id; remark = remark { body = "Колено"; saidAtNs = begunNs } } })
         transport.tell(serverEvent { reply = reply { requestId = said.requestId; granted = true } })
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
-        compose.onNodeWithText("Колено").assertIsDisplayed()
+        compose.onNodeWithText("«Колено»").assertIsDisplayed()
     }
 
     @Test
