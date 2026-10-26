@@ -112,7 +112,7 @@ class TrainingEditorTest {
         val press = train.exercisesList.single()
         assertEquals("Жим", press.name)
         assertEquals("Лопатки сведены", press.instruction)
-        assertEquals(listOf(10_000 to 9, 10_000 to 9), press.approachesList.map { it.weightGrams to it.repetitions })
+        assertEquals(listOf(4_000 to 9, 4_000 to 9), press.approachesList.map { it.weightGrams to it.repetitions })
         compose.onNodeWithText("Отправляется…").assertIsDisplayed()
         ask().assertIsNotEnabled()
 

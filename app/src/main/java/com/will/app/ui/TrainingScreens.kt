@@ -166,7 +166,7 @@ private fun ComparedApproach(number: Int, asked: ApproachItem?, did: ApproachIte
 
 
 private const val MAX_INSTRUCTION_BYTES = 1000
-private const val WEIGHT_STEP = 2_500
+private const val WEIGHT_STEP = 1_000
 private const val MAX_GRAMS = 1_000_000
 private const val MAX_REPETITIONS = 10_000
 private const val DEFAULT_REST = 90
