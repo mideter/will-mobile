@@ -477,7 +477,8 @@ private fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit, exact
             .background(WillColors.Background),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepButton("−", onMinus)
+        // Шаг — от принятого числа, и поле закрывается, чтобы не показывать набранное поверх.
+        StepButton("−") { typing = false; onMinus() }
         if (typing) {
             ExactField(exact) { typing = false }
         } else {
@@ -490,36 +491,36 @@ private fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit, exact
                 modifier = Modifier.weight(1f).clickable { typing = true }.padding(vertical = 10.dp),
             )
         }
-        StepButton("+", onPlus)
+        StepButton("+") { typing = false; onPlus() }
     }
 }
 
 @Composable
 private fun RowScope.ExactField(exact: ExactInput, onDone: () -> Unit) {
-    // Число само становится полем: прежнее выделено — его сразу перебивают; неверное не
-    // принимается, и остаётся прежнее.
+    // Число само становится полем: прежнее выделено — его сразу перебивают. Верное принимается
+    // с каждым знаком, а не по уходу из поля: касание кнопки фокус не забирает, и набранное
+    // пропало бы. Неверное не принимается, и остаётся прежнее.
     var value by remember { mutableStateOf(TextFieldValue(exact.initial, selection = TextRange(0, exact.initial.length))) }
     val focus = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    val done = {
-        exact.accept(value.text)
-        onDone()
-    }
     BasicTextField(
         value = value,
-        onValueChange = { value = it },
+        onValueChange = {
+            value = it
+            exact.accept(it.text)
+        },
         textStyle = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium, color = WillColors.Ink, textAlign = TextAlign.Center),
         cursorBrush = SolidColor(WillColors.Accent),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = exact.keyboard, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { done() }),
+        keyboardActions = KeyboardActions(onDone = { onDone() }),
         modifier = Modifier
             .weight(1f)
             .padding(vertical = 10.dp)
             .focusRequester(focus)
             .onFocusChanged {
-                if (focused && !it.isFocused) done()
+                if (focused && !it.isFocused) onDone()
                 focused = it.isFocused
             },
         decorationBox = { inner ->

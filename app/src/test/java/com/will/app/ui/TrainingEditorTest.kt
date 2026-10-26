@@ -164,4 +164,26 @@ class TrainingEditorTest {
         ask().performClick()
         assertEquals(12, trained().train.exercisesList.single().approachesList.single().repetitions)
     }
+
+    @Test
+    fun `a number typed is taken though the field is not left before the training is set`() {
+        field(0).performTextInput("Среда")
+        field(1).performTextInput("Жим")
+        compose.onAllNodesWithText("10")[0].performClick()
+        compose.onAllNodes(hasSetTextAction()).onLast().performTextReplacement("12")
+        ask().performClick()
+        assertEquals(12, trained().train.exercisesList.single().approachesList.single().repetitions)
+    }
+
+    @Test
+    fun `a step while typing goes from the number typed`() {
+        field(0).performTextInput("Среда")
+        field(1).performTextInput("Жим")
+        compose.onAllNodesWithText("10")[0].performClick()
+        compose.onAllNodes(hasSetTextAction()).onLast().performTextReplacement("12")
+        compose.onAllNodesWithText("+")[2].performClick()
+        compose.onNodeWithText("13").assertIsDisplayed()
+        ask().performClick()
+        assertEquals(13, trained().train.exercisesList.single().approachesList.single().repetitions)
+    }
 }
