@@ -10,13 +10,12 @@ enum class Connection { Connecting, Ready, Reconnecting }
  */
 enum class Reply { None, Pending, Granted }
 
-/** Комната в списке Обители: в какой она части и что отражает — переносят только Кельи ([Aspect.Words]). */
 /**
- * Комната Обители: [name] — её имя у сервера, по нему в неё входят; [testator] — Тренер, если это
- * Узы, где хозяин — ученик. Человеку она — [said]: такая комната зовётся по Тренеру, без
- * «Послушания».
+ * Комната Обители: [name] — её имя у сервера, по нему в неё входят; [outer] — она во внешнем;
+ * [testator] — Тренер, если это Узы, где хозяин — ученик. Человеку она — [said]: такая комната
+ * зовётся по Тренеру, без «Послушания».
  */
-data class RoomItem(val name: String, val outer: Boolean, val aspect: Aspect = Aspect.Words, val testator: String = "") {
+data class RoomItem(val name: String, val outer: Boolean, val testator: String = "") {
     val said: String get() = roomSaid(name, testator)
 }
 
@@ -94,7 +93,7 @@ sealed interface View {
     /**
      * Обитель. [owed] — что мне выполнить, задания, где я Послушник; [unreviewed] — что выполнено
      * у меня как у Тренера, а я ещё не видел; [awaited] — чего я ожидаю от других; [waiting] —
-     * сколько стоит у моих Врат, ждёт, чтобы впустили: их имён я не знаю.
+     * сколько стучит в мои Врата, ждёт, чтобы впустили: их имён я не знаю.
      */
     data class Abode(
         override val host: String,
@@ -106,11 +105,11 @@ sealed interface View {
     ) : View
 
     /**
-     * Комната. [aspect] — что она отражает: слова (Слово, Узы), порог (Врата) или
-     * обитателей (Кормчая). [writable] — здесь пишут: своё Слово; Ведение — у Тренера.
-     * Во Вратах — [gatesOpen], [keeping] (я их хозяин) и, хозяину, [waiting] и метки
-     * нерождённых [unborn]; в Кормчей — [people] и все комнаты Обители с их частями [rooms]:
-     * здесь переносят Кельи. В комнате Уз [underways] — начатые подходы её тренировок, по
+     * Где стою в Обители. [aspect] — что здесь: слова (Слово, Узы) или край — Врата и Кормчая,
+     * их сервер зовёт не комнатами, а внешним и внутренним краем. [writable] — здесь пишут:
+     * своё Слово; Ведение — у Тренера. Во Вратах — [gatesOpen], [keeping] (я их хозяин),
+     * [knocking] (я стучу) и, хозяину, [waiting] — кто стучит, и метки нерождённых [unborn]; в
+     * Кормчей — [people] и все комнаты Обители, внешние и внутренние, [rooms]: здесь их переносят. В комнате Уз [underways] — начатые подходы её тренировок, по
      * номеру тренировки: в каждой не больше одного; [testator] — Тренер, если я здесь ученик, и
      * тогда комната зовётся по нему ([said]).
      */
@@ -122,6 +121,7 @@ sealed interface View {
         val words: List<WordItem> = emptyList(),
         val gatesOpen: Boolean = false,
         val keeping: Boolean = false,
+        val knocking: Boolean = false,
         val waiting: List<String> = emptyList(),
         val people: List<Person> = emptyList(),
         val unborn: List<Long> = emptyList(),

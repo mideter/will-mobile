@@ -1,6 +1,7 @@
 package com.will.app
 
 import will.v1.MessengerOuterClass.ClientEvent
+import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.ServerEvent
 import will.v1.authOk
 import will.v1.historyEnd
@@ -111,7 +112,17 @@ class FakeTransport : Transport {
     fun refuse(event: ClientEvent) = tell(serverEvent { reply = reply { requestId = event.requestId; granted = false } })
 
     fun show(host: String, room: String) {
-        tell(serverEvent { turned = turned { abodeOf = host; this.room = room } })
+        // Врата и Кормчую сервер называет краями, а не комнатами.
+        tell(serverEvent {
+            turned = turned {
+                abodeOf = host
+                when (room) {
+                    "Врата" -> edge = RoomPart.OUTER
+                    "Кормчая" -> edge = RoomPart.INNER
+                    else -> this.room = room
+                }
+            }
+        })
         tell(serverEvent { historyEnd = historyEnd {} })
     }
 

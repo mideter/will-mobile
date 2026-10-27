@@ -36,7 +36,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.will.app.Aspect
 import com.will.app.Kind
 import com.will.app.Person
 import com.will.app.Standing
@@ -45,18 +44,19 @@ import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Врата — порог Обители и ядро её внешней части: через них выходят и входят, через них и
- * рождаются. В своих хозяин держит их открытыми: видит, кто ждёт, и впускает знакомым; видит
- * нерождённых и рождает их своими чадами; отсюда же уходит — в Обители, где обитает, или к
- * чужим Вратам по имени. У чужих Врат обитатель входит внутрь, а пришедший ждёт, пока впустят, и
- * видит, у Врат ли хозяин. Всё — группами, как в обзоре; пустое не показывается.
+ * Врата — порог Обители, самое внешнее её: через них выходят и входят, через них и рождаются.
+ * В своих хозяин держит их открытыми: видит, кто стучит, и впускает знакомым; видит
+ * нерождённых и рождает их своими чадами; отсюда же уходит к другим по имени — к тем, кто
+ * знает его, сразу внутрь, к прочим — к их Вратам. У чужих Врат знакомый входит внутрь, а
+ * пришедший — ему это просто место по имени хозяина — может постучать, раз, пока стоит здесь.
+ * Всё — группами, как в обзоре; пустое не показывается.
  */
 @Composable
 fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
     val own = view.host.isEmpty()
     Column(Modifier.fillMaxSize()) {
         Header(
-            title = if (own) "Врата" else "Врата — ${view.host}",
+            title = if (own) "Врата" else view.host,
             // Из своих Врат назад — домой, из чужих — к своим Вратам: подпись говорит, куда.
             subtitle = if (own) state.ownName else "Врата — ${state.ownName}",
             onBack = { session.back() },
@@ -74,11 +74,11 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
     val listState = rememberLazyListState()
     LazyColumn(Modifier.fillMaxSize().goneUnder(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
         if (view.waiting.isNotEmpty()) {
-            item { SectionTitle("У Врат") }
-            // Кто стоит у Врат, тот ждёт ответа — как Просьба, красным.
+            item { SectionTitle("Стучат") }
+            // Кто стучит, тот ждёт ответа — как Просьба, красным.
             item {
                 Group(view.waiting, WillColors.SupplicationRow) { name ->
-                    Acting(name, "Впустить", { Text("Ждёт, чтобы впустили", fontSize = 13.sp, color = WillColors.Supplication) }) {
+                    Acting(name, "Впустить", { Text("Стучит", fontSize = 13.sp, color = WillColors.Supplication) }) {
                         session.admit(name)
                     }
                 }
@@ -92,7 +92,7 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
             item { Hint("Кому вы дадите имя, у того вы всегда будете хотя бы ближним.") }
         }
 
-        // Из своего выходят только через свои Врата.
+        // К другим ходят только из своих Врат.
         item { SectionTitle("Посетить") }
         item {
             Group(state.dwellings + null) { dwelling ->
@@ -102,12 +102,12 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
                     } else {
                         ByName { host ->
                             going = false
-                            session.gates(host)
+                            session.visit(host)
                         }
                     }
                 } else {
                     val known = listOfNotNull("знает вас", WillSession.kindSaid(dwelling.kind)).joinToString(" · ")
-                    Line(dwelling.name, { Text(known, fontSize = 13.sp, color = WillColors.Muted) }) { session.gates(dwelling.name) }
+                    Line(dwelling.name, { Text(known, fontSize = 13.sp, color = WillColors.Muted) }) { session.visit(dwelling.name) }
                 }
             }
         }
@@ -132,16 +132,16 @@ private fun Acting(title: String, action: String, below: (@Composable () -> Unit
 
 @Composable
 private fun OthersGates(state: WillState, view: View.Room, session: WillSession) {
-    // Кого здесь знают, тот входит сам — хозяин ему не нужен; кого не знают, тому весть одна:
-    // видит ли его хозяин.
+    // Кого здесь знают, тот входит сам — хозяин ему не нужен; кого не знают, тот стучит — раз:
+    // стук слышен, пока он стоит здесь.
     val known = state.dwellings.any { it.name == view.host }
     Column(Modifier.padding(top = 12.dp)) {
         Group(listOf(known)) {
-            if (known) {
-                Line("Войти") { session.visit(view.host) }
-            } else {
-                Text(
-                    if (view.gatesOpen) "Хозяин видит вас: ждите, пока впустит." else "Подойдя к Вратам, хозяин увидит вас.",
+            when {
+                known -> Line("Войти") { session.visit(view.host) }
+                !view.knocking -> Line("Стук") { session.knock() }
+                else -> Text(
+                    if (view.gatesOpen) "Хозяин слышит ваш стук." else "Вы постучали.",
                     fontSize = 16.sp,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 )
@@ -179,8 +179,9 @@ private fun ByName(onGo: (String) -> Unit) {
 }
 
 /**
- * Кормчая — ядро внутренней части, только хозяина: Просьбы к нему, обитатели и их статусы,
- * Кельи и их части. Здесь он отвечает на Просьбы, просит сам, меняет статусы и переносит Кельи.
+ * Кормчая — самое внутреннее Обители, только хозяина: Просьбы к нему, обитатели и их статусы,
+ * комнаты, внутренние и внешние. Здесь он отвечает на Просьбы, просит сам, меняет статусы и
+ * переносит комнаты внутрь и наружу.
  */
 @Composable
 fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
@@ -226,10 +227,9 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
                 }
             }
 
-            item { Hint("Во внутреннюю часть входят друзья, во внешнюю — и ближние.") }
-            for ((title, outer) in listOf("Внутренняя часть" to false, "Внешняя часть" to true)) {
-                // Ядро части — Врата или Кормчая — впереди её Келий, и его не переносят.
-                val rooms = view.rooms.filter { it.outer == outer }.sortedBy { it.aspect == Aspect.Words }
+            item { Hint("Внутреннее видят друзья, внешнее — и ближние.") }
+            for ((title, outer) in listOf("Внутреннее" to false, "Внешнее" to true)) {
+                val rooms = view.rooms.filter { it.outer == outer }
                 if (rooms.isEmpty()) continue
                 item { SectionTitle(title) }
                 item {
@@ -239,10 +239,8 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(room.said, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                            if (room.aspect == Aspect.Words) {
-                                TextButton(onClick = { session.arrange(room.name, outer = !outer) }) {
-                                    Text(if (outer) "во внутреннюю" else "во внешнюю", color = WillColors.Muted)
-                                }
+                            TextButton(onClick = { session.arrange(room.name, outer = !outer) }) {
+                                Text(if (outer) "внутрь" else "наружу", color = WillColors.Muted)
                             }
                         }
                     }

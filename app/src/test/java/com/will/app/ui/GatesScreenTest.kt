@@ -17,14 +17,16 @@ import com.will.app.FakeTransport
 import com.will.app.View
 import com.will.app.session
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.DwellerKind
-import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.dwelling
 import will.v1.dwellings
 import will.v1.historyEnd
@@ -55,7 +57,7 @@ class GatesScreenTest {
     }
 
     private fun gates(host: String, open: Boolean, waiting: List<String> = emptyList(), unbornMarks: List<Long> = emptyList()) {
-        transport.tell(serverEvent { turned = turned { abodeOf = host; room = "Врата"; aspect = RoomAspect.THRESHOLD } })
+        transport.tell(serverEvent { turned = turned { abodeOf = host; edge = RoomPart.OUTER } })
         transport.tell(serverEvent { threshold = threshold { this.open = open; keeping = host.isEmpty(); this.waiting += waiting } })
         if (host.isEmpty()) transport.tell(serverEvent { unborn = unborn { marks += unbornMarks } })
         transport.tell(serverEvent { historyEnd = historyEnd {} })
@@ -67,9 +69,10 @@ class GatesScreenTest {
     private fun lastTurn() = transport.sent.last { it.hasTurn() }.turn
 
     @Test
-    fun `at one's own gates one lets in who waits and bears the unborn`() {
+    fun `at one's own gates one lets in who knocks and bears the unborn`() {
         gates("", open = true, waiting = listOf("boris"), unbornMarks = listOf(4))
         compose.onNodeWithText("‹ anna").assertIsDisplayed()
+        compose.onNodeWithText("Стучит").assertIsDisplayed()
         compose.onNodeWithText("Впустить").performClick()
         assertEquals("boris", transport.sent.last { it.hasAdmit() }.admit.name)
         compose.onNodeWithText("#4").assertIsDisplayed()
@@ -78,21 +81,22 @@ class GatesScreenTest {
     }
 
     @Test
-    fun `no one waiting and no one awaiting birth, their sections are not shown, and one may still visit by name`() {
+    fun `no one knocking and no one awaiting birth, their sections are not shown, and one may still visit by name`() {
         gates("", open = true)
-        compose.onAllNodesWithText("У Врат").assertCountEquals(0)
+        compose.onAllNodesWithText("Стучат").assertCountEquals(0)
         compose.onAllNodesWithText("Дать имя").assertCountEquals(0)
         compose.onNodeWithText("по имени…").assertIsDisplayed()
     }
 
     @Test
-    fun `from one's own gates one goes out to the abodes one dwells in`() {
+    fun `from one's own gates one visits those who know one, by name`() {
         gates("", open = true)
         dwellingIn("viktor")
         compose.onNodeWithText("знает вас · ближний").assertIsDisplayed()
         compose.onNodeWithText("viktor").performClick()
         assertEquals("viktor", lastTurn().abodeOf)
-        assertEquals("Врата", lastTurn().room)
+        assertFalse(lastTurn().hasEdge())
+        assertEquals("", lastTurn().room)
     }
 
     @Test
@@ -103,28 +107,33 @@ class GatesScreenTest {
         compose.onNodeWithText("Имя").performTextInput(" boris ")
         compose.onNode(hasText("Посетить") and hasClickAction()).performClick()
         assertEquals("boris", lastTurn().abodeOf)
-        assertEquals("Врата", lastTurn().room)
+        assertFalse(lastTurn().hasEdge())
+        assertEquals("", lastTurn().room)
     }
 
     @Test
     fun `at another's gates a dweller goes in`() {
         dwellingIn("viktor")
         gates("viktor", open = false)
-        compose.onNodeWithText("Врата — viktor").assertIsDisplayed()
+        compose.onNodeWithText("viktor").assertIsDisplayed()
         compose.onNodeWithText("‹ Врата — anna").assertIsDisplayed()
-        compose.onAllNodesWithText("Хозяина нет у Врат").assertCountEquals(0)
+        compose.onAllNodesWithText("Стук").assertCountEquals(0)
         compose.onNodeWithText("Войти").performClick()
         assertEquals("viktor", lastTurn().abodeOf)
         assertEquals("", lastTurn().room)
     }
 
     @Test
-    fun `one who has come waits, sees the host come to the gates, and once let in goes in`() {
+    fun `one who has come knocks once, hears that the host hears, and once let in goes in`() {
         gates("viktor", open = false)
-        compose.onNodeWithText("Подойдя к Вратам, хозяин увидит вас.").assertIsDisplayed()
         compose.onAllNodesWithText("Войти").assertCountEquals(0)
-        transport.tell(serverEvent { threshold = threshold { open = true } })
-        compose.onNodeWithText("Хозяин видит вас: ждите, пока впустит.").assertIsDisplayed()
+        compose.onNodeWithText("Стук").performClick()
+        assertTrue(transport.sent.last().hasKnock())
+        transport.tell(serverEvent { threshold = threshold { knocking = true } })
+        compose.onAllNodesWithText("Стук").assertCountEquals(0)
+        compose.onNodeWithText("Вы постучали.").assertIsDisplayed()
+        transport.tell(serverEvent { threshold = threshold { open = true; knocking = true } })
+        compose.onNodeWithText("Хозяин слышит ваш стук.").assertIsDisplayed()
         dwellingIn("viktor")
         compose.onNodeWithText("Войти").assertIsDisplayed()
     }

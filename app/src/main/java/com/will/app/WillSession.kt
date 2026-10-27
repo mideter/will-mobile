@@ -10,7 +10,6 @@ import will.v1.MessengerOuterClass.ClientEvent
 import will.v1.MessengerOuterClass.OutstandingBehest
 import will.v1.MessengerOuterClass.Underway
 import will.v1.MessengerOuterClass.DwellerKind
-import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.ServerEvent
 import will.v1.MessengerOuterClass.Word
@@ -27,6 +26,7 @@ import will.v1.exercise
 import will.v1.finishApproach
 import will.v1.fulfil
 import will.v1.heartbeat
+import will.v1.knock
 import will.v1.historyRequest
 import will.v1.listDwellers
 import will.v1.listDwellings
@@ -200,11 +200,15 @@ class WillSession(
         if (leads(notice)) look("", room)
     }
 
-    fun visit(host: String) = look(host, "")
+    fun visit(host: String) = look(host.trim(), "")
 
     fun enter(room: String) = look(_state.value.view?.host.orEmpty(), room)
 
     fun gates(host: String) = look(host.trim(), GATES)
+
+    fun helm() = look("", HELM)
+
+    fun knock() = send(clientEvent { knock = knock {} })
 
     fun bear(mark: Long) = send(clientEvent { bear = bear { this.mark = mark } })
 
@@ -217,7 +221,11 @@ class WillSession(
             own -> home()
             atGates -> gates("")
             view is View.Room -> look(view.host, "")
-            else -> gates(view.host)
+            else -> {
+                // Из чужой Обители — через её Врата к своим: у чужих Врат знакомому стоять незачем.
+                gates(view.host)
+                gates("")
+            }
         }
         return true
     }
@@ -350,10 +358,11 @@ class WillSession(
     fun listSupplications() = send(clientEvent { listSupplications = listSupplications {} })
 
     private fun walk(host: String, room: String) {
+        // К другому — только из своих Врат: из чужого через его Врата к своим.
         val view = _state.value.view
         if (view != null && view.host != host) {
             if (!(view is View.Room && view.aspect == Aspect.Threshold)) look(view.host, GATES)
-            if (room != GATES) look(host, GATES)
+            if (view.host.isNotEmpty()) look("", GATES)
         }
         look(host, room)
     }
@@ -401,7 +410,19 @@ class WillSession(
 
     private fun look(host: String, room: String) {
         target = host to room
-        send(clientEvent { turn = turn { abodeOf = host; this.room = room } })
+        send(turnTo(host, room))
+    }
+
+    private fun turnTo(host: String, room: String): ClientEvent = clientEvent {
+        // Врата и Кормчая — не комнаты, а края Обители: сервер зовёт их внешним и внутренним.
+        turn = turn {
+            abodeOf = host
+            when (room) {
+                GATES -> edge = RoomPart.OUTER
+                HELM -> edge = RoomPart.INNER
+                else -> this.room = room
+            }
+        }
     }
 
     private fun send(event: ClientEvent): Boolean = transport.send(event)
@@ -442,7 +463,7 @@ class WillSession(
                 // сразу, мимо обзора Обители: на миг показанный, он закрыл бы открытое в комнате.
                 val (host, room) = target
                 if (host.isEmpty() && room.isNotEmpty()) {
-                    returningRequest = ask(clientEvent { turn = turn { abodeOf = host; this.room = room } })
+                    returningRequest = ask(turnTo(host, room))
                 } else {
                     target = "" to ""
                     gathering = View.Abode("")
@@ -455,15 +476,16 @@ class WillSession(
             ServerEvent.EventCase.AUTH_REQUIRED -> tell("Вход отклонён")
             ServerEvent.EventCase.TURNED -> {
                 val turned = event.turned
-                gathering = if (turned.room.isEmpty()) {
-                    View.Abode(turned.abodeOf)
-                } else {
-                    View.Room(turned.abodeOf, turned.room, turned.aspect.toAspect(), turned.writable, testator = turned.testator)
+                gathering = when {
+                    turned.hasEdge() && turned.edge == RoomPart.OUTER -> View.Room(turned.abodeOf, GATES, Aspect.Threshold)
+                    turned.hasEdge() -> View.Room(turned.abodeOf, HELM, Aspect.Dwellers)
+                    turned.room.isEmpty() -> View.Abode(turned.abodeOf)
+                    else -> View.Room(turned.abodeOf, turned.room, Aspect.Words, turned.writable, testator = turned.testator)
                 }
                 _state.update { it.copy(loading = true) }
             }
             ServerEvent.EventCase.ROOMS -> {
-                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.aspect.toAspect(), it.testator) }
+                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.testator) }
                 when (val gathered = gathering) {
                     is View.Abode -> gathering = gathered.copy(rooms = rooms)
                     is View.Room -> gathering = gathered.copy(rooms = rooms)
@@ -636,13 +658,14 @@ class WillSession(
                 val open = event.threshold.open
                 val keeping = event.threshold.keeping
                 val waiting = event.threshold.waitingList
+                val knocking = event.threshold.knocking
                 val gatheringGates = (gathering as? View.Room)?.takeIf { it.aspect == Aspect.Threshold }
                 if (gatheringGates != null) {
-                    gathering = gatheringGates.copy(gatesOpen = open, keeping = keeping, waiting = waiting)
+                    gathering = gatheringGates.copy(gatesOpen = open, keeping = keeping, waiting = waiting, knocking = knocking)
                 } else {
                     _state.update { s ->
                         val shown = (s.view as? View.Room)?.takeIf { it.aspect == Aspect.Threshold } ?: return@update s
-                        s.copy(view = shown.copy(gatesOpen = open, keeping = keeping, waiting = waiting))
+                        s.copy(view = shown.copy(gatesOpen = open, keeping = keeping, waiting = waiting, knocking = knocking))
                     }
                 }
             }
@@ -750,12 +773,6 @@ class WillSession(
             Kind.Acquaintance -> null
             Kind.Neighbour -> "ближний"
             Kind.Friend -> "друг"
-        }
-
-        private fun RoomAspect.toAspect(): Aspect = when (this) {
-            RoomAspect.THRESHOLD -> Aspect.Threshold
-            RoomAspect.DWELLERS -> Aspect.Dwellers
-            else -> Aspect.Words
         }
 
         private fun DwellerKind.toKind(): Kind = when (this) {

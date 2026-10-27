@@ -15,16 +15,18 @@ object Notices {
         return when (code) {
             // Чего не позволяет мир.
             NoticeCode.NOTICE_ALREADY_DWELLS -> "Вы уже знаете этого человека"
-            NoticeCode.NOTICE_NOT_AT_GATES -> "Уже не у Врат"
+            NoticeCode.NOTICE_DOES_NOT_KNOCK -> "Он уже не стучит"
+            // Кнопка стука уходит, как только постучал: повтор скажет экран.
+            NoticeCode.NOTICE_ALREADY_KNOCKS -> null
             // Номер берут из списка, и список сразу говорит, что его уже нет: экран показывает сам.
             NoticeCode.NOTICE_NO_SUCH_UNBORN -> null
             NoticeCode.NOTICE_DOES_NOT_DWELL -> "Вы не знаете этого человека"
             NoticeCode.NOTICE_DOES_NOT_ENTER_ROOM -> "Вам не открыта эта комната"
-            NoticeCode.NOTICE_STAND_IN_CELL -> "Это делают в Слове, Ведении или Послушании"
+            NoticeCode.NOTICE_STAND_IN_ROOM -> "Это делают в Слове, Ведении или Послушании"
             NoticeCode.NOTICE_STAND_AT_HELM -> "Это делают в Кормчей"
             NoticeCode.NOTICE_STAND_AT_GATES -> "Это делают, стоя во Вратах"
             NoticeCode.NOTICE_ONLY_HOST_ACTS -> "Здесь действует только хозяин"
-            NoticeCode.NOTICE_PASS_THROUGH_GATES -> "Туда идут через Врата"
+            NoticeCode.NOTICE_PASS_THROUGH_GATES -> "Туда идут из своих Врат"
             NoticeCode.NOTICE_TELL_WHAT_WAS_DONE -> "Сначала скажите, что сделано в подходе"
             NoticeCode.NOTICE_FATHER_BY_FLESH_NEIGHBOUR -> "Отец по плоти — всегда не ниже ближнего"
             NoticeCode.NOTICE_FATHER_BY_SPIRIT_FRIEND -> "Отец по духу — всегда друг"

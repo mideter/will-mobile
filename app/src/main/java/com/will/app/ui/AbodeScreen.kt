@@ -5,13 +5,17 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -23,20 +27,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.will.app.Aspect
 import com.will.app.RoomItem
 import com.will.app.View
 import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Обитель: её комнаты по частям — во внешней Врата, через них выходят; во внутренней Кормчая
- * и Кельи. Своя: под каждой комнатой сказано, что в ней ждёт, — дело живёт там, где его
- * выполняют: во Вратах — стук, без имён: они мне ещё никто; в
- * Кормчей — Просьбы; в комнате Уз — что выполнить, что проверить, чего я ожидаю, и идущий
- * подход или отдых. Чужая: только комнаты, открытые моему роду; назад — к её Вратам.
+ * Обитель: её комнаты, внутренние и внешние. Своя: «Внутреннее» ведёт в Кормчую, к самому
+ * внутреннему, «Внешнее» — к Вратам, к самому внешнему; у них сказано, что ждёт там: у
+ * Внешнего — стук, без имён: стучащие мне ещё никто; у Внутреннего — Просьбы. Под каждой
+ * комнатой — что в ней ждёт: дело живёт там, где его выполняют, — что выполнить, что
+ * проверить, чего я ожидаю, и идущий подход или отдых. Чужая: только комнаты, что она мне
+ * показывает; назад — к её Вратам.
  */
 @Composable
 fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
@@ -45,10 +51,10 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
 
     Column(Modifier.fillMaxSize()) {
         Header(
-            // Место зовётся именем хозяина. Вторая строка — где я на пути: в гостях путь назад
-            // лежит через Врата, а дома пути назад нет, и что имя моё, понятно само.
+            // Место зовётся именем хозяина. Вторая строка — где я на пути: из гостей путь назад
+            // лежит к своим Вратам, а дома пути назад нет, и что имя моё, понятно само.
             title = if (own) state.ownName else view.host,
-            subtitle = if (own) "дома" else "Врата",
+            subtitle = if (own) "дома" else "Врата — ${state.ownName}",
             onBack = if (own) null else ({ session.back() }),
             onTitleClick = if (own) ({
                 clipboard.setText(AnnotatedString(state.ownName))
@@ -60,30 +66,31 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
             if (view.rooms.isEmpty()) {
                 item { Hint(if (own) "Комнат нет" else "Ни одна комната вам здесь не открыта") }
             }
-            for ((title, outer) in listOf("Внутренняя часть" to false, "Внешняя часть" to true)) {
-                // Ядро части — Врата или Кормчая — впереди её Келий.
-                val rooms = view.rooms.filter { it.outer == outer }.sortedBy { it.aspect == Aspect.Words }
+            for ((title, outer) in listOf("Внутреннее" to false, "Внешнее" to true)) {
+                val rooms = view.rooms.filter { it.outer == outer }
+                if (rooms.isEmpty() && !own) continue
+                // Ждущий ответа — красным: стучащий у Врат и просящий в Кормчей.
+                val plea = when {
+                    !own -> null
+                    // «Стук» никого не называет: число — только когда стучат несколько.
+                    outer -> when (view.waiting) {
+                        0 -> null
+                        1 -> "стук"
+                        else -> "стук · ${view.waiting}"
+                    }
+                    state.supplications.isNotEmpty() ->
+                        state.supplications.joinToString(", ") +
+                            if (state.supplications.size == 1) " просит стать Тренером" else " просят стать Тренером"
+                    else -> null
+                }
+                val edge = if (!own) null else if (outer) ({ session.gates("") }) else ({ session.helm() })
+                item { PartTitle(title, plea, knock = outer, onClick = edge) }
                 if (rooms.isEmpty()) continue
-                item { SectionTitle(title) }
                 item {
                     Group(rooms) { room ->
-                        // Ждущий ответа — красным: у Врат и с Просьбой в Кормчей.
-                        val plea = when {
-                            !own -> null
-                            // «Стук» никого не называет: число — только когда стучат несколько.
-                            room.aspect == Aspect.Threshold -> when (view.waiting) {
-                                0 -> null
-                                1 -> "стук"
-                                else -> "стук · ${view.waiting}"
-                            }
-                            room.aspect == Aspect.Dwellers && state.supplications.isNotEmpty() ->
-                                state.supplications.joinToString(", ") +
-                                    if (state.supplications.size == 1) " просит стать Тренером" else " просят стать Тренером"
-                            else -> null
-                        }
                         // Ведут тренировку этой комнаты — значит, в ней идёт подход или отдых.
                         val led = own && state.workout?.let { it.host.isEmpty() && it.room == room.name } == true
-                        RoomLine(room, view, plea, led) { session.enter(room.name) }
+                        RoomLine(room, view, led) { session.enter(room.name) }
                     }
                 }
             }
@@ -92,7 +99,33 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
 }
 
 @Composable
-private fun RoomLine(room: RoomItem, view: View.Abode, plea: String?, led: Boolean, onClick: () -> Unit) {
+private fun PartTitle(title: String, plea: String?, knock: Boolean, onClick: (() -> Unit)?) {
+    // Заголовок части своей Обители ведёт к её краю — синий, как всякое действие.
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (onClick != null) WillColors.Accent else WillColors.Muted,
+        )
+        if (plea != null) {
+            Spacer(Modifier.width(10.dp))
+            if (knock) Knock()
+            Text(plea, fontSize = 13.sp, color = WillColors.Supplication, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.weight(1f))
+        if (onClick != null) Text("›", fontSize = 16.sp, color = WillColors.Muted)
+    }
+}
+
+@Composable
+private fun RoomLine(room: RoomItem, view: View.Abode, led: Boolean, onClick: () -> Unit) {
     val deeds = listOf("выполнить" to view.owed, "проверить" to view.unreviewed, "ожидаю" to view.awaited)
         .mapNotNull { (what, list) -> list.count { it.room == room.name }.takeIf { it > 0 }?.let { "$what $it" } }
     val underway = view.owed.firstNotNullOfOrNull { waiting -> waiting.underway?.takeIf { waiting.room == room.name } }
@@ -101,15 +134,9 @@ private fun RoomLine(room: RoomItem, view: View.Abode, plea: String?, led: Boole
         led -> "идёт отдых"
         else -> null
     }
-    val quiet = plea == null && deeds.isEmpty() && going == null
+    val quiet = deeds.isEmpty() && going == null
 
     Line(room.said, if (quiet) null else ({
-        if (plea != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (room.aspect == Aspect.Threshold) Knock()
-                Text(plea, fontSize = 13.sp, color = WillColors.Supplication)
-            }
-        }
         Row {
             if (deeds.isNotEmpty()) Text(deeds.joinToString(" · "), fontSize = 13.sp, color = WillColors.Muted)
             if (deeds.isNotEmpty() && going != null) Text(" · ", fontSize = 13.sp, color = WillColors.Muted)

@@ -5,6 +5,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -22,7 +24,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import will.v1.MessengerOuterClass.Room
-import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.Word
 import will.v1.effort
@@ -60,14 +61,12 @@ class AbodeScreenTest {
     }
 
     private val ownRooms = listOf(
-        room { name = "Слово"; part = RoomPart.INNER; aspect = RoomAspect.WORDS },
-        room { name = "Врата"; part = RoomPart.OUTER; aspect = RoomAspect.THRESHOLD },
-        room { name = "Кормчая"; part = RoomPart.INNER; aspect = RoomAspect.DWELLERS },
+        room { name = "Слово"; part = RoomPart.INNER },
     )
 
-    private fun taught(by: String) = room { name = "Послушание — $by"; part = RoomPart.INNER; aspect = RoomAspect.WORDS; testator = by }
+    private fun taught(by: String) = room { name = "Послушание — $by"; part = RoomPart.INNER; testator = by }
 
-    private fun teaching(whom: String) = room { name = "Ведение — $whom"; part = RoomPart.INNER; aspect = RoomAspect.WORDS }
+    private fun teaching(whom: String) = room { name = "Ведение — $whom"; part = RoomPart.INNER }
 
     private fun abode(
         host: String,
@@ -105,16 +104,14 @@ class AbodeScreenTest {
     private fun lastTurn() = transport.sent.last { it.hasTurn() }.turn
 
     @Test
-    fun `one's own abode shows one's name and its rooms by parts, the core before the cells`() {
+    fun `one's own abode shows one's name and its rooms, the inner, then the outer, even when it has none`() {
         abode("", ownRooms)
         compose.onNodeWithText("anna").assertIsDisplayed()
         compose.onNodeWithText("дома").assertIsDisplayed()
-        val inner = compose.onNodeWithText("Внутренняя часть").fetchSemanticsNode().boundsInRoot.top
-        val helm = compose.onNodeWithText("Кормчая").fetchSemanticsNode().boundsInRoot.top
+        val inner = compose.onNodeWithText("Внутреннее").fetchSemanticsNode().boundsInRoot.top
         val word = compose.onNodeWithText("Слово").fetchSemanticsNode().boundsInRoot.top
-        val outer = compose.onNodeWithText("Внешняя часть").fetchSemanticsNode().boundsInRoot.top
-        val gates = compose.onNodeWithText("Врата").fetchSemanticsNode().boundsInRoot.top
-        assertEquals(listOf(inner, helm, word, outer, gates), listOf(inner, helm, word, outer, gates).sorted())
+        val outer = compose.onNodeWithText("Внешнее").fetchSemanticsNode().boundsInRoot.top
+        assertEquals(listOf(inner, word, outer), listOf(inner, word, outer).sorted())
         compose.onNodeWithText("Слово").performClick()
         assertEquals("", lastTurn().abodeOf)
         assertEquals("Слово", lastTurn().room)
@@ -158,22 +155,22 @@ class AbodeScreenTest {
     }
 
     @Test
-    fun `the supplications are said in red under the helm, which they lead to`() {
+    fun `the supplications are said in red by the inner, which leads to the helm`() {
         transport.tell(serverEvent { supplications = supplications { suppliantNames += listOf("boris", "viktor") } })
         abode("", ownRooms)
         compose.onNodeWithText("boris, viktor просят стать Тренером").assertIsDisplayed()
-        compose.onNodeWithText("Кормчая").performClick()
-        assertEquals("Кормчая", lastTurn().room)
+        compose.onNodeWithText("Внутреннее").performClick()
+        assertEquals(RoomPart.INNER, lastTurn().edge)
     }
 
     @Test
-    fun `that some knock at the gates is said under them, without names, and they are entered`() {
+    fun `that some knock is said by the outer, without names, and it leads to the gates`() {
         abode("", ownRooms, waiting = 1)
         compose.onNodeWithText("стук").assertIsDisplayed()
         abode("", ownRooms, waiting = 3)
         compose.onNodeWithText("стук · 3").assertIsDisplayed()
-        compose.onNodeWithText("Врата").performClick()
-        assertEquals("Врата", lastTurn().room)
+        compose.onNodeWithText("Внешнее").performClick()
+        assertEquals(RoomPart.OUTER, lastTurn().edge)
     }
 
     @Test
@@ -198,13 +195,17 @@ class AbodeScreenTest {
     }
 
     @Test
-    fun `another's abode shows only the rooms open to one, and back leads to its gates`() {
-        abode("boris", listOf(room { name = "Врата"; part = RoomPart.OUTER; aspect = RoomAspect.THRESHOLD }))
+    fun `another's abode shows only the rooms it shows one, its parts leading nowhere, and back leads through its gates to one's own`() {
+        abode("boris", listOf(room { name = "Слово"; part = RoomPart.OUTER }))
         compose.onNodeWithText("boris").assertIsDisplayed()
-        compose.onAllNodesWithText("Слово").assertCountEquals(0)
-        compose.onNodeWithText("‹ Врата").performClick()
-        assertEquals("boris", lastTurn().abodeOf)
-        assertEquals("Врата", lastTurn().room)
+        compose.onAllNodesWithText("Внутреннее").assertCountEquals(0)
+        compose.onNode(hasText("Внешнее") and hasClickAction()).assertDoesNotExist()
+        compose.onNodeWithText("Слово").performClick()
+        assertEquals("Слово", lastTurn().room)
+        compose.onNodeWithText("‹ Врата — anna").performClick()
+        val turns = transport.sent.filter { it.hasTurn() }.takeLast(2).map { it.turn }
+        assertEquals(listOf("boris", ""), turns.map { it.abodeOf })
+        assertEquals(listOf(RoomPart.OUTER, RoomPart.OUTER), turns.map { it.edge })
     }
 
     @Test

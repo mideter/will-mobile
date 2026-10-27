@@ -9,8 +9,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import will.v1.MessengerOuterClass.RoomPart
 import will.v1.MessengerOuterClass.NoticeCode
-import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.MessengerOuterClass.Word
 import will.v1.exercise
 import will.v1.historyEnd
@@ -60,7 +60,7 @@ class WillSessionNoticesTest {
 
     @Test
     fun `a supplication is not said at one's own helm, where it is shown`() {
-        transport.tell(serverEvent { turned = turned { room = "Кормчая"; aspect = RoomAspect.DWELLERS } })
+        transport.tell(serverEvent { turned = turned { edge = RoomPart.INNER } })
         transport.tell(serverEvent { historyEnd = historyEnd {} })
         offer()
         assertEquals(emptyList<String>(), heard)
@@ -78,7 +78,7 @@ class WillSessionNoticesTest {
     fun `what one has done oneself is not said, a refusal is`() {
         transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_BEHEST_FULFILLED; message = "behest 9 fulfilled" } })
         transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_PASS_THROUGH_GATES; message = "one goes there only through gates" } })
-        assertEquals(listOf("Туда идут через Врата"), heard)
+        assertEquals(listOf("Туда идут из своих Врат"), heard)
     }
 
     @Test

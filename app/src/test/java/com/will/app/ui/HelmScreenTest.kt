@@ -21,7 +21,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import will.v1.MessengerOuterClass.Dweller
 import will.v1.MessengerOuterClass.DwellerKind
-import will.v1.MessengerOuterClass.RoomAspect
 import will.v1.MessengerOuterClass.RoomPart
 import will.v1.dweller
 import will.v1.dwellers
@@ -58,20 +57,14 @@ class HelmScreenTest {
     private fun cell(name: String, outer: Boolean) = room {
         this.name = name
         part = if (outer) RoomPart.OUTER else RoomPart.INNER
-        aspect = RoomAspect.WORDS
     }
-
-    private val cores = listOf(
-        room { name = "Врата"; part = RoomPart.OUTER; aspect = RoomAspect.THRESHOLD },
-        room { name = "Кормчая"; part = RoomPart.INNER; aspect = RoomAspect.DWELLERS },
-    )
 
     private fun helm(people: List<Dweller> = emptyList(), asking: List<String> = emptyList(), dwellingIn: List<String> = emptyList()) {
         transport.tell(serverEvent { dwellings = dwellings { dwellingIn.forEach { dwellings += dwelling { hostName = it } } } })
         transport.tell(serverEvent { supplications = supplications { suppliantNames += asking } })
-        transport.tell(serverEvent { turned = turned { room = "Кормчая"; aspect = RoomAspect.DWELLERS } })
+        transport.tell(serverEvent { turned = turned { edge = RoomPart.INNER } })
         transport.tell(serverEvent { dwellers = dwellers { dwellers += people } })
-        transport.tell(serverEvent { rooms = rooms { rooms += cell("Слово", outer = false); rooms += cores } })
+        transport.tell(serverEvent { rooms = rooms { rooms += cell("Слово", outer = false) } })
         transport.tell(serverEvent { historyEnd = historyEnd {} })
     }
 
@@ -135,18 +128,17 @@ class HelmScreenTest {
 
 
     @Test
-    fun `cells are moved between the parts, and the gates and the helm are not`() {
+    fun `rooms are moved outward and inward`() {
         helm()
-        compose.onNodeWithText("Врата").assertIsDisplayed()
-        compose.onAllNodesWithText("во внутреннюю").assertCountEquals(0)
-        compose.onNodeWithText("во внешнюю").performClick()
+        compose.onAllNodesWithText("внутрь").assertCountEquals(0)
+        compose.onNodeWithText("наружу").performClick()
         val arranged = transport.sent.last { it.hasArrange() }.arrange
         assertEquals("Слово", arranged.room)
         assertEquals(RoomPart.OUTER, arranged.part)
 
-        // Сервер говорит комнаты заново — Келья уже во внешней части.
-        transport.tell(serverEvent { rooms = rooms { rooms += cell("Слово", outer = true); rooms += cores } })
-        compose.onNodeWithText("во внутреннюю").assertIsDisplayed()
+        // Сервер говорит комнаты заново — комната уже во внешнем.
+        transport.tell(serverEvent { rooms = rooms { rooms += cell("Слово", outer = true) } })
+        compose.onNodeWithText("внутрь").assertIsDisplayed()
         compose.onAllNodesWithText("во внешнюю").assertCountEquals(0)
     }
 }
