@@ -56,9 +56,10 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
     val own = view.host.isEmpty()
     Column(Modifier.fillMaxSize()) {
         Header(
-            title = if (own) "Врата" else view.host,
-            // Из своих Врат назад — домой, из чужих — к своим Вратам: подпись говорит, куда.
-            subtitle = if (own) state.ownName else "Врата — ${state.ownName}",
+            title = if (own) "Внешнее" else view.host,
+            // Ни Врата, ни Кормчая не называются: свои — это Внешнее, чужие — имя хозяина. Назад
+            // подписано своим именем: из своих — домой, из чужих — к своим.
+            subtitle = state.ownName,
             onBack = { session.back() },
         )
         if (own) OwnGates(state, view, session) else OthersGates(state, view, session)
@@ -191,7 +192,7 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
     var open by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize()) {
-        Header(title = "Кормчая", subtitle = state.ownName, onBack = { session.back() })
+        Header(title = "Внутреннее", subtitle = state.ownName, onBack = { session.back() })
         val listState = rememberLazyListState()
         LazyColumn(Modifier.fillMaxSize().goneUnder(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
             if (state.supplications.isNotEmpty()) {
@@ -214,7 +215,7 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
             }
 
             item { SectionTitle("Знаю") }
-            if (view.people.isEmpty()) item { Hint("Вы пока никого не знаете. Впускают у Врат.") }
+            if (view.people.isEmpty()) item { Hint("Вы пока никого не знаете. Впускают тех, кто стучит, во Внешнем.") }
             else item {
                 Group(view.people) { dweller ->
                     DwellerRow(
@@ -228,7 +229,7 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
             }
 
             item { Hint("Внутреннее видят друзья, внешнее — и ближние.") }
-            for ((title, outer) in listOf("Внутреннее" to false, "Внешнее" to true)) {
+            for ((title, outer) in listOf("Комнаты внутри" to false, "Комнаты снаружи" to true)) {
                 val rooms = view.rooms.filter { it.outer == outer }
                 if (rooms.isEmpty()) continue
                 item { SectionTitle(title) }

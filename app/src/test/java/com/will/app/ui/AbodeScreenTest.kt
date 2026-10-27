@@ -202,7 +202,7 @@ class AbodeScreenTest {
         compose.onNode(hasText("Внешнее") and hasClickAction()).assertDoesNotExist()
         compose.onNodeWithText("Слово").performClick()
         assertEquals("Слово", lastTurn().room)
-        compose.onNodeWithText("‹ Врата — anna").performClick()
+        compose.onNodeWithText("‹ anna").performClick()
         val turns = transport.sent.filter { it.hasTurn() }.takeLast(2).map { it.turn }
         assertEquals(listOf("boris", ""), turns.map { it.abodeOf })
         assertEquals(listOf(RoomPart.OUTER, RoomPart.OUTER), turns.map { it.edge })

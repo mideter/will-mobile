@@ -116,7 +116,7 @@ class GatesScreenTest {
         dwellingIn("viktor")
         gates("viktor", open = false)
         compose.onNodeWithText("viktor").assertIsDisplayed()
-        compose.onNodeWithText("‹ Врата — anna").assertIsDisplayed()
+        compose.onNodeWithText("‹ anna").assertIsDisplayed()
         compose.onAllNodesWithText("Стук").assertCountEquals(0)
         compose.onNodeWithText("Войти").performClick()
         assertEquals("viktor", lastTurn().abodeOf)

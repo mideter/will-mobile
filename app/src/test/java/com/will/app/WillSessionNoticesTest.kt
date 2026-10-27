@@ -78,7 +78,7 @@ class WillSessionNoticesTest {
     fun `what one has done oneself is not said, a refusal is`() {
         transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_BEHEST_FULFILLED; message = "behest 9 fulfilled" } })
         transport.tell(serverEvent { protocolNotice = protocolNotice { code = NoticeCode.NOTICE_PASS_THROUGH_GATES; message = "one goes there only through gates" } })
-        assertEquals(listOf("Туда идут из своих Врат"), heard)
+        assertEquals(listOf("К другим идут из своего Внешнего"), heard)
     }
 
     @Test

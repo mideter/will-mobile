@@ -51,10 +51,10 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
 
     Column(Modifier.fillMaxSize()) {
         Header(
-            // Место зовётся именем хозяина. Вторая строка — где я на пути: из гостей путь назад
-            // лежит к своим Вратам, а дома пути назад нет, и что имя моё, понятно само.
+            // Место зовётся именем хозяина. Вторая строка — где я на пути: из гостей путь назад —
+            // к своему, и подписан он моим именем; дома пути назад нет, и что имя моё, понятно само.
             title = if (own) state.ownName else view.host,
-            subtitle = if (own) "дома" else "Врата — ${state.ownName}",
+            subtitle = if (own) "дома" else state.ownName,
             onBack = if (own) null else ({ session.back() }),
             onTitleClick = if (own) ({
                 clipboard.setText(AnnotatedString(state.ownName))

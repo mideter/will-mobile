@@ -77,7 +77,7 @@ class HelmScreenTest {
     @Test
     fun `no one dwelling, it says where one lets in`() {
         helm()
-        compose.onNodeWithText("Вы пока никого не знаете. Впускают у Врат.").assertIsDisplayed()
+        compose.onNodeWithText("Вы пока никого не знаете. Впускают тех, кто стучит, во Внешнем.").assertIsDisplayed()
     }
 
     @Test
