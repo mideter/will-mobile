@@ -485,7 +485,7 @@ class WillSession(
                 _state.update { it.copy(loading = true) }
             }
             ServerEvent.EventCase.ROOMS -> {
-                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.testator) }
+                val rooms = event.rooms.roomsList.map { RoomItem(it.name, it.part == RoomPart.OUTER, it.testator, it.novice) }
                 when (val gathered = gathering) {
                     is View.Abode -> gathering = gathered.copy(rooms = rooms)
                     is View.Room -> gathering = gathered.copy(rooms = rooms)

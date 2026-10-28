@@ -66,7 +66,7 @@ class AbodeScreenTest {
 
     private fun taught(by: String) = room { name = "Послушание — $by"; part = RoomPart.INNER; testator = by }
 
-    private fun teaching(whom: String) = room { name = "Ведение — $whom"; part = RoomPart.INNER }
+    private fun teaching(whom: String) = room { name = "Ведение — $whom"; part = RoomPart.INNER; novice = whom }
 
     private fun abode(
         host: String,

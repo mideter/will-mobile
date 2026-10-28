@@ -153,7 +153,7 @@ private fun RoomLine(room: RoomItem, view: View.Abode, led: Boolean, onClick: ()
     // Комната Уз зовётся тем, с кем они, а кем он мне приходится — подписью.
     val (title, role) = when {
         room.testator.isNotEmpty() -> room.testator to "тренер"
-        room.name.startsWith("Ведение — ") -> room.name.removePrefix("Ведение — ") to "ведение"
+        room.novice.isNotEmpty() -> room.novice to "ведение"
         else -> room.said to null
     }
     val said = listOfNotNull(role) + deeds

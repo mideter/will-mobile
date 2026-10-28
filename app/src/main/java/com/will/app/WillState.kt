@@ -12,10 +12,10 @@ enum class Reply { None, Pending, Granted }
 
 /**
  * Комната Обители: [name] — её имя у сервера, по нему в неё входят; [outer] — она во внешнем;
- * [testator] — Тренер, если это Узы, где хозяин — ученик. Человеку она — [said]: такая комната
- * зовётся по Тренеру, без «Послушания».
+ * [testator] — Тренер, если это Узы, где хозяин — ученик; [novice] — ученик, если хозяин в них
+ * Тренер. Человеку она — [said]: такая комната зовётся по Тренеру, без «Послушания».
  */
-data class RoomItem(val name: String, val outer: Boolean, val testator: String = "") {
+data class RoomItem(val name: String, val outer: Boolean, val testator: String = "", val novice: String = "") {
     val said: String get() = roomSaid(name, testator)
 }
 
