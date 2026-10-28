@@ -71,7 +71,7 @@ class GatesScreenTest {
     @Test
     fun `at one's own gates one lets in who knocks and bears the unborn`() {
         gates("", open = true, waiting = listOf("boris"), unbornMarks = listOf(4))
-        compose.onNodeWithText("‹ anna").assertIsDisplayed()
+        compose.onNodeWithText("‹ домой").assertIsDisplayed()
         compose.onNodeWithText("Стучит").assertIsDisplayed()
         compose.onNodeWithText("Впустить").performClick()
         assertEquals("boris", transport.sent.last { it.hasAdmit() }.admit.name)
@@ -117,7 +117,7 @@ class GatesScreenTest {
         dwellingIn("viktor")
         gates("viktor", open = false)
         compose.onNodeWithText("viktor").assertIsDisplayed()
-        compose.onNodeWithText("‹ anna").assertIsDisplayed()
+        compose.onNodeWithText("‹ к себе").assertIsDisplayed()
         compose.onAllNodesWithText("Стук").assertCountEquals(0)
         compose.onNodeWithText("Войти").performClick()
         assertEquals("viktor", lastTurn().abodeOf)

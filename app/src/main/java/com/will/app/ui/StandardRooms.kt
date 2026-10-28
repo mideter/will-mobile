@@ -58,9 +58,9 @@ fun GatesScreen(state: WillState, view: View.Room, session: WillSession) {
     Column(Modifier.fillMaxSize()) {
         Header(
             title = if (own) "Внешнее" else view.host,
-            // Ни Врата, ни Кормчая не называются: свои — это Внешнее, чужие — имя хозяина. Назад
-            // подписано своим именем: из своих — домой, из чужих — к своим.
-            subtitle = state.ownName,
+            // Ни Врата, ни Кормчая не называются: свои — это Внешнее, чужие — имя хозяина. Из своих
+            // назад — домой; из чужих — к себе: к своему порогу, ещё не внутрь.
+            subtitle = if (own) "домой" else "к себе",
             onBack = { session.back() },
         )
         if (own) OwnGates(state, view, session) else OthersGates(state, view, session)
@@ -193,7 +193,7 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
     var open by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize()) {
-        Header(title = "Внутреннее", subtitle = state.ownName, onBack = { session.back() })
+        Header(title = "Внутреннее", subtitle = "домой", onBack = { session.back() })
         val listState = rememberLazyListState()
         LazyColumn(Modifier.fillMaxSize().goneUnder(listState), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
             if (state.supplications.isNotEmpty()) {
