@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
@@ -92,6 +93,22 @@ fun SectionTitle(text: String) {
         fontWeight = FontWeight.Medium,
         color = WillColors.Muted,
     )
+}
+
+@Composable
+fun PlaqueTitle(title: String, onClick: (() -> Unit)?, after: (@Composable () -> Unit)? = null) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = WillColors.Muted)
+        after?.invoke()
+        Spacer(Modifier.weight(1f))
+        if (onClick != null) Text("›", fontSize = 16.sp, color = WillColors.Muted)
+    }
 }
 
 @Composable

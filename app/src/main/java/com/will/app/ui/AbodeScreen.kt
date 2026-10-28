@@ -122,22 +122,13 @@ private fun Rooms(rooms: List<RoomItem>, divider: Color, room: @Composable (Room
 
 @Composable
 private fun PartTitle(title: String, plea: String?, knock: Boolean, onClick: (() -> Unit)?) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = WillColors.Muted)
-        if (plea != null) {
+    PlaqueTitle(title, onClick, plea?.let {
+        {
             Spacer(Modifier.width(10.dp))
             if (knock) Knock()
-            Text(plea, fontSize = 13.sp, color = WillColors.Supplication, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(it, fontSize = 13.sp, color = WillColors.Supplication, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Spacer(Modifier.weight(1f))
-        if (onClick != null) Text("›", fontSize = 16.sp, color = WillColors.Muted)
-    }
+    })
 }
 
 @Composable

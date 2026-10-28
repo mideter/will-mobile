@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -93,22 +94,24 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
             item { Hint("Кому вы дадите имя, у того вы всегда будете хотя бы ближним.") }
         }
 
-        // К другим ходят только из своих Врат.
-        item { SectionTitle("Посетить") }
+        // К другим ходят только из своих Врат: подпись «Посетить» — вход по имени, а ниже те, кто
+        // меня знает, — к ним сразу. Что знают, не говорится: здесь только они; говорится, насколько.
         item {
-            Group(state.dwellings + null) { dwelling ->
-                if (dwelling == null) {
-                    if (!going) {
-                        Line("по имени…") { going = true }
-                    } else {
-                        ByName { host ->
-                            going = false
-                            session.visit(host)
-                        }
-                    }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).plaque()) {
+                if (!going) {
+                    PlaqueTitle("Посетить", onClick = { going = true })
                 } else {
-                    val known = listOfNotNull("знает вас", WillSession.kindSaid(dwelling.kind)).joinToString(" · ")
-                    Line(dwelling.name, { Text(known, fontSize = 13.sp, color = WillColors.Muted) }) { session.visit(dwelling.name) }
+                    ByName { host ->
+                        going = false
+                        session.visit(host)
+                    }
+                }
+                state.dwellings.forEachIndexed { index, dwelling ->
+                    if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = WillColors.Divider)
+                    val kind = WillSession.kindSaid(dwelling.kind)
+                    Line(dwelling.name, kind?.let { { Text(it, fontSize = 13.sp, color = WillColors.Muted) } }) {
+                        session.visit(dwelling.name)
+                    }
                 }
             }
         }

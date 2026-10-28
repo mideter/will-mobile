@@ -85,14 +85,15 @@ class GatesScreenTest {
         gates("", open = true)
         compose.onAllNodesWithText("Стучат").assertCountEquals(0)
         compose.onAllNodesWithText("Дать имя").assertCountEquals(0)
-        compose.onNodeWithText("по имени…").assertIsDisplayed()
+        compose.onNodeWithText("Посетить").assertIsDisplayed()
     }
 
     @Test
-    fun `from one's own gates one visits those who know one, by name`() {
+    fun `from one's own gates one visits those who know one, by name, how near said and that they know one not`() {
         gates("", open = true)
         dwellingIn("viktor")
-        compose.onNodeWithText("знает вас · ближний").assertIsDisplayed()
+        compose.onNodeWithText("ближний").assertIsDisplayed()
+        compose.onAllNodesWithText("знает вас", substring = true).assertCountEquals(0)
         compose.onNodeWithText("viktor").performClick()
         assertEquals("viktor", lastTurn().abodeOf)
         assertFalse(lastTurn().hasEdge())
@@ -100,9 +101,9 @@ class GatesScreenTest {
     }
 
     @Test
-    fun `one visits by name, the row opened in place, and not without a name`() {
+    fun `one visits by name, opened in place of its title, and not without a name`() {
         gates("", open = true)
-        compose.onNodeWithText("по имени…").performClick()
+        compose.onNodeWithText("Посетить").performClick()
         compose.onNode(hasText("Посетить") and hasClickAction()).assertIsNotEnabled()
         compose.onNodeWithText("Имя").performTextInput(" boris ")
         compose.onNode(hasText("Посетить") and hasClickAction()).performClick()
