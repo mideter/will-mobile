@@ -213,6 +213,7 @@ fun TrainingRun(
                             willed = exercise.approaches.getOrNull(a),
                             effort = effort,
                             underwayFor = going?.takeIf { it.exercise == e && it.approach == a }?.let { (nowNs - it.begunAtNs) / NANOS },
+                            untoldTook = doing?.takeIf { it.exercise == e && it.approach == a }?.endedAtNs?.let { (it - doing.begunAtNs) / NANOS },
                             selected = doing == null && selected == e to a,
                             onSelect = if (doing == null && a == next) ({ session.choose(training.id, e) }) else null,
                         )
@@ -226,6 +227,7 @@ fun TrainingRun(
                                 willed = null,
                                 effort = null,
                                 underwayFor = null,
+                                untoldTook = null,
                                 selected = true,
                                 onSelect = null,
                             )
@@ -355,11 +357,13 @@ private fun RunRow(
     willed: ApproachItem?,
     effort: EffortItem?,
     underwayFor: Long?,
+    untoldTook: Long?,
     selected: Boolean,
     onSelect: (() -> Unit)?,
 ) {
-    // Строка, к которой подходят, видна целиком: пульт под списком не закрывает её.
-    val inSight = underwayFor != null || selected
+    // Строка, к которой подходят, видна целиком: пульт под списком не закрывает её. Законченный,
+    // но не рассказанный — тоже: о нём говорит пульт.
+    val inSight = underwayFor != null || untoldTook != null || selected
     val sight = remember { BringIntoViewRequester() }
     LaunchedEffect(inSight) { if (inSight) sight.bringIntoView() }
     Row(
@@ -368,19 +372,20 @@ private fun RunRow(
             .bringIntoViewRequester(sight)
             .padding(vertical = 2.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) WillColors.Background else WillColors.Row)
+            .background(if (selected || untoldTook != null) WillColors.Background else WillColors.Row)
             .let { if (onSelect != null) it.clickable(onClick = onSelect) else it }
             .padding(horizontal = 6.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             when {
-                effort != null -> "✓"
+                // Законченный подход сделан, даже пока о нём не рассказано.
+                effort != null || untoldTook != null -> "✓"
                 underwayFor != null -> "▶"
                 selected -> "●"
                 else -> "○"
             },
-            color = if (effort != null || underwayFor != null || selected) WillColors.Accent else WillColors.Muted,
+            color = if (effort != null || underwayFor != null || untoldTook != null || selected) WillColors.Accent else WillColors.Muted,
             modifier = Modifier.width(22.dp),
         )
         Text("$number", fontSize = 14.sp, color = WillColors.Muted, modifier = Modifier.width(20.dp))
@@ -391,6 +396,10 @@ private fun RunRow(
                 "${weightText(effort.weightGrams)} × ${effort.repetitions} · ${spanText(took)}" to
                     (if (changed || willed == null) WillColors.Accent else WillColors.Ink)
             }
+            // Как он прошёл, ещё не сказано: в строке заданное и сколько он длился.
+            untoldTook != null ->
+                (willed?.let { "${weightText(it.weightGrams)} × ${it.repetitions}" } ?: "сверх заданного") + " · ${spanText(untoldTook)}" to
+                    WillColors.Ink
             // Сколько подход идёт, говорит пульт; строке довольно, что идёт он.
             underwayFor != null ->
                 (willed?.let { "${weightText(it.weightGrams)} × ${it.repetitions}" } ?: "сверх заданного") to WillColors.Accent
