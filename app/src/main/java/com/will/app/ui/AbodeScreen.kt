@@ -145,16 +145,10 @@ private fun RoomLine(room: RoomItem, view: View.Abode, led: Boolean, onClick: ()
         led -> "идёт отдых"
         else -> null
     }
-    // Комната Уз зовётся тем, с кем они, а кем он мне приходится — подписью.
-    val (title, role) = when {
-        room.testator.isNotEmpty() -> room.testator to "тренер"
-        room.novice.isNotEmpty() -> room.novice to "ведение"
-        else -> room.said to null
-    }
-    val said = listOfNotNull(role) + deeds
+    val said = listOfNotNull(room.role) + deeds
     val quiet = said.isEmpty() && going == null
 
-    Line(title, if (quiet) null else ({
+    Line(room.who, if (quiet) null else ({
         Row {
             if (said.isNotEmpty()) Text(said.joinToString(" · "), fontSize = 13.sp, color = WillColors.Muted)
             if (said.isNotEmpty() && going != null) Text(" · ", fontSize = 13.sp, color = WillColors.Muted)

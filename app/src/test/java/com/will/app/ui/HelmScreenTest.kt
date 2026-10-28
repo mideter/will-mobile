@@ -54,6 +54,17 @@ class HelmScreenTest {
         }
     }
 
+    @Test
+    fun `a tie room is named here as in the abode, by the other side, what he is to one beneath`() {
+        helm()
+        transport.tell(serverEvent {
+            rooms = rooms { rooms += cell("Слово", outer = false); rooms += room { name = "Ведение — boris"; part = RoomPart.INNER; novice = "boris" } }
+        })
+        compose.onNodeWithText("boris").assertIsDisplayed()
+        compose.onNodeWithText("ведение").assertIsDisplayed()
+        compose.onAllNodesWithText("Ведение — boris").assertCountEquals(0)
+    }
+
     private fun cell(name: String, outer: Boolean) = room {
         this.name = name
         part = if (outer) RoomPart.OUTER else RoomPart.INNER
@@ -108,7 +119,7 @@ class HelmScreenTest {
         val cases = listOf(
             Triple(acquaintance("boris"), true, null),
             Triple(acquaintance("viktor"), false, null),
-            Triple(acquaintance("gleb") { trainer = true }, true, "Тренер"),
+            Triple(acquaintance("gleb") { trainer = true }, true, "тренер"),
             Triple(acquaintance("dana") { asks = true }, true, "просит"),
             Triple(acquaintance("egor") { asked = true }, true, "просьба отправлена"),
             Triple(acquaintance("zoya") { novice = true }, true, "ученик"),

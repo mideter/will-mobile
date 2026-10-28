@@ -240,7 +240,10 @@ fun HelmScreen(state: WillState, view: View.Room, session: WillSession) {
                             Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 16.dp, end = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(room.said, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                            Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                                Text(room.who, fontSize = 16.sp)
+                                room.role?.let { Text(it, fontSize = 13.sp, color = WillColors.Muted) }
+                            }
                             TextButton(onClick = { session.arrange(room.name, outer = !outer) }) {
                                 Text(if (outer) "внутрь" else "наружу", color = WillColors.Muted)
                             }
@@ -264,7 +267,7 @@ private fun DwellerRow(dweller: Person, open: Boolean, mayAsk: Boolean, onToggle
                 Text(dweller.name, fontSize = 16.sp)
                 val told = listOfNotNull(
                     WillSession.kindSaid(dweller.kind),
-                    "Тренер".takeIf { Standing.Trainer in standings },
+                    "тренер".takeIf { Standing.Trainer in standings },
                     "ученик".takeIf { Standing.Novice in standings },
                     "просит".takeIf { Standing.Asks in standings },
                     "просьба отправлена".takeIf { Standing.Asked in standings },

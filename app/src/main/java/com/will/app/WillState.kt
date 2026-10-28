@@ -13,10 +13,13 @@ enum class Reply { None, Pending, Granted }
 /**
  * Комната Обители: [name] — её имя у сервера, по нему в неё входят; [outer] — она во внешнем;
  * [testator] — Тренер, если это Узы, где хозяин — ученик; [novice] — ученик, если хозяин в них
- * Тренер. Человеку она — [said]: такая комната зовётся по Тренеру, без «Послушания».
+ * Тренер. Человеку она — [said]: такая комната зовётся по Тренеру, без «Послушания». В списках
+ * комната Уз зовётся тем, с кем они ([who]), а кем он мне приходится — подписью ([role]).
  */
 data class RoomItem(val name: String, val outer: Boolean, val testator: String = "", val novice: String = "") {
     val said: String get() = roomSaid(name, testator)
+    val who: String get() = testator.ifEmpty { novice.ifEmpty { said } }
+    val role: String? get() = if (testator.isNotEmpty()) "тренер" else if (novice.isNotEmpty()) "ведение" else null
 }
 
 fun roomSaid(name: String, testator: String): String = if (testator.isEmpty()) name else "Тренер — $testator"
