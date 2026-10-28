@@ -132,11 +132,11 @@ class AbodeScreenTest {
             owed = listOf("Понедельник" to "Послушание — boris", "Среда" to "Послушание — viktor"),
             awaited = listOf("Пятница" to "Ведение — gleb"),
         )
-        compose.onAllNodesWithText("выполнить 1").assertCountEquals(2)
+        compose.onAllNodesWithText("тренер · выполнить 1").assertCountEquals(2)
         compose.onNodeWithText("идёт подход").assertIsDisplayed()
         compose.onNodeWithText("подход закончен — как прошёл?").assertIsDisplayed()
-        compose.onNodeWithText("ожидаю 1").assertIsDisplayed()
-        compose.onNodeWithText("Тренер — boris").performClick()
+        compose.onNodeWithText("ведение · ожидаю 1").assertIsDisplayed()
+        compose.onNodeWithText("boris").performClick()
         assertEquals("Послушание — boris", lastTurn().room)
     }
 
@@ -150,7 +150,7 @@ class AbodeScreenTest {
             .addEfforts(effort { weightGrams = 40_000; repetitions = 5; begunAtNs = finished - 30_000_000_000L; finishedAtNs = finished })
         transport.tell(serverEvent { outstanding = outstanding { owed += owedTraining.toBuilder().setBehest(rested).build() } })
         transport.tell(serverEvent { historyEnd = historyEnd {} })
-        compose.onNodeWithText("выполнить 1").assertIsDisplayed()
+        compose.onNodeWithText("тренер · выполнить 1").assertIsDisplayed()
         compose.onNodeWithText("идёт отдых").assertIsDisplayed()
     }
 
@@ -180,18 +180,18 @@ class AbodeScreenTest {
             awaited = listOf("Пятница" to "Ведение — viktor"),
             unreviewed = listOf("Среда" to "Ведение — viktor"),
         )
-        compose.onNodeWithText("проверить 1 · ожидаю 1").assertIsDisplayed()
+        compose.onNodeWithText("ведение · проверить 1 · ожидаю 1").assertIsDisplayed()
     }
 
     @Test
     fun `what waits is told anew while one looks at the abode`() {
         abode("", ownRooms + teaching("gleb"), awaited = listOf("Пятница" to "Ведение — gleb"))
-        compose.onNodeWithText("ожидаю 1").assertIsDisplayed()
+        compose.onNodeWithText("ведение · ожидаю 1").assertIsDisplayed()
         transport.tell(serverEvent {
             outstanding = outstanding { unreviewed += waiting(20L, "Пятница", "Ведение — gleb", training = true) }
         })
-        compose.onNodeWithText("проверить 1").assertIsDisplayed()
-        compose.onAllNodesWithText("ожидаю 1").assertCountEquals(0)
+        compose.onNodeWithText("ведение · проверить 1").assertIsDisplayed()
+        compose.onAllNodesWithText("ведение · ожидаю 1").assertCountEquals(0)
     }
 
     @Test
@@ -215,10 +215,15 @@ class AbodeScreenTest {
     }
 
     @Test
-    fun `a room where one is taught is named by one's trainer, and entered by its own name`() {
-        abode("", ownRooms + taught("boris"))
+    fun `a tie room is named by the other side, what he is to one said beneath, and entered by its own name`() {
+        abode("", ownRooms + taught("boris") + teaching("gleb"))
         compose.onAllNodesWithText("Послушание — boris").assertCountEquals(0)
-        compose.onNodeWithText("Тренер — boris").performClick()
+        compose.onAllNodesWithText("Ведение — gleb").assertCountEquals(0)
+        compose.onNodeWithText("тренер").assertIsDisplayed()
+        compose.onNodeWithText("ведение").assertIsDisplayed()
+        compose.onNodeWithText("gleb").performClick()
+        assertEquals("Ведение — gleb", lastTurn().room)
+        compose.onNodeWithText("boris").performClick()
         assertEquals("Послушание — boris", lastTurn().room)
     }
 }
