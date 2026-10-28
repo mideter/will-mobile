@@ -16,6 +16,7 @@ object WillColors {
     val Ink = Color(0xFF1A1A1A)
     val Muted = Color(0xFF787878)
     val Row = Color(0xFFF8F8F8)
+    val Deeper = Color(0xFFEFEFEF)
     val Accent = Color(0xFF3B82F6)
     val Divider = Color(0xFFECECEC)
     val Outline = Color(0xFFC8C8C8)

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -37,12 +41,12 @@ import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Обитель: её комнаты, внутренние и внешние. Своя: «Внутреннее» ведёт в Кормчую, к самому
- * внутреннему, «Внешнее» — к Вратам, к самому внешнему; у них сказано, что ждёт там: у
- * Внешнего — стук, без имён: стучащие мне ещё никто; у Внутреннего — Просьбы. Под каждой
- * комнатой — что в ней ждёт: дело живёт там, где его выполняют, — что выполнить, что
- * проверить, чего я ожидаю, и идущий подход или отдых. Чужая: только комнаты, что она мне
- * показывает; назад — к её Вратам.
+ * Обитель как она устроена: внешнее, а в нём внутреннее, и в каждом — его комнаты. Своя:
+ * подпись «Внешнее» ведёт к Вратам, к самому внешнему, «Внутреннее» — в Кормчую, к самому
+ * внутреннему; рядом сказано, что ждёт там: у Внешнего — стук, без имён: стучащие мне ещё
+ * никто; у Внутреннего — Просьбы. Под каждой комнатой — что в ней ждёт: дело живёт там, где
+ * его выполняют, — что выполнить, что проверить, чего я ожидаю, и идущий подход или отдых.
+ * Чужая: только комнаты, что она мне показывает, подписи никуда не ведут; назад — к своим.
  */
 @Composable
 fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
@@ -66,31 +70,35 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
             if (view.rooms.isEmpty()) {
                 item { Hint(if (own) "Комнат нет" else "Ни одна комната вам здесь не открыта") }
             }
-            for ((title, outer) in listOf("Внутреннее" to false, "Внешнее" to true)) {
-                val rooms = view.rooms.filter { it.outer == outer }
-                if (rooms.isEmpty() && !own) continue
-                // Ждущий ответа — красным: стучащий у Врат и просящий в Кормчей.
-                val plea = when {
-                    !own -> null
-                    // «Стук» никого не называет: число — только когда стучат несколько.
-                    outer -> when (view.waiting) {
-                        0 -> null
-                        1 -> "стук"
-                        else -> "стук · ${view.waiting}"
-                    }
-                    state.supplications.isNotEmpty() ->
-                        state.supplications.joinToString(", ") +
-                            if (state.supplications.size == 1) " просит стать Тренером" else " просят стать Тренером"
-                    else -> null
-                }
-                val edge = if (!own) null else if (outer) ({ session.gates("") }) else ({ session.helm() })
-                item { PartTitle(title, plea, knock = outer, onClick = edge) }
-                if (rooms.isEmpty()) continue
-                item {
-                    Group(rooms) { room ->
-                        // Ведут тренировку этой комнаты — значит, в ней идёт подход или отдых.
-                        val led = own && state.workout?.let { it.host.isEmpty() && it.room == room.name } == true
-                        RoomLine(room, view, led) { session.enter(room.name) }
+            val outerRooms = view.rooms.filter { it.outer }
+            val innerRooms = view.rooms.filter { !it.outer }
+            // Ждущий ответа — красным: стучащий у Врат и просящий в Кормчей. «Стук» никого не
+            // называет: число — только когда стучат несколько.
+            val knocks = when {
+                !own || view.waiting == 0 -> null
+                view.waiting == 1 -> "стук"
+                else -> "стук · ${view.waiting}"
+            }
+            val asks = if (!own || state.supplications.isEmpty()) null else
+                state.supplications.joinToString(", ") +
+                    if (state.supplications.size == 1) " просит стать Тренером" else " просят стать Тренером"
+            val room = @Composable { item: RoomItem ->
+                // Ведут тренировку этой комнаты — значит, в ней идёт подход или отдых.
+                val led = own && state.workout?.let { it.host.isEmpty() && it.room == item.name } == true
+                RoomLine(item, view, led) { session.enter(item.name) }
+            }
+            if (own || view.rooms.isNotEmpty()) item {
+                // Обитель — внешнее, а в нём внутреннее: заливка в заливке, у каждой — своя тихая
+                // подпись, она же вход к краю. В гостях подписи никуда не ведут, а внутреннего,
+                // которого мне не показывают, нет вовсе.
+                Depth(WillColors.Row, Modifier.padding(horizontal = 12.dp)) {
+                    PartTitle("Внешнее", knocks, knock = true, onClick = if (own) ({ session.gates("") }) else null)
+                    Rooms(outerRooms, WillColors.Divider, room)
+                    if (own || innerRooms.isNotEmpty()) {
+                        Depth(WillColors.Deeper, Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp)) {
+                            PartTitle("Внутреннее", asks, knock = false, onClick = if (own) ({ session.helm() }) else null)
+                            Rooms(innerRooms, WillColors.Row, room)
+                        }
                     }
                 }
             }
@@ -99,21 +107,29 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
 }
 
 @Composable
+private fun Depth(fill: Color, modifier: Modifier, content: @Composable () -> Unit) {
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(fill)) { content() }
+}
+
+@Composable
+private fun Rooms(rooms: List<RoomItem>, divider: Color, room: @Composable (RoomItem) -> Unit) {
+    // Подпись — имя заливки, а не строка списка: черта лишь между комнатами.
+    rooms.forEachIndexed { index, item ->
+        if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = divider)
+        room(item)
+    }
+}
+
+@Composable
 private fun PartTitle(title: String, plea: String?, knock: Boolean, onClick: (() -> Unit)?) {
-    // Заголовок части своей Обители ведёт к её краю — синий, как всякое действие.
     Row(
         Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 6.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            title,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (onClick != null) WillColors.Accent else WillColors.Muted,
-        )
+        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = WillColors.Muted)
         if (plea != null) {
             Spacer(Modifier.width(10.dp))
             if (knock) Knock()

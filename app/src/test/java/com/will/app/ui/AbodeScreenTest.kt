@@ -104,14 +104,14 @@ class AbodeScreenTest {
     private fun lastTurn() = transport.sent.last { it.hasTurn() }.turn
 
     @Test
-    fun `one's own abode shows one's name and its rooms, the inner, then the outer, even when it has none`() {
+    fun `one's own abode shows one's name and the outer holding the inner, its rooms within it, even when the outer has none`() {
         abode("", ownRooms)
         compose.onNodeWithText("anna").assertIsDisplayed()
         compose.onNodeWithText("дома").assertIsDisplayed()
         val inner = compose.onNodeWithText("Внутреннее").fetchSemanticsNode().boundsInRoot.top
         val word = compose.onNodeWithText("Слово").fetchSemanticsNode().boundsInRoot.top
         val outer = compose.onNodeWithText("Внешнее").fetchSemanticsNode().boundsInRoot.top
-        assertEquals(listOf(inner, word, outer), listOf(inner, word, outer).sorted())
+        assertEquals(listOf(outer, inner, word), listOf(outer, inner, word).sorted())
         compose.onNodeWithText("Слово").performClick()
         assertEquals("", lastTurn().abodeOf)
         assertEquals("Слово", lastTurn().room)
