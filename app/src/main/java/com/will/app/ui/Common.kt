@@ -53,8 +53,8 @@ fun Header(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Шапка — подпись к месту, а не предмет в нём: без плашки. Назад ведёт подпись «‹ куда» —
-            // синяя, как всякое действие; дома касание имени копирует его. Заголовок стоит по линии
-            // текста групп и не прыгает.
+            // серая, как всякий путь: синее — для дел, а уйти не дело; дома касание имени копирует
+            // его. Заголовок стоит по линии текста групп и не прыгает.
             Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
                 Text(
                     title,
@@ -70,7 +70,7 @@ fun Header(
                     Text(
                         if (onBack != null) "‹ $subtitle" else subtitle,
                         fontSize = 14.sp,
-                        color = if (onBack != null) WillColors.Accent else WillColors.Muted,
+                        color = WillColors.Muted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
