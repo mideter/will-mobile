@@ -5,8 +5,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -195,11 +193,12 @@ class AbodeScreenTest {
     }
 
     @Test
-    fun `another's abode shows only the rooms it shows one, its parts leading nowhere, and back leads through its gates to one's own`() {
-        abode("boris", listOf(room { name = "Слово"; part = RoomPart.OUTER }))
+    fun `another's abode shows the rooms it shows one all in one outer light, unnamed, and back leads through its gates to one's own`() {
+        abode("boris", listOf(room { name = "Слово"; part = RoomPart.OUTER }, room { name = "Ведение — anna"; part = RoomPart.INNER }))
         compose.onNodeWithText("boris").assertIsDisplayed()
         compose.onAllNodesWithText("Внутреннее").assertCountEquals(0)
-        compose.onNode(hasText("Внешнее") and hasClickAction()).assertDoesNotExist()
+        compose.onAllNodesWithText("Внешнее").assertCountEquals(0)
+        compose.onNodeWithText("Ведение — anna").assertIsDisplayed()
         compose.onNodeWithText("Слово").performClick()
         assertEquals("Слово", lastTurn().room)
         compose.onNodeWithText("‹ anna").performClick()

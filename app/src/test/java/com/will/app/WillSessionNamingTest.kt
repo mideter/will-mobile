@@ -11,6 +11,7 @@ import org.junit.Test
 import will.v1.MessengerOuterClass.DwellerKind
 import will.v1.authOk
 import will.v1.dwelling
+import will.v1.dwellings
 import will.v1.serverEvent
 
 class WillSessionNamingTest {
@@ -50,6 +51,16 @@ class WillSessionNamingTest {
         knownBy("ih7wzipz")
         assertEquals(emptyList<String>(), heard)
         knownBy("boris")
+        assertEquals(listOf("boris знает вас"), heard)
+    }
+
+    @Test
+    fun `that one is known is said once, and how near never`() {
+        transport.welcome("anna")
+        knownBy("boris", DwellerKind.NEIGHBOUR)
+        assertEquals(listOf("boris знает вас"), heard)
+        transport.tell(serverEvent { dwellings = dwellings { dwellings += dwelling { hostName = "boris"; kind = DwellerKind.NEIGHBOUR } } })
+        knownBy("boris", DwellerKind.FRIEND)
         assertEquals(listOf("boris знает вас"), heard)
     }
 

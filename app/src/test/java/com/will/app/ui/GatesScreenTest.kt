@@ -89,10 +89,10 @@ class GatesScreenTest {
     }
 
     @Test
-    fun `from one's own gates one visits those who know one, by name, how near said and that they know one not`() {
+    fun `from one's own gates one visits those who know one, by name, neither that they know one nor how near said`() {
         gates("", open = true)
         dwellingIn("viktor")
-        compose.onNodeWithText("ближний").assertIsDisplayed()
+        compose.onAllNodesWithText("ближний").assertCountEquals(0)
         compose.onAllNodesWithText("знает вас", substring = true).assertCountEquals(0)
         compose.onNodeWithText("viktor").performClick()
         assertEquals("viktor", lastTurn().abodeOf)

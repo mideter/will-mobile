@@ -95,7 +95,8 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
         }
 
         // К другим ходят только из своих Врат: подпись «Посетить» — вход по имени, а ниже те, кто
-        // меня знает, — к ним сразу. Что знают, не говорится: здесь только они; говорится, насколько.
+        // меня знает, — к ним сразу. Ни что знают, ни насколько не говорится: здесь только они, а
+        // насколько мне доверяют, я вижу по тому, что мне открыто.
         item {
             Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).plaque()) {
                 if (!going) {
@@ -108,10 +109,7 @@ private fun OwnGates(state: WillState, view: View.Room, session: WillSession) {
                 }
                 state.dwellings.forEachIndexed { index, dwelling ->
                     if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), color = WillColors.Divider)
-                    val kind = WillSession.kindSaid(dwelling.kind)
-                    Line(dwelling.name, kind?.let { { Text(it, fontSize = 13.sp, color = WillColors.Muted) } }) {
-                        session.visit(dwelling.name)
-                    }
+                    Line(dwelling.name) { session.visit(dwelling.name) }
                 }
             }
         }

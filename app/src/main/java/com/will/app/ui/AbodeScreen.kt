@@ -41,12 +41,12 @@ import com.will.app.WillSession
 import com.will.app.WillState
 
 /**
- * Обитель как она устроена: внешнее, а в нём внутреннее, и в каждом — его комнаты. Своя:
+ * Обитель. Своя — как она устроена: внешнее, а в нём внутреннее, и в каждом — его комнаты:
  * подпись «Внешнее» ведёт к Вратам, к самому внешнему, «Внутреннее» — в Кормчую, к самому
  * внутреннему; рядом сказано, что ждёт там: у Внешнего — стук, без имён: стучащие мне ещё
  * никто; у Внутреннего — Просьбы. Под каждой комнатой — что в ней ждёт: дело живёт там, где
  * его выполняют, — что выполнить, что проверить, чего я ожидаю, и идущий подход или отдых.
- * Чужая: только комнаты, что она мне показывает, подписи никуда не ведут; назад — к своим.
+ * Чужая — в одном внешнем свете: только комнаты, что она мне показывает; назад — к своим.
  */
 @Composable
 fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
@@ -87,19 +87,23 @@ fun AbodeScreen(state: WillState, view: View.Abode, session: WillSession) {
                 val led = own && state.workout?.let { it.host.isEmpty() && it.room == item.name } == true
                 RoomLine(item, view, led) { session.enter(item.name) }
             }
-            if (own || view.rooms.isNotEmpty()) item {
-                // Обитель — внешнее, а в нём внутреннее: заливка в заливке, у каждой — своя тихая
-                // подпись, она же вход к краю. В гостях подписи никуда не ведут, а внутреннего,
-                // которого мне не показывают, нет вовсе.
+            if (own) item {
+                // Своя Обитель — внешнее, а в нём внутреннее: заливка в заливке, у каждой — своя тихая
+                // подпись, она же вход к краю.
                 Depth(WillColors.Row, Modifier.padding(horizontal = 12.dp)) {
-                    PartTitle("Внешнее", knocks, knock = true, onClick = if (own) ({ session.gates("") }) else null)
+                    PartTitle("Внешнее", knocks, knock = true, onClick = { session.gates("") })
                     Rooms(outerRooms, WillColors.Divider, room)
-                    if (own || innerRooms.isNotEmpty()) {
-                        Depth(WillColors.Deeper, Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp)) {
-                            PartTitle("Внутреннее", asks, knock = false, onClick = if (own) ({ session.helm() }) else null)
-                            Rooms(innerRooms, WillColors.Row, room)
-                        }
+                    Depth(WillColors.Deeper, Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp)) {
+                        PartTitle("Внутреннее", asks, knock = false, onClick = { session.helm() })
+                        Rooms(innerRooms, WillColors.Row, room)
                     }
+                }
+            } else if (view.rooms.isNotEmpty()) item {
+                // Чужая Обитель обращена ко мне своим внешним, как глубоко бы меня ни пускали: всё,
+                // что мне показано, — в одном внешнем свете, без внутреннего и без подписей, чтобы
+                // устройство экрана не выдавало, насколько мне доверяют.
+                Depth(WillColors.Row, Modifier.padding(horizontal = 12.dp)) {
+                    Rooms(view.rooms, WillColors.Divider, room)
                 }
             }
         }

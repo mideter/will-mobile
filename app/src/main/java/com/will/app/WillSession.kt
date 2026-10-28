@@ -626,10 +626,10 @@ class WillSession(
                 if (reply.notice.isNotEmpty()) Notices.say(reply.code, reply.argsList, reply.notice)?.let { tell(it) }
             }
             ServerEvent.EventCase.DWELLING -> {
-                // Кто дал имя, того и знаешь первым: экран имени уже говорит о нём.
-                if (event.dwelling.hostName != _state.value.namedBy) {
-                    tell(listOfNotNull("${event.dwelling.hostName} знает вас", kindSaid(event.dwelling.kind.toKind())).joinToString(" · "))
-                }
+                // Говорится только, что знает, и только впервые: насколько доверяет, хозяин не
+                // объявляет. Кто дал имя, того и знаешь первым: экран имени уже говорит о нём.
+                val host = event.dwelling.hostName
+                if (host != _state.value.namedBy && _state.value.dwellings.none { it.name == host }) tell("$host знает вас")
                 listDwellings()
             }
             ServerEvent.EventCase.DWELLERS -> {
