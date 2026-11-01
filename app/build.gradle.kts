@@ -21,8 +21,8 @@ android {
         applicationId = "com.will.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.9"
+        versionCode = 11
+        versionName = "1.10"
     }
 
     buildFeatures {
@@ -84,11 +84,11 @@ android {
         jvmTarget = "17"
     }
 
-    // The wire protocol lives with the server, in the sibling will repository.
+    // The wire protocol lives with the server, in the sibling server repository.
     sourceSets {
         named("main") {
             proto {
-                srcDir("../../will/src/infra/transport")
+                srcDir("../../server/src/infra/transport")
             }
         }
     }
