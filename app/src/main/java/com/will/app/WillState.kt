@@ -4,18 +4,8 @@ import will.v1.MessengerOuterClass.Word
 
 enum class Connection { Connecting, Ready, Reconnecting }
 
-/**
- * Ответ сервера, которого ждёт окно: просьбы нет, она отправлена и ждёт или исполнена.
- * Сервер отвечает на неё ровно одним уведомлением; отказ возвращает к `None`.
- */
 enum class Reply { None, Pending, Granted }
 
-/**
- * Комната Обители: [name] — её имя у сервера, по нему в неё входят; [outer] — она во внешнем;
- * [testator] — Тренер, если это Узы, где хозяин — ученик; [novice] — ученик, если хозяин в них
- * Тренер. Человеку она — [said]: такая комната зовётся по Тренеру, без «Послушания». В списках
- * комната Уз зовётся тем, с кем они ([who]), а кем он мне приходится — подписью ([role]).
- */
 data class RoomItem(val name: String, val outer: Boolean, val testator: String = "", val novice: String = "") {
     val said: String get() = roomSaid(name, testator)
     val who: String get() = testator.ifEmpty { novice.ifEmpty { said } }
@@ -24,28 +14,14 @@ data class RoomItem(val name: String, val outer: Boolean, val testator: String =
 
 fun roomSaid(name: String, testator: String): String = if (testator.isEmpty()) name else "Тренер — $testator"
 
-/**
- * Всплывающее: [text] — что сказано; [room] — комната своей Обители, куда оно ведёт, если ведёт;
- * [suppliant] — кто просит, если это Просьба.
- */
 data class Notice(val text: String, val room: String? = null, val suppliant: String? = null)
 
-/**
- * Неисполненное Веление в обзоре хозяина: [word] — оно само; [counterpart] — другой в Узах: Тренер,
- * если велено мне, ученик, если велел я; [underway] — подход, если он идёт в тренировке.
- */
 data class Waiting(val room: String, val word: WordItem, val counterpart: String, val underway: UnderwayItem? = null)
 
-/** Подход: вес в граммах (0 — свой вес), повторы и отдых перед ним, в секундах. */
 data class ApproachItem(val weightGrams: Int, val repetitions: Int, val restSeconds: Int = 0)
 
 data class ExerciseItem(val name: String, val approaches: List<ApproachItem>, val instruction: String = "")
 
-/**
- * Сделанный подход тренировки: какой (номера с нуля), с каким весом и сколько повторов,
- * начат и закончен когда (наносекунды от эпохи, по часам сервера) и как прошёл — [strain]
- * знаков: ни одного — как надо, «!» — тяжело, «!!» — на пределе.
- */
 data class EffortItem(
     val exercise: Int,
     val approach: Int,
@@ -56,18 +32,10 @@ data class EffortItem(
     val strain: Int = 0,
 )
 
-/** Заметка ученика к упражнению тренировки (номер с нуля): что сказал и когда, по часам сервера. */
 data class RemarkItem(val exercise: Int, val body: String, val saidAtNs: Long)
 
-/** Подход, который Послушник выполняет сейчас; [endedAtNs] — закончен, и ещё не сказано, что сделано. */
 data class UnderwayItem(val behestId: Long, val exercise: Int, val approach: Int, val begunAtNs: Long, val endedAtNs: Long? = null)
 
-/**
- * Слово в ленте комнаты. У Дела [behestId] — номер Веления, которое оно исполняет. У
- * тренировки [exercises] — велённые упражнения, у Дела, исполнившего её, — сделанные;
- * [efforts] — подходы тренировки, сделанные по ходу; [remarks] — заметки ученика к её
- * упражнениям, в том порядке, в каком сказаны.
- */
 data class WordItem(
     val id: Long,
     val author: String,
@@ -82,22 +50,15 @@ data class WordItem(
 
 enum class Kind { Acquaintance, Neighbour, Friend }
 
-/** Как обитатель стоит к хозяину в тренерстве; Узы бывают в обе стороны, поэтому отношений может быть несколько. */
 enum class Standing { Asked, Asks, Trainer, Novice }
 
 data class Person(val name: String, val kind: Kind, val standings: Set<Standing> = emptySet())
 
 enum class Aspect { Words, Threshold, Dwellers }
 
-/** Что перед глазами: Обитель (своя, когда [host] пуст) или комната в ней. */
 sealed interface View {
     val host: String
 
-    /**
-     * Обитель. [owed] — что мне выполнить, задания, где я Послушник; [unreviewed] — что выполнено
-     * у меня как у Тренера, а я ещё не видел; [awaited] — чего я ожидаю от других; [waiting] —
-     * сколько стучит в мои Врата, ждёт, чтобы впустили: их имён я не знаю.
-     */
     data class Abode(
         override val host: String,
         val rooms: List<RoomItem> = emptyList(),
@@ -107,15 +68,6 @@ sealed interface View {
         val waiting: Int = 0,
     ) : View
 
-    /**
-     * Где стою в Обители. [aspect] — что здесь: слова (Слово, Узы) или край — Врата и Кормчая,
-     * их сервер зовёт не комнатами, а внешним и внутренним краем. [writable] — здесь пишут:
-     * своё Слово; Ведение — у Тренера. Во Вратах — [gatesOpen], [keeping] (я их хозяин),
-     * [knocking] (я стучу) и, хозяину, [waiting] — кто стучит, и метки нерождённых [unborn]; в
-     * Кормчей — [people] и все комнаты Обители, внешние и внутренние, [rooms]: здесь их переносят. В комнате Уз [underways] — начатые подходы её тренировок, по
-     * номеру тренировки: в каждой не больше одного; [testator] — Тренер, если я здесь ученик, и
-     * тогда комната зовётся по нему ([said]).
-     */
     data class Room(
         override val host: String,
         val room: String,
@@ -136,19 +88,8 @@ sealed interface View {
     }
 }
 
-/** Тренировка, которую выполняют: где она — Обитель [host] и комната [room] — и её номер. */
 data class Workout(val host: String, val room: String, val behestId: Long)
 
-/**
- * Всё, из чего рисуются экраны. [loading] — слова и списки нового вида ещё идут;
- * [unbornMark] — тело ещё не рождено, вот его метка; [namedBy] — имя только что дано, дал его
- * этот человек: так и говорится, пока не начнут. [willing] и [fulfilling] — что с
- * тренировкой из редактора и с заданием, отправленным на выполнение; [beginning] — `Pending`,
- * пока сервер не сказал, что подход идёт, или почему нет; [telling] и [remarking] — так же
- * рассказ о подходе и заметка: до ответа пульт и поле не закрываются, и сказанное не теряется
- * с оборванной связью. [choice] видят и экран выполнения, и
- * уведомление; [workout] — тренировка с первого подхода до завершения, её ведёт [TrainingService].
- */
 data class WillState(
     val connection: Connection = Connection.Connecting,
     val ownName: String = "",

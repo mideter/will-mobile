@@ -188,7 +188,6 @@ private fun secondsOf(text: String): Int? {
     return seconds.takeIf { it in 0..MAX_REST }
 }
 
-/** Черновик подхода: вес и повторы. */
 internal class ApproachDraft(grams: Int, repetitions: Int) {
     var grams by mutableStateOf(grams)
     var repetitions by mutableStateOf(repetitions)
@@ -201,7 +200,6 @@ internal class ApproachDraft(grams: Int, repetitions: Int) {
     }
 }
 
-/** Черновик упражнения: [rest] — один отдых перед каждым его подходом, как его и читают. */
 private class ExerciseDraft(name: String, approaches: List<ApproachDraft>, instruction: String = "", rest: Int = DEFAULT_REST) {
     var name by mutableStateOf(name)
     var instruction by mutableStateOf(instruction)
@@ -247,11 +245,6 @@ private fun exercisesOf(drafts: List<ExerciseDraft>): List<ExerciseItem> =
         ExerciseItem(draft.name.trim(), draft.approaches.map { ApproachItem(it.grams, it.repetitions, draft.rest) }, draft.instruction.trim())
     }
 
-/**
- * Редактор тренировки: Тренер составляет её — название, упражнения карточками: отдых — один
- * на упражнение, подходы — вес и повторы шагами. [names] — прежние названия упражнений для подсказки.
- * [sending] — тренировка отправлена и ждёт ответа сервера: второй раз её не задать.
- */
 @Composable
 fun TrainingEditor(
     heading: String,
@@ -460,7 +453,6 @@ internal fun RepetitionsStepper(approach: ApproachDraft, modifier: Modifier) {
     )
 }
 
-/** Точный ввод числа на месте: [hint] — что видно в пустом поле; [accept] — принять, если верно. */
 private class ExactInput(
     val hint: String,
     val initial: String,

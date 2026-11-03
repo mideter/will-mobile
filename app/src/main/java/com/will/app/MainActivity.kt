@@ -8,11 +8,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.will.app.ui.WillApp
 import com.will.app.ui.WillTheme
 
-/**
- * Единственный экран. Заставка доигрывает «Смирение» — [SPLASH_MS], как в
- * `splash_icon_animated.xml`, — но не тогда, когда приложение открывают, чтобы вернуться к
- * тренировке ([EXTRA_TRAINING]).
- */
 class MainActivity : ComponentActivity() {
 
     private val session get() = (application as WillApplication).session

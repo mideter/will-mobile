@@ -2,11 +2,6 @@ package com.will.app
 
 import kotlin.random.Random
 
-/**
- * Паузы между попытками переподключиться: каждая вдвое дольше прежней, от [firstMs] до
- * [maxMs], с разбросом ±[spread], чтобы после сбоя сервера телефоны не стучались в него
- * разом. После удачного входа — [reset], и снова с короткой.
- */
 class Backoff(
     private val firstMs: Long = 1_000,
     private val maxMs: Long = 30_000,

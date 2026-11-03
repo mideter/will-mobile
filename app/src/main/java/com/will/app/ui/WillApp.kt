@@ -31,10 +31,6 @@ import com.will.app.WillSession
 
 private const val NOTICE_MILLIS = 5_000L
 
-/**
- * Корень приложения: вид из состояния сессии, «назад» — тем путём, каким пришли. Уведомления сервера — во
- * всплывающем поле; связь не уведомление: без неё экран закрывает заставка ([Veil]).
- */
 @Composable
 fun WillApp(session: WillSession) {
     val state by session.state.collectAsState()

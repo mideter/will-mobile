@@ -8,13 +8,6 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 
-/**
- * Телефон, в котором живёт сессия: токен её тела, сеть — какая сейчас и что появилась или
- * пропала, — время без сна, главный поток с отложенными действиями, служба тренировки и
- * журнал. Сеть телефон только различает: что она такое, сессии знать незачем. Всё, о чём он
- * сообщает, приходит на главный поток. На деле это [AndroidPhone]; в тестах телефон
- * подделывают, и время в нём идёт рукой.
- */
 interface Phone {
     val deviceToken: String
 
@@ -34,7 +27,6 @@ interface Phone {
 }
 
 
-/** Телефон на Android: собран из [Context] приложения. */
 class AndroidPhone(context: Context) : Phone {
 
     private val appContext = context.applicationContext

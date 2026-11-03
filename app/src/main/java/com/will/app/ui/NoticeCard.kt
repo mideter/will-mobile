@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.will.app.Notice
 
-/** Всплывающее — светлая скруглённая карточка, как группы обзора; если ведёт куда-то — со «›». Просьба — красная. */
 @Composable
 fun NoticeCard(notice: Notice, leads: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(12.dp)

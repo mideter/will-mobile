@@ -3,11 +3,6 @@ package com.will.app
 import android.content.Context
 import java.security.SecureRandom
 
-/**
- * Как `will::DeviceTokenStore`: load-or-create opaque hex device token
- * (`DeviceToken::generate` — 32 hex chars from two uint64, `{:016x}{:016x}`), its length
- * bounded as `DeviceToken::MinLength` / `MaxLength`.
- */
 object DeviceTokenStore {
 
     private const val PREFS_NAME = "will_device_token"

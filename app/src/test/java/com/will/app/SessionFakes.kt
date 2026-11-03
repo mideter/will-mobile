@@ -9,7 +9,6 @@ import will.v1.reply
 import will.v1.serverEvent
 import will.v1.turned
 
-/** Телефон для тестов: время идёт рукой ([pass]), и отложенное выполняется, когда его время пришло. */
 class FakePhone : Phone {
     override val deviceToken = "token"
     override var network: Any? = WIFI
@@ -69,7 +68,6 @@ class FakePhone : Phone {
 }
 
 
-/** Связь для тестов: помнит отправленное, а сервер в ней говорит и рвёт её рукой. */
 class FakeTransport : Transport {
     var connections = 0
         private set

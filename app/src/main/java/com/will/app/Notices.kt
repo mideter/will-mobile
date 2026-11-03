@@ -2,12 +2,6 @@ package com.will.app
 
 import will.v1.MessengerOuterClass.NoticeCode
 
-/**
- * Уведомления сервера по-русски. Сервер говорит кодом ([NoticeCode]), а имена и номера
- * в уведомлении — отдельно ([say]); перевод — по коду, на каждый код свой. Сделанное мной
- * не говорится: его показывает сам экран. Без кода (сбой, не ставший отказом мира) — по
- * английским словам сервера ([ru]), незнакомое — как есть.
- */
 object Notices {
 
     fun say(code: NoticeCode, args: List<String>, message: String): String? {
